@@ -1,5 +1,10 @@
 Revision history for Perl extension Genezzo
 
+0.25  Mon Sep 27 01:33:50 2004
+        - print text of check constraints on failure
+        - trap undefined functions in WHERE clauses and CHECK constraints
+        - havok/UserExtend tables for user extensibility
+
 0.24  Sun Sep 19 01:43:13 2004
         - force sync on commit
 

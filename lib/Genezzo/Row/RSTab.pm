@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSTab.pm,v 6.6 2004/09/11 00:04:20 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSTab.pm,v 6.7 2004/09/27 08:50:15 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -296,8 +296,18 @@ sub check_insert
                 exists($cons_list->{check_insert}));
 
     my $cci_check = $cons_list->{check_insert};
+    
+    my $val;
+    # be very paranoid - filter might be invalid perl
+    eval {$val = &$cci_check(@_) };
+    if ($@)
+    {
+        whisper "check constraint blew up: $@";
+        greet  $cci_check;
+        return 1; #### undef;
+    }
 
-    return (&$cci_check(@_));
+    return ($val);
 } # end check insert
 
 # insert new values into index when inserting new row
@@ -1335,8 +1345,21 @@ sub SQLFetch
 
         # Note: always return the rid
         return ($currkey, $outarr)
-            unless (defined($filter) &&
-                    !(&$filter($self, $currkey, $outarr)));
+            unless (defined($filter));
+        
+        # filter is defined
+        my $val;
+
+        # be very paranoid - filter might be invalid perl
+        eval {$val = &$filter($self, $currkey, $outarr) };
+        if ($@)
+        {
+            whisper "filter blew up: $@";
+            greet   $fullfilter;
+            return undef;
+        }
+        return ($currkey, $outarr)
+            unless (!$val);
     }
 
     return undef;

@@ -13,6 +13,7 @@ t/DBI1.t
 t/Gnzo1.t
 t/Gnzo2.t
 t/Gnzo3.t
+t/Havok1.t
 t/Index1.t
 t/Index2.t
 t/Index3.t
@@ -20,6 +21,7 @@ t/PushHash1.t
 t/Row1.t
 t/Util1.t
 lib/Genezzo/bigdb.sql
+lib/Genezzo/havok.sql
 lib/Genezzo/dbi_example.pl
 lib/Genezzo/gendba.pl
 lib/Genezzo/Row/RSIdx1.pm
@@ -33,6 +35,9 @@ lib/Genezzo/BufCa/BufCaElt.pm
 lib/Genezzo/BufCa/DirtyScalar.pm
 lib/Genezzo/BufCa/PinScalar.pm
 lib/Genezzo/Dict.pm
+lib/Genezzo/Havok.pm
+lib/Genezzo/Havok/UserExtend.pm
+lib/Genezzo/Havok/RedGreen.pm
 lib/Genezzo/TSHash.pm
 lib/Genezzo/Feeble.pm
 lib/Genezzo/Parse/FeebLex.pm

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 6.12 2004/09/11 06:58:31 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 6.13 2004/09/27 08:49:47 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -15,10 +15,11 @@ use Genezzo::Util;
 use Genezzo::Tablespace ;
 use File::Spec;
 use Genezzo::Index::btHash;
+use Genezzo::Havok;
 
 BEGIN {
     our $VERSION;
-    $VERSION = do { my @r = (q$Revision: 6.12 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 6.13 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -253,7 +254,7 @@ sub _init
 
             my $cons1_def = 
                 "cons_id=n cons_name=c cons_type=c tid=n " .
-                "check_text=c ref_cons_name=c delete_rule=c status=c";
+                "check_text=c check2=c ref_cons_name=c delete_rule=c status=c";
 
             my $ind1_def = 
                 "iid=n tsid=n iname=c owner=c creationdate=c " .
@@ -271,8 +272,21 @@ sub _init
             return 0 
                 unless ($self->_DictDBDefineTable(\%p2_tab));
 
+            # Phase 3: Havok Table
+#            my $havok_def = 
+#                "hid=n modname=c owner=c creationdate=c";
+#            my %p3_tab =
+#                (
+#                 havok => $havok_def
+#                 );
+#            return 0 
+#                unless ($self->_DictDBDefineTable(\%p3_tab));
+
+            # define constraints on all tables
             return 0 
                 unless ($self->dictp2_define_cons());
+
+
         }
         return 0 
             unless ($self->DictSave());
@@ -535,8 +549,11 @@ sub DictStartup
 
         $self->{use_constraints} = 1; # Note: used in get_table
     }
+    return 0
+        unless Genezzo::Havok::HavokInit(dict => $self);
+
     return 1;
-}
+} # end DictStartup
 
 sub DictShutdown
 {
@@ -2426,7 +2443,10 @@ sub DictTableAddConstraint
             return 0;
         }
 
+        # get the original WHERE clause and the perl filter
+
         my $where_clause = $args{where_clause};
+        my $where_filter = $args{where_filter};
 
         # insert the check constraint
         # XXX XXX: check for duplicate names? 
@@ -2444,7 +2464,8 @@ sub DictTableAddConstraint
 
         my $constype = "CK";
         
-        my @rowarr = ($consid, $cons_name, $constype, $tid, $where_clause);
+        my @rowarr = ($consid, $cons_name, $constype, $tid, 
+                      $where_filter, $where_clause);
 
 #        greet @rowarr;
 
@@ -3612,7 +3633,8 @@ sub _make_constraint_check_fn
         my $consid     = $vv->[$getcol->{cons_id}];
         my $cons_name  = $vv->[$getcol->{cons_name}];
         my $cons_type  = $vv->[$getcol->{cons_type}];
-        my $check_text = $vv->[$getcol->{check_text}]; 
+        my $check_text = $vv->[$getcol->{check_text}];  # filter text or iid
+        my $check_plaintext = $vv->[$getcol->{check2}]; # real plaintext
 
         my $cons_func = ();
 
@@ -3627,7 +3649,9 @@ sub _make_constraint_check_fn
         elsif ($cons_type =~ m/CK/)
         {
             $cons_func = $self->_make_cons_ck_check($tid, $consid, $cons_type,
-                                                    $cons_name, $check_text);
+                                                    $cons_name, 
+                                                    $check_text,
+                                                    $check_plaintext);
         }
         else
         {
@@ -4084,7 +4108,8 @@ sub _make_cons_pk_check
 sub _make_cons_ck_check
 {
 #    whoami;
-    my ($self, $tid, $consid, $cons_type, $cons_name, $check_text ) = @_;
+    my ($self, $tid, $consid, $cons_type, $cons_name, 
+        $check_filter, $check_text ) = @_;
 
     my %cons_ck_fn;
 
@@ -4095,12 +4120,13 @@ sub _make_cons_ck_check
     my $filter;     # the anonymous subroutine which is the 
                     # result of eval of filterstring
 
-    my $status = eval " $check_text ";
+    my $status = eval " $check_filter ";
 
     unless (defined($status))
     {
         warn $@ if $@;
         print "bad filter:\n";
+        print $check_filter, "\n";
         print $check_text, "\n";
         return undef;
     }
@@ -4126,6 +4152,7 @@ sub _make_cons_ck_check
         unless (&$filter($tabdef, $place, $val))
         {
             print "violated constraint $cons_name\n";
+            print "must satisfy $check_text\n";
             return 1;
         }
         return 0;

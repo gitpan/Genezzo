@@ -118,7 +118,7 @@ BEGIN {
 #my $Var1   = '';
 #my %Hashit = ();
 
-our $QUIETWHISPER = 0;
+our $QUIETWHISPER = 1; # XXX XXX XXX XXX
 our $WHISPERDEPTH = 1;
 
 our $DEFBLOCKSIZE = 4096;

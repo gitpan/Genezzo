@@ -5,6 +5,7 @@ WriteMakefile(
     'NAME'		=> 'Genezzo',
     'ABSTRACT'          => 'extensible database system',
     'AUTHOR'            => 'Jeffrey I Cohen (jcohen@cpan.org)',
+#    'LICENSE'           => 'gpl',
     'VERSION_FROM'	=> 'lib/Genezzo/GenDBI.pm', # finds $VERSION
     'PREREQ_PM'		=> {
 

@@ -1,6 +1,6 @@
-REM Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
+REM Copyright (c) 2004 Jeffrey I Cohen.  All rights reserved.
 REM
-REM increase the buffer cache 
+REM 
 select * from _pref1 where prefkey="bc_size";
 update  _pref1 set prefvalue=1000 where prefkey="bc_size";
 

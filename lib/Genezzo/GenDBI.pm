@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 6.7 2004/09/19 08:45:33 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 6.8 2004/09/27 08:46:03 claude Exp $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -48,11 +48,11 @@ BEGIN {
 	
 }
 
-our $VERSION   = '0.24';
+our $VERSION   = '0.25';
 our $RELSTATUS = 'Alpha'; # release status
 # grab the code check-in date and convert to YYYYMMDD
 our $RELDATE   = 
-    do { my @r = (q$Date: 2004/09/19 08:45:33 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
+    do { my @r = (q$Date: 2004/09/27 08:46:03 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
 
 # Preloaded methods go here.
 
@@ -1460,9 +1460,8 @@ sub SQLAlter
                            }
 #                         greet $filter;
 
-                           $nargs{where_clause} =
-#                                                       $where_clause,
-                               $filter->{filter_text};
+                           $nargs{where_clause} = $filter->{where_text};
+                           $nargs{where_filter} = $filter->{filter_text};
 
                            # XXX XXX XXX: need to get constraint name if
                            # defined by system

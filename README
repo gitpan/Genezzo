@@ -343,9 +343,20 @@ NEW FEATURES - ALTER TABLE ADD CONSTRAINT
   Need to extend to fully support NULL/NOT NULL, FOREIGN KEY, plus
   ENABLE/DISABLE.
 
+NEW FEATURES - System/User Extensibility
+
+  Version 0.25 of Genezzo supports database extensibility.  See
+  Genezzo::Havok for more details.  The script "havok.sql" can be used
+  add extensibility tables to your database.  It can be invoked as
+  "@havok.sql" from the gendba command line.  In particular, the table
+  UserExtend can be used to load new functions or perl modules into
+  Genezzo.  For example, the havok.sql script loads "Text::Soundex", so
+  queries can use Text::Soundex::soundex in the WHERE clause.
+  
+
 INCOMPATIBLE CHANGES
 
-  Version 0.23 dictionary and block format is incompatible with
+  Version 0.25 dictionary and block format is incompatible with
   previous release.  No upgrade path is supported.
 
 SEE ALSO

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/g3/lib/Genezzo/Row/RCS/RSFile.pm,v 6.1 2004/08/12 09:31:15 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSFile.pm,v 6.2 2004/09/27 08:50:55 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -64,9 +64,9 @@ sub _init
 #    $self->{next_extent} = $args{next_extent};
 
     $self->{smf} = Genezzo::SpaceMan::SMFile->new($args{filename},
-                                               $args{numbytes},
-                                               $args{numblocks},
-                                               $args{bufcache});
+                                                  $args{numbytes},
+                                                  $args{numblocks},
+                                                  $args{bufcache});
 
     return 0
         unless (defined($self->{smf}));
