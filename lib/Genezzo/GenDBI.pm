@@ -48,7 +48,7 @@ BEGIN {
 	
 }
 
-our $VERSION   = '0.25';
+our $VERSION   = '0.26';
 our $RELSTATUS = 'Alpha'; # release status
 # grab the code check-in date and convert to YYYYMMDD
 our $RELDATE   = 

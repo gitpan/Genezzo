@@ -1,5 +1,8 @@
 Revision history for Perl extension Genezzo
 
+0.26  Tue Sep 28 01:11:09 PDT 2004
+        - try to fix metadata
+
 0.25  Mon Sep 27 01:33:50 2004
         - print text of check constraints on failure
         - trap undefined functions in WHERE clauses and CHECK constraints
