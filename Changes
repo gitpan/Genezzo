@@ -1,5 +1,12 @@
 Revision history for Perl extension Genezzo
 
+0.36  Mon Feb  7 22:28:28 2005
+        - BufCa/bce: set fileread flag in buffercache element 
+          when reading blocks in to counteract the spurious 
+          dirtyflag setting when the bigbuf gets updated.
+          Set filenum/blocknum *before* the fileread so GetInfo
+          is up-to-date.
+
 0.35  Tue Feb  1 22:53:00 2005
         - fix parser to give error for INSERT with no VALUES
         - fix 0.34 compatibility - syshook table changed.

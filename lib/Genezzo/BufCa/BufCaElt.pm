@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BufCaElt.pm,v 6.3 2005/02/02 06:46:26 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BufCaElt.pm,v 6.4 2005/02/08 06:33:57 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -23,7 +23,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 6.3 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 6.4 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
 #    @EXPORT      = qw(&func1 &func2 &func4 &func5);
@@ -100,6 +100,8 @@ sub _init
     $self->{pin}    = 0;
     $self->{dirty}  = 0;
 
+    $self->{file_read} = 0;
+
     return 1;
 }
 
@@ -159,6 +161,15 @@ sub _dirty
     $self->{dirty} = shift if @_ ;
 
     return $self->{dirty};
+
+} 
+
+sub _fileread
+{
+    my $self = shift;
+    $self->{file_read} = shift if @_ ;
+
+    return $self->{file_read};
 
 } 
 

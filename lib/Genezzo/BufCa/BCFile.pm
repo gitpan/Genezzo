@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BCFile.pm,v 6.8 2005/02/02 06:46:26 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BCFile.pm,v 6.9 2005/02/08 06:34:49 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -370,20 +370,24 @@ sub ReadBlock
     $hitlist->{$fileinfo}             = $bcblocknum;
     $hitlist->{"BC:" . "$bcblocknum"} = $fileinfo;
 
-    return (undef)
-        unless (
-                $self->_filereadblock($fname, $fnum, $fh, $bnum, 
-                                       $bce->{bigbuf}, $fhdrsz)
-                );
-
-    # new block is not dirty
-    $bce->_dirty(0);
-
     # get the hash of bce information and update with filenum, blocknum
     my $infoh = $bce->GetInfo();
 
+    # update the GetInfo *before* the fileread so locking code has some
+    # place to look up the information
     $infoh->{filenum}  = $fnum;
     $infoh->{blocknum} = $bnum;
+
+    $bce->_fileread(1);
+    my $readstat =  $self->_filereadblock($fname, $fnum, $fh, $bnum, 
+                                          $bce->{bigbuf}, $fhdrsz);
+    $bce->_fileread(0);
+    # new block is not dirty
+    $bce->_dirty(0);
+
+    # XXX XXX XXX: error -- need to clean the hitlist!!
+    return (undef)
+        unless ($readstat);
 
 #    greet $hitlist;
     return $self->{bc}->ReadBlock(blocknum => $bcblocknum);
@@ -689,6 +693,8 @@ Currently requires 2 blocks per open file.
 =head1 TODO
 
 =over 4
+
+=item  note that _fileread could just be part of GetInfo
 
 =item  need to move TSExtendFile functionality here if want to overload
        syswrite with encryption
