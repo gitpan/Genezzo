@@ -2358,7 +2358,7 @@ __END__
     
 =head1 NAME
     
-Genezzo::Index::bt? - btree
+Genezzo::Index::bt2 - basic btree
 
 A btree built of row directory blocks.  
 

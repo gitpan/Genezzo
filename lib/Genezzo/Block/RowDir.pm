@@ -107,6 +107,8 @@ __END__
 
 =head1 NAME
 
+Genezzo::Block::RowDir - row directory
+
 =head1 SYNOPSIS
 
 =head1 DESCRIPTION

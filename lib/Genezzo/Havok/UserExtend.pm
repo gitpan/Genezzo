@@ -126,13 +126,14 @@ __END__
 
 =head1 NAME
 
-Genezzo::Havok::UserExtend
+Genezzo::Havok::UserExtend - load the UserExtend table
 
 =head1 SYNOPSIS
 
-Basic Havok module - load the UserExtend table
 
 =head1 DESCRIPTION
+
+Basic Havok module - load the UserExtend table
 
 =head1 ARGUMENTS
 

@@ -267,7 +267,7 @@ __END__
     
 =head1 NAME
     
-Genezzo::Index::bt? - btree
+Genezzo::Index::bt3 - persistent btree
 
 A btree built of row directory blocks.  
 

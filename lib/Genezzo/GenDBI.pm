@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 6.8 2004/09/27 08:46:03 claude Exp $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 6.9 2004/09/29 06:37:24 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -48,11 +48,11 @@ BEGIN {
 	
 }
 
-our $VERSION   = '0.26';
+our $VERSION   = '0.27';
 our $RELSTATUS = 'Alpha'; # release status
 # grab the code check-in date and convert to YYYYMMDD
 our $RELDATE   = 
-    do { my @r = (q$Date: 2004/09/27 08:46:03 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
+    do { my @r = (q$Date: 2004/09/29 06:37:24 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
 
 # Preloaded methods go here.
 
@@ -3535,7 +3535,7 @@ __END__
 
 =head1 NAME
 
-GenDBI.pm - basic line mode and DBI interfaces to Genezzo
+Genezzo::GenDBI.pm - an extensible database with SQL and DBI
 
 =head1 SYNOPSIS
 

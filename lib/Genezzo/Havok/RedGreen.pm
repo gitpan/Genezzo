@@ -40,13 +40,13 @@ __END__
 
 =head1 NAME
 
-Genezzo::Havok::RedGreen
+Genezzo::Havok::RedGreen - test if argument is red or green
 
 =head1 SYNOPSIS
 
-Havok test module - test if argument is red or green
-
 =head1 DESCRIPTION
+
+Havok test module 
 
 =head1 ARGUMENTS
 
