@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/g3/lib/Genezzo/PushHash/RCS/hph.pm,v 6.1 2004/08/12 09:31:15 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/PushHash/RCS/hph.pm,v 6.3 2004/12/14 07:41:38 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -17,6 +17,27 @@ use Carp;
 use warnings::register;
 
 our @ISA = qw(Genezzo::PushHash::PushHash) ;
+
+our $GZERR = sub {
+    my %args = (@_);
+
+    return 
+        unless (exists($args{msg}));
+
+    if (exists($args{self}))
+    {
+        my $self = $args{self};
+        if (defined($self) && exists($self->{GZERR}))
+        {
+            my $err_cb = $self->{GZERR};
+            return &$err_cb(%args);
+        }
+    }
+
+    carp $args{msg}
+        if warnings::enabled();
+    
+};
 
 # private
 sub _init
@@ -139,8 +160,11 @@ sub _make_new_chunk
 
     unless (defined ($tiehash))
     {
-        carp "factory could not allocate pushhash"
-            if warnings::enabled();
+        my %earg = (self => $self, msg => "factory could not allocate pushhash");
+
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return undef; # factory out of hashes
     }
 
@@ -162,8 +186,11 @@ sub _splitrid
     #whoami @_;
     unless ($_[1] =~ m/$RIDSEPRX/)
     {
-        carp "could not split key: $_[1] "
-            if warnings::enabled();
+        my %earg = (self => $_[0], msg => "could not split key: $_[1] ");
+
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return undef; # no rid separator
     }
     my @splitval = split(/$RIDSEPRX/,($_[1]), 2);
@@ -192,15 +219,21 @@ sub _get_a_chunk
 
     if ($_[1] !~ /\d+/)
     {
-        carp "Non-numeric key: $_[1] "
-            if warnings::enabled();
+        my %earg = (self => $_[0], msg => "Non-numeric key: $_[1] ");
+
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return (undef); # protect us from non-numeric array offsets
     }
     if (    ($_[1] > scalar(@{$harr}))
          || ($_[1] < 1))
     {
-        carp "key out of range: $_[1] "
-            if warnings::enabled();
+        my %earg = (self => $_[0], msg => "key out of range: $_[1] ");
+
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return (undef);
     }
 
@@ -312,8 +345,11 @@ sub STORE
     unless (defined($chunk)
             && $chunk->EXISTS($sliceno))
     {
-        carp "No such key: $place "
-            if warnings::enabled();
+        my %earg = (self => $self, msg => "No such key: $place ");
+
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return undef;
     }
     return $self->_realSTORE ($chunk, $sliceno, $value);
@@ -327,8 +363,11 @@ sub FETCH
 
     unless (defined($chunk))
     {
-        carp "No such key: $place "
-            if warnings::enabled();
+        my %earg = (self => $self, msg => "No such key: $place ");
+
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return undef;
     }
 
@@ -392,8 +431,11 @@ sub NEXTKEY
         {   
             # Note: bad stuff, like running out of blocks in the
             # buffer cache
-            carp "chunk $chunkno not found!"
-                if warnings::enabled();
+            my %earg = (self => $self, msg => "chunk $chunkno not found!");
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             return undef;
         }
 
@@ -623,9 +665,7 @@ Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
 
 Address bug reports and comments to: jcohen@genezzo.com
 
+For more information, please visit the Genezzo homepage 
+at http://www.genezzo.com
+
 =cut
-
-
-
-
-

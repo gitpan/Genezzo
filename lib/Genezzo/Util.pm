@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Util.pm,v 6.4 2004/09/11 06:59:57 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Util.pm,v 6.5 2004/12/14 07:47:26 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -20,7 +20,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 6.4 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 6.5 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
     @EXPORT      = qw(&whisper &whoami &greet 
@@ -34,7 +34,7 @@ BEGIN {
 #    @EXPORT_OK   = qw($Var1 %Hashit &func3 &func5);
     @EXPORT_OK   = qw($QUIETWHISPER $WHISPERDEPTH $DEFBLOCKSIZE $USECARP 
                       $DEFDBSIZE $MINBLOCKSIZE $MAXBLOCKSIZE $MAXDBSIZE
-                      $UNPACK_TEMPL_ARR);
+                      $UNPACK_TEMPL_ARR $UTILPRINT $WHISPERPREFIX);
 
 }
 
@@ -118,8 +118,9 @@ BEGIN {
 #my $Var1   = '';
 #my %Hashit = ();
 
-our $QUIETWHISPER = 1; # XXX XXX XXX XXX
+our $QUIETWHISPER = 0; # XXX XXX XXX XXX
 our $WHISPERDEPTH = 1;
+our $WHISPERPREFIX = "whisper: ";
 
 our $DEFBLOCKSIZE = 4096;
 our $DEFDBSIZE    = 80 * $DEFBLOCKSIZE ; # 327680 was 163840
@@ -130,6 +131,8 @@ our $MAXBLOCKSIZE = 65536;
 our $MAXDBSIZE    = 2**31; # 2 Gig # XXX : 4 gig ok all platforms?
 
 our $USECARP = 1;
+
+our $UTILPRINT = sub { print @_ ; };
 
 # then the others (which are still accessible as $Some::Module::stuff)
 #$stuff  = '';
@@ -160,7 +163,7 @@ sub _realwhisper
 
     return unless (defined($outmess));
 
-    my $wprefix = "whisper: ";
+    my $wprefix = $WHISPERPREFIX;
 
     # print all the args space delimited
 
@@ -181,7 +184,8 @@ sub _realwhisper
     $outmess .= "\n" unless $outmess=~/\n$/;
 
     # treat string as multiple lines, and prefix each with "whisper:" prefix
-    $outmess =~ s/^/$wprefix/gm ;
+    $outmess =~ s/^/$wprefix/gm 
+        if (defined($wprefix));
 
     # taken from carp::heavy
     if (1)
@@ -196,7 +200,7 @@ sub _realwhisper
     # treat string as multiple lines, and prefix each with "whisper:" prefix
 #    $outmess =~ s/\^J/\n$wprefix/gm ;
 
-    print $outmess;
+    &$UTILPRINT( $outmess );
 }
 
 sub whoami  
@@ -271,7 +275,8 @@ sub Validate
             }
             else
             {
-                print "$package $filename $line: ", $vv;
+                my $m1 = "$package $filename $line: " . $vv;
+                &$UTILPRINT( $m1 );
             }
             return 0;
         }
@@ -417,7 +422,8 @@ sub HumanNum
     }
     else
     {
-        print "$package $filename $line: ", $emsg;
+        my $m1 = "$package $filename $line: " . $emsg;
+        &$UTILPRINT( $m1 );
     }
     return undef;
 }
@@ -525,7 +531,8 @@ sub NumVal
     }
     else
     {
-        print "$package $filename $line: ", $emsg;
+        my $m1 = "$package $filename $line: " . $emsg;
+        &$UTILPRINT( $m1 );
     }
     return 0;
 }
@@ -703,7 +710,8 @@ sub checkKeyVal
     }
     else
     {
-        print "$package $filename $line: ", $emsg;
+        my $m1 = "$package $filename $line: " . $emsg;
+        &$UTILPRINT( $m1 );
     }
     return undef;
 }
@@ -1508,5 +1516,8 @@ Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 Address bug reports and comments to: jcohen@genezzo.com
+
+For more information, please visit the Genezzo homepage 
+at http://www.genezzo.com
 
 =cut

@@ -361,17 +361,17 @@ NEW FEATURES - System/User Extensibility
 
 INCOMPATIBLE CHANGES
 
-  Version 0.28 dictionary and block format is incompatible with
-  previous release.  No upgrade path is supported.
+  Version 0.29 dictionary and block format is incompatible with
+  previous releases.  No upgrade path is supported.
 
 SEE ALSO
 
-  The project homepage at http://genezzo.com
+  The project homepage at http://www.genezzo.com
 
 
 AUTHOR
 
-  Original author: Jeffrey I Cohen <jeff@genezzo.com>
+  Original author: Jeffrey I Cohen <jcohen@genezzo.com>
 
   Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
 
@@ -390,3 +390,6 @@ AUTHOR
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 Address bug reports and comments to: jcohen@genezzo.com
+
+For more information, please visit the Genezzo homepage 
+at http://www.genezzo.com

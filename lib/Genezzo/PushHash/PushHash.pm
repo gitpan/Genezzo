@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/g3/lib/Genezzo/PushHash/RCS/PushHash.pm,v 6.1 2004/08/12 09:31:15 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/PushHash/RCS/PushHash.pm,v 6.3 2004/12/14 07:41:38 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -16,6 +16,27 @@ use Carp;
 use warnings::register;
 
 our @ISA = qw(Tie::Hash) ;
+
+our $GZERR = sub {
+    my %args = (@_);
+
+    return 
+        unless (exists($args{msg}));
+
+    if (exists($args{self}))
+    {
+        my $self = $args{self};
+        if (defined($self) && exists($self->{GZERR}))
+        {
+            my $err_cb = $self->{GZERR};
+            return &$err_cb(%args);
+        }
+    }
+
+    carp $args{msg}
+        if warnings::enabled();
+    
+};
 
 sub _init
 {
@@ -41,6 +62,11 @@ sub _init
     my $refthing = ref($self->{ref});
     croak "supplied $refthing , requires HASH" 
         unless ($refthing eq "HASH");
+
+    if (exists($args{GZERR}))
+    {
+        $self->{GZERR} = $args{GZERR};
+    }
 
     return 1;
 }
@@ -140,8 +166,16 @@ sub STORE
     {
         unless ($self->EXISTS($place))
         {
-            carp "No such key: $place "
-                if warnings::enabled();
+            my $msg = "No such key: $place ";
+            if (defined($GZERR))
+            {
+                &$GZERR(msg => $msg, self => $self);
+            }
+            else
+            {
+                carp $msg
+                    if warnings::enabled();
+            }
             return undef;
         }
     }
@@ -344,5 +378,8 @@ Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 Address bug reports and comments to: jcohen@genezzo.com
+
+For more information, please visit the Genezzo homepage 
+at http://www.genezzo.com
 
 =cut

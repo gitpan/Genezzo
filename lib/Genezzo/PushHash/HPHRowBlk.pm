@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/g3/lib/Genezzo/PushHash/RCS/HPHRowBlk.pm,v 6.1 2004/08/12 09:31:15 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/PushHash/RCS/HPHRowBlk.pm,v 6.3 2004/12/14 07:41:38 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -18,6 +18,27 @@ use Carp;
 use warnings::register;
 
 our @ISA = qw(Genezzo::PushHash::hph) ;
+
+our $GZERR = sub {
+    my %args = (@_);
+
+    return 
+        unless (exists($args{msg}));
+
+    if (exists($args{self}))
+    {
+        my $self = $args{self};
+        if (defined($self) && exists($self->{GZERR}))
+        {
+            my $err_cb = $self->{GZERR};
+            return &$err_cb(%args);
+        }
+    }
+
+    carp $args{msg}
+        if warnings::enabled();
+    
+};
 
 # private
 sub _init
@@ -57,7 +78,11 @@ sub _make_new_block
 
     unless (defined($chunk))
     {
-        whisper "no chunk to make new block!";
+        my %earg = (self => $self, msg => "no chunk to make new block!");
+
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return undef;
     }
 
@@ -96,7 +121,11 @@ sub _get_current_block
 
     unless (defined($chunk))
     {
-        whisper "no chunk to get block!";
+        my %earg = (self => $self, msg => "no chunk to get block!");
+
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return undef;
     }
 
@@ -134,8 +163,11 @@ sub _fetch2
 
     unless (defined($chunk))
     {
-        carp "No such key: $place "
-             if warnings::enabled();
+        my %earg = (self => $self, msg => "No such key: $place ");
+
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return undef;
     }
 
@@ -154,8 +186,11 @@ sub _exists2
 
     unless (defined($chunk))
     {
-        carp "No such key: $place "
-             if warnings::enabled();
+        my %earg = (self => $self, msg => "No such key: $place ");
+
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return undef;
     }
 
@@ -318,9 +353,7 @@ Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
 
 Address bug reports and comments to: jcohen@genezzo.com
 
+For more information, please visit the Genezzo homepage 
+at http://www.genezzo.com
+
 =cut
-
-
-
-
-

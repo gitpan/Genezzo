@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/RedGreen.pm,v 1.3 2004/09/29 07:00:06 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/RedGreen.pm,v 1.4 2004/12/14 07:48:17 claude Exp claude $
 #
 # copyright (c) 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -94,5 +94,8 @@ Copyright (c) 2004 Jeffrey I Cohen.  All rights reserved.
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 Address bug reports and comments to: jcohen@genezzo.com
+
+For more information, please visit the Genezzo homepage 
+at http://www.genezzo.com
 
 =cut

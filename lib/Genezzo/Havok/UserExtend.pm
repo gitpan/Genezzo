@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/UserExtend.pm,v 1.5 2004/10/04 08:05:12 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/UserExtend.pm,v 1.7 2004/12/14 07:48:17 claude Exp claude $
 #
 # copyright (c) 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -13,6 +13,27 @@ use warnings;
 use warnings::register;
 
 use Carp;
+
+our $GZERR = sub {
+    my %args = (@_);
+
+    return 
+        unless (exists($args{msg}));
+
+    if (exists($args{self}))
+    {
+        my $self = $args{self};
+        if (defined($self) && exists($self->{GZERR}))
+        {
+            my $err_cb = $self->{GZERR};
+            return &$err_cb(%args);
+        }
+    }
+
+    carp $args{msg}
+        if warnings::enabled();
+    
+};
 
 sub HavokInit
 {
@@ -63,9 +84,12 @@ sub HavokInit
         {
             unless (eval "require $xname")
             {
-                whisper "no such package - $xname";
-                carp "no such package - $xname"
-                    if warnings::enabled();
+                my %earg = (#self => $self,
+                            msg => "no such package - $xname");
+
+                &$GZERR(%earg)
+                    if (defined($GZERR));
+
                 next;
             }
 
@@ -99,7 +123,11 @@ sub HavokInit
                 eval " $func " ;
                 if ($@)
                 {
-                    whisper "bad function : $func";
+                    my %earg = (#self => $self,
+                                msg => "bad function : $func");
+
+                    &$GZERR(%earg)
+                        if (defined($GZERR));
                 }
 
             }
@@ -125,14 +153,20 @@ sub HavokInit
             eval " $func " ;
             if ($@)
             {
-                whisper "bad function : $func";
+                my %earg = (#self => $self,
+                            msg => "bad function : $func");
+
+                &$GZERR(%earg)
+                    if (defined($GZERR));
             }
         }
         else
         {
-            carp "unknown phase - $phase"
-                if warnings::enabled();
+            my %earg = (#self => $self,
+                        msg => "unknown user extension - $xtype");
 
+            &$GZERR(%earg)
+                if (defined($GZERR));
         }
 
     } # end while
@@ -275,5 +309,8 @@ Copyright (c) 2004 Jeffrey I Cohen.  All rights reserved.
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 Address bug reports and comments to: jcohen@genezzo.com
+
+For more information, please visit the Genezzo homepage 
+at http://www.genezzo.com
 
 =cut

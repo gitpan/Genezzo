@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 6.10 2004/10/04 08:03:07 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 6.11 2004/12/14 07:46:54 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -12,7 +12,6 @@ use strict;
 use warnings;
 
 require Exporter;
-#use AutoLoader qw(AUTOLOAD);
 
 use Carp;
 use Data::Dumper ;
@@ -48,11 +47,17 @@ BEGIN {
 	
 }
 
-our $VERSION   = '0.28';
+our $VERSION   = '0.29';
 our $RELSTATUS = 'Alpha'; # release status
 # grab the code check-in date and convert to YYYYMMDD
 our $RELDATE   = 
-    do { my @r = (q$Date: 2004/10/04 08:03:07 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
+    do { my @r = (q$Date: 2004/12/14 07:46:54 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
+
+$Genezzo::Util::QUIETWHISPER  = 1; # XXX XXX XXX XXX
+#$Genezzo::Util::USECARP       = 0;
+#$Genezzo::Util::WHISPERPREFIX = "baz: ";
+#$Genezzo::Util::WHISPERPREFIX = undef;
+#$Genezzo::Util::UTILPRINT     = sub { print "baz2: ", @_ ; };
 
 # Preloaded methods go here.
 
@@ -3619,5 +3624,8 @@ Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 Address bug reports and comments to: jcohen@genezzo.com
+
+For more information, please visit the Genezzo homepage 
+at http://www.genezzo.com
 
 =cut

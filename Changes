@@ -1,5 +1,9 @@
 Revision history for Perl extension Genezzo
 
+0.29  Mon Dec 13 23:54:35 2004
+        - Havok API change.
+        - Revise error reporting mechanisms (Util, etc).
+
 0.28  Mon Oct  4 01:09:37 2004
         - cleanup of Havok and UserExtend.  UserExtend simulates
           function import.  More pod documentation.

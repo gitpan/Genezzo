@@ -8,7 +8,7 @@
 # Change 1..1 below to 1..last_test_to_print .
 # (It may become useful if the test is moved to ./t subdirectory.)
 
-BEGIN { $| = 1; print "1..30\n"; }
+BEGIN { $| = 1; print "1..27\n"; }
 END {print "not ok 1\n" unless $loaded;}
 use Genezzo::GenDBI;
 $loaded = 1;
@@ -68,6 +68,7 @@ rmtree($gnz_home, 1, 1);
 
 {
     use Genezzo::Util;
+    use Genezzo::Havok;
 
     my $dbh = Genezzo::GenDBI->connect($gnz_home, "NOUSER", "NOPASSWORD");
 
@@ -87,43 +88,29 @@ rmtree($gnz_home, 1, 1);
         not_ok ("could not startup");
     }
 
-    if ($dbh->do("create table havok (hid n, modname c, owner c, creationdate c, flag c)"))
-    {       
-        ok();
-    }
-    else
-    {
-        not_ok ("could not create table havok");
-    }
-    if ($dbh->do("create table user_extend (xid n, xtype c, xname c, args c, owner c, creationdate c)"))
-    {       
-        ok();
-    }
-    else
-    {
-        not_ok ("could not create table user_extend");
-    }
+    my $bigSQL = Genezzo::Havok::MakeSQL(); # get the string
 
-    my $now = now();
+    my @bigarr = split(/\n/, $bigSQL);
+#    greet @bigarr;
 
-    if ($dbh->do(
-        "insert into havok values (1, Genezzo::Havok::UserExtend, SYSTEM, $now, 0)"))
-    {       
-        ok();
-    }
-    else
+    for my $lin (@bigarr)
     {
-        not_ok ("could not insert into havok");
-    }
+#        print $lin, "\n";
 
-    if ($dbh->do(
-        "insert into user_extend values (1, require, Text::Soundex, soundex, SYSTEM, $now)"))
-    {       
-        ok();
-    }
-    else
-    {
-        not_ok ("could not insert into user_extend");
+        if ($lin =~ m/commit/) 
+        {
+            ok(); # stop at commit
+            last;
+        }
+
+        next # ignore comments (REMarks)
+            if ($lin =~ m/REM/);
+        
+        next
+            unless (length($lin));
+        
+        not_ok ("could not create table havok")
+            unless ($dbh->do($lin));
     }
 
     if ($dbh->do("commit"))
