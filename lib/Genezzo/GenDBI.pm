@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/g3/lib/Genezzo/RCS/GenDBI.pm,v 6.1 2004/08/12 09:31:15 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 6.3 2004/08/24 21:34:39 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -48,11 +48,11 @@ BEGIN {
 	
 }
 
-our $VERSION   = '0.21';
+our $VERSION   = '0.22';
 our $RELSTATUS = 'Alpha'; # release status
 # grab the code check-in date and convert to YYYYMMDD
 our $RELDATE   = 
-    do { my @r = (q$Date: 2004/08/12 09:31:15 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
+    do { my @r = (q$Date: 2004/08/24 21:34:39 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
 
 # Preloaded methods go here.
 
@@ -192,7 +192,7 @@ sub new
 sub Kgnz_Rem
 {
     my $self = shift;
-    return;
+    return 1;
 }
 
 sub Kgnz_Quit
@@ -201,7 +201,7 @@ sub Kgnz_Quit
     print "quitting...\n";
     exit ;
 
-    return ;
+    return 1;
 	
 } # end Kgnz_Quit
 
@@ -223,9 +223,8 @@ sub Kgnz_Dump
 {
     my $self = shift;
     my $dictobj = $self->{dictobj};
-    $dictobj->DictDump (@_);
+    return $dictobj->DictDump (@_);
 
-    return ;
 }
 
 sub Kgnz_AddFile
@@ -337,7 +336,7 @@ sub Kgnz_Describe
         return 1;
 
     }
-    return ;
+    return 0;
 
 } # end describe
 
@@ -440,101 +439,9 @@ sub Kgnz_CT
         return $self->Kgnz_Create(%args);
 
     }
-    return ;
+    return 0;
 
 } # end CT
-
-sub pcon
-{
-    my $self = shift;
-    my %args = (@_);
-
-    my $indent = (exists ($args{indent})) ?
-        $args{indent} : "\t\t";
-
-    my @colname = 
-        (exists ($args{colnamearr})) ?
-            @{  $args{colnamearr} } : 
-                (
-                 (exists ($args{colname})) ?
-                   $args{colname}  : 
-                 ()
-                 ) ;
-
-    my $colcnt = scalar( @colname );
-
-    my $timeadjust = 0;
-    my $newtime = 0;
-    my $oldtime = 0;
-
-  L_pcon:
-    foreach my $cons (@{ $args{constraint} })
-    {
-        $newtime = time ();
-        
-        if ($newtime != $oldtime) 
-        {
-            $timeadjust = 0  ;
-        }
-        else
-        {
-            $timeadjust++  ;
-        }
-        
-        # add some bits to timestamp if not unique
-        my $mytstamp = ($newtime . "." . $timeadjust); 
-
-        my $cname = ();
-
-#        greet ($cons);
-
-#        whisper ($cons->{conname});
-
-        if (exists ($cons->{conname}))
-        {
-            $cname = $cons->{conname};
-        }
-        else
-        {
-            $cname = ("SYS_C" . $mytstamp);
-        }
-        $oldtime = $newtime ; 
-
-        unless (@colname)
-        {
-            if (exists ($cons->{colnamearr}))
-            {
-                $colcnt = scalar ($cons->{colnamearr} );
-            }
-            unless ($colcnt)
-            {
-                print $indent, "no column specified\n" ;
-                last L_pcon;
-            }
-        }
-        
-        print $indent, "constraint $cname, type $cons->{contype}\n";
-        print $indent, "on ", ((1 == $colcnt) ? "column " : "columns ");
-            
-        if (scalar(@colname))
-        {
-            foreach my $cn (@colname)
-            {
-                print "$cn, ";
-            }
-        }
-        else
-        {
-            my $lcol = $cons->{colnamearr} ;
-            foreach my $cn (@{ $lcol })
-            {
-                print "$cn, ";
-            }
-        }                     
-        print "\n";
-        
-    }
-} # end pcon
 
 sub Kgnz_Create
 {
@@ -607,10 +514,6 @@ sub Kgnz_Create
             my $colidx = 1;
 
             print "tablename : $tablename\n" if $bVerbose ;
-            if (exists($tabdefn->{constraint}))
-            {
-                pcon (%{ $tabdefn });
-            }
 
           L_coldataloop:
             foreach my $token (@{ $tabdefn->{coldefarr} })
@@ -632,10 +535,6 @@ sub Kgnz_Create
 
                     print "\tcolumn $colname : $dtype $extra\n" 
                 }
-                if (exists($token->{constraint}))
-                {
-                    pcon (%{ $token });
-                }
 
                 $coldatatype{$colname} = [$colidx, $dtype];
                 $colidx++;
@@ -654,7 +553,7 @@ sub Kgnz_Create
 
         }
     }
-    return ;
+    return 0;
         
 }
 
@@ -711,7 +610,7 @@ sub Kgnz_Spool
 	$| = 1;
     }
 
-    return ;
+    return 1;
 	
 }
 
@@ -1088,10 +987,6 @@ sub SQLSelectPrepare
 {
     my $self = shift;    
 
-#    print "$_\n";
-#    my $sqltxt  = "SELECT  ";
-#    $sqltxt .= join(' ',@_);
-
     my $sqltxt = $self->{current_line};
 
     my ($sql_cmd, $pretty, $badparse) =
@@ -1398,7 +1293,26 @@ sub SQLCreate
     my ($sql_cmd, $pretty, $badparse) =
         $self->{feeble}->Parseall($sqltxt);
 
+    return undef
+        if ($badparse);
+
 #    greet $sql_cmd;
+
+    # lists of equivalent types for char and numeric data
+    # XXX XXX: nchar?
+    my @chartype1 = qw(
+                       char character varchar varchar2 long
+                       );
+    push @chartype1, ("character varying", "char varying", "long varchar");
+    my @numtype1  = qw(
+                       numeric decimal dec integer int smallint 
+                       float real
+                       number
+                       );
+    push @numtype1, ("double precision");
+                       
+    my $char_regex = '(?i)^(' . (join '|', @chartype1) . ')$';
+    my $num_regex  = '(?i)^(' . (join '|', @numtype1)  . ')$';
 
     if (exists($sql_cmd->{operation}))
     {
@@ -1421,9 +1335,10 @@ sub SQLCreate
                     
                     # convert to bogus internal number/char types
                     $coltype = "c"
-                        if ($coltype =~ m/char/i);
+                        if ($coltype =~ m/$char_regex/);
+
                     $coltype = "n"
-                        if ($coltype =~ m/num/i);
+                        if ($coltype =~ m/$num_regex/);
 
                     push @outi, "$colname=$coltype";
                 }
@@ -1470,6 +1385,9 @@ sub SQLAlter
     my ($sql_cmd, $pretty, $badparse) =
         $self->{feeble}->Parseall($sqltxt);
 
+    return undef
+        if ($badparse);
+
 #    greet $sql_cmd;
 
     my $tablename;
@@ -1486,7 +1404,7 @@ sub SQLAlter
 
             $tablename = $sql_cmd->{alt_table_list}->{tablename};
 
-            return 0
+            return undef
                 unless $dictobj->DictTableExists (tname => $tablename);
 
 #            push @outi, $sql_cmd->{alt_table_list}->{tablename};
@@ -1500,51 +1418,79 @@ sub SQLAlter
                 if (exists($alist->{type})
                     && ($alist->{type} eq 'constraint'))
                 {
-                    unless (exists($alist->{cons_name}))
+                    my %nargs = (
+                                 tname => $tablename
+                                 );
+
+                    my $cons_name;
+                    if (exists($alist->{cons_name}))
                     {
-                        whisper "no constraint name!";
-                        return 0;
+                        $cons_name = $alist->{cons_name};
+                        $nargs{cons_name} = $cons_name;
                     }
-                    my $cons_name = $alist->{cons_name};
 
-                    if (exists($alist->{cons_type})
-                        && ($alist->{cons_type} eq 'unique'))
+                    if (exists($alist->{cons_type}))
                     {
-                        # XXX XXX XXX: not processed
-                        whisper "not executed";
-                        greet $alist;
-                    }  
-                    if (exists($alist->{cons_type})
-                        && ($alist->{cons_type} eq 'check'))
-                    {
+                        $nargs{cons_type} = $alist->{cons_type};
+                    }
 
-                        my $where_clause =
-                            $alist->{where_clause};
+                    if (exists($alist->{cons_type}))
+                    { 
+                       if ($alist->{cons_type} =~ m/unique|primary/i)
+                       { # UNIQUE or PRIMARY KEY
+                           if (exists($alist->{col_list}))
+                           {
+                               $nargs{cols} = $alist->{col_list};
+                           }
+                       }
+                       elsif ($alist->{cons_type} eq 'check')
+                       {
 
-                        my $filter =
-                            $self->SQLWhere(tablename => $tablename,
-                                            where     => $where_clause);
+                           my $where_clause =
+                               $alist->{where_clause};
 
-                        if (defined($filter))
-                        {
-#                            greet $filter;
+                           my $filter =
+                               $self->SQLWhere(tablename => $tablename,
+                                               where     => $where_clause);
 
-                            return 
-                                $dictobj->
-                                DictTableAddConstraint(tname => $tablename,
-                                                       cons_type => "check",
-                                                       where_clause =>
+                           unless (defined($filter))
+                           {
+                               whisper "invalid where clause";
+                               return 0;
+                           }
+#                         greet $filter;
+
+                           $nargs{where_clause} =
 #                                                       $where_clause,
-                                                       $filter->{filter_text},
-                                                       cons_name =>
-                                                       $cons_name);
-                        }
-                        else
-                        {
-                            whisper "invalid where clause";
-                            return 0;
-                        }
-                    }
+                               $filter->{filter_text};
+
+                           # XXX XXX XXX: need to get constraint name if
+                           # defined by system
+                       }
+                       else
+                       {
+                           whisper "unknown constraint";
+                           greet %nargs;
+                           return 0;
+                       }
+
+                       my $stat = 
+                           $dictobj->DictTableAddConstraint(%nargs);
+                       my $outstr;
+                       if ($stat)
+                       {
+                           $cons_name = ""
+                               unless (defined($cons_name));
+                           $outstr = "Added constraint $cons_name" .
+                               " to table $tablename";
+                       }
+                       else
+                       {
+                               $outstr = "Failed to add constraint";
+                           }
+                       print $outstr, "\n";
+                       return $stat;
+                   } # end if exists constraint
                 }
             }
         }
@@ -1561,6 +1507,9 @@ sub SQLUpdate
 
     my ($sql_cmd, $pretty, $badparse) =
         $self->{feeble}->Parseall($sqltxt);
+
+    return undef
+        if ($badparse);
 
     greet $sql_cmd;
 
@@ -1687,10 +1636,6 @@ sub SQLUpdate
 sub SQLInsert
 {
     my $self = shift;    
-
-#    print "$_\n";
-#    my $sqltxt  = "SELECT  ";
-#    $sqltxt .= join(' ',@_);
 
     my $sqltxt = $self->{current_line};
 
@@ -1839,10 +1784,6 @@ sub SQLInsert
 sub SQLDelete
 {
     my $self = shift;    
-
-#    print "$_\n";
-#    my $sqltxt  = "SELECT  ";
-#    $sqltxt .= join(' ',@_);
 
     my $sqltxt = $self->{current_line};
 
@@ -2650,7 +2591,7 @@ sub Kgnz_History
     {
         print "Cleared history...\n";
         $self->{histlist} = [];
-        return;
+        return 1;
     }
 
     foreach my $aval (@{$histlist})
@@ -2665,9 +2606,84 @@ sub Kgnz_History
 sub Kgnz_Help
 {
     my $self = shift;
-    print Dumper(%parsedispatch) ;
+#    print Dumper(%parsedispatch) ;
+    my $bigHelp;
+    $bigHelp = <<EOF_HELP;
 
-    return ;
+@ : execute a command file.  Syntax - @<filename> 
+
+!<number>, !! : re-execute command history
+
+addfile, af : add a file to a tablespace.  Type "addfile help" for more 
+    details.
+
+alter : SQL alter
+
+ci : create index.  Syntax - ci <index name> <table name> <column name>.
+
+commit : flush changes to disk
+
+create : SQL Create
+
+ct : create table.  Syntax - 
+    ct <tablename> <column name>=<column type> [<column name>=<column type>...]
+    Supported types are "c" for character data and "n" for numeric.
+
+d : delete from a table.  Syntax - d <table-name> <rid> [<rid>...]
+
+delete : SQL Delete
+
+describe, desc :  describe a table
+
+drop :  SQL Drop
+
+dt : drop table.  Syntax - dt <table-name>
+
+dump :  dump internal state.  Type "dump help" for more details.
+
+help :  This page.
+
+history, h : command history.  Use shell-style "!<command-number>" to repeat.
+
+i : insert into a table. 
+    Syntax - i <tablename> <column-data> [<column-data>...]
+
+insert : SQL Insert
+
+password : password authentication [unused]
+
+quit : quit the line-mode app
+
+reload : Reload all genezzo modules
+
+rem : Remark [comment]
+
+s : select from a table.  
+    Syntax - s <table-name> *
+             s <table-name> <column-name> [<column-name>...]
+    Legal "pseudo-columns" are "rid", "rownum".
+
+select : SQL Select
+   
+show :  License, warranty, and version information.  Type "show help"
+        for more information.
+
+shutdown : shutdown an instance.  Provides read-only access to "pref1"
+           table.
+ 
+spool : write output to a file.  Syntax - spool <filename>
+
+startup : Loads dictionary, provides read/write access to tables.
+
+u : update a table.  
+    Syntax - u <table-name> <rid> <column-value> [<column-value>...]
+
+update : SQL Update
+
+EOF_HELP
+
+print $bigHelp, "\n";
+    return 1;
 	
 }
 
@@ -2783,7 +2799,9 @@ sub Kgnz_Prepare
 
 		while (<$fh>) {
 		    print "$inifile> $_ \n";
-                    $self->Parseall ($_);
+                    my $in_line = $_;
+                    $in_line =~ s/;(\s*)$//; # XXX: remove the semicolon
+                    $self->Parseall ($in_line);
 
 		} # end big while
 		close ($fh);
@@ -2910,15 +2928,14 @@ sub Kgnz_BigStatement
         {
             print "Could not find valid operation in: \n";
             print "$bigstatement \n";
-            return;
+            return 0;
         }
         my $dispatch = $opdispatch{lc($args{op1})};
 
         no strict 'refs' ;
-        &$dispatch (%args) ;
-        return;
+        return &$dispatch (%args) ;
     }
-    return;
+    return 0;
 }
 
 # check preferences for automatic mount
@@ -2967,13 +2984,15 @@ sub Interactive
 
     my $prompt = "\ngendba $self->{histcounter}> ";
 
-    while ( defined ($_ = $term->readline($prompt)))
+    my $in_line;
+
+    while ( defined ($in_line = $term->readline($prompt)))
     {
-#    print "input: $_ \n" ;
-        next unless /\S/;
-        $term->addhistory($_);
-        $self->histpush($self->{histcounter}, $_);
-        $self->Parseall ($_);
+        $in_line =~ s/;(\s*)$//; # XXX: remove the semicolon
+        next unless ($in_line =~ m/\S/);
+        $term->addhistory($in_line);
+        $self->histpush($self->{histcounter}, $in_line);
+        $self->Parseall ($in_line);
         ($self->{histcounter}) += 1;
         $prompt = "\ngendba $self->{histcounter}> ";
     } # end big while
@@ -3524,8 +3543,8 @@ GenDBI.pm - basic line mode and DBI interfaces to Genezzo
   use Genezzo::GenDBI; # see gendba.pl
 
   my $fb = Genezzo::GenDBI->new(exe => $0, 
-                           gnz_home => $mygnz_home, 
-                           dbinit => $do_init);
+                                gnz_home => $mygnz_home, 
+                                dbinit => $do_init);
 
   $fb->Parseall($myquery); # process a statement
 
@@ -3556,8 +3575,8 @@ GenDBI.pm - basic line mode and DBI interfaces to Genezzo
   a fixed amount of memory and disk.  This system is designed to be
   easily configured and extended with custom functions, persistent
   storage representations, and novel data access methods.  In its
-  current incarnation it supports a limited SQL-like language using
-  DBI-style interfaces.
+  current incarnation it supports a subset of SQL and a partial
+  DBI interface.
 
 =head2 EXPORT
 

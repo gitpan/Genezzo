@@ -2,8 +2,7 @@ Copyright (C) 2003, 2004 Jeffrey I Cohen.  All rights reserved, worldwide.
 
 NAME
 
-  Genezzo::GenDBI - Genezzo engine
-
+  Genezzo - an extensible database system
 
 DESCRIPTION
 
@@ -11,8 +10,8 @@ DESCRIPTION
   hashes using a fixed amount of memory and disk.  This system is
   designed to be easily configured and extended with custom functions,
   persistent storage representations, and novel data access methods.
-  In its current incarnation it supports a limited SQL-like
-  language with DBI-style interfaces.
+  In its current incarnation it supports a limited subset of SQL with
+  a command line tool [gendba] and a partial DBI-style interface.
 
 REQUIREMENTS
 
@@ -26,9 +25,13 @@ INSTALLATION
   perl Makefile.PL  # constructs the makefile
   make              
   make test         
-  make install      # (as superuser)
+  make install      # (as superuser [optional])
 
-  You should be able to run scripts from the directory containing
+
+  If you install Genezzo, you should be able to run the line-mode tool
+  directly by typing "gendba.pl" at the command line.
+
+  You also should be able to run scripts from the directory containing
   this file, something like:
 
   perl -Iblib/lib lib/Genezzo/gendba.pl
@@ -41,6 +44,11 @@ USAGE
 
     gendba.pl -help
     gendba.pl -man 
+
+  or:
+
+    perl -Iblib/lib lib/Genezzo/gendba.pl -help
+    perl -Iblib/lib lib/Genezzo/gendba.pl -man
 
   for more information.
 
@@ -292,8 +300,7 @@ NEW FEATURES - automatic tablespace and file growth
 NEW FEATURES - Non-Unique Indexes
 
   In version 0.20, all user-defined indexes are non-unique.  Unique
-  indexes should be created as unique constraints (but they aren't
-  implemented yet).
+  indexes should be created as unique constraints (fixed in version 0.22).
 
 NEW FEATURES - ALTER TABLE ADD CONSTRAINT
 
@@ -323,16 +330,18 @@ NEW FEATURES - ALTER TABLE ADD CONSTRAINT
     Failed to insert row 1 in table testcon at lib/Genezzo/gendba.pl line 244
     inserted 0 rows into table testcon.
 
-  Currently, it only supports a single constraint or single index
-  per table.  Also, it parses ADD CONSTRAINT <name> UNIQUE (<column-list>), 
-  but does not execute.  Sorry.  Need to extend to fully support UNIQUE,
-  NOT NULL, PRIMARY, with multiple constraints and indexes per table, 
-  plus ENABLE/DISABLE.
+  Version 0.22 supports 
+    ALTER TABLE ADD CONSTRAINT <name> UNIQUE (<column-list>)
+    and
+    ALTER TABLE ADD CONSTRAINT <name> PRIMARY KEY (<column-list>
 
+  Currently, it only supports a single constraint or single index per
+  table.  Sorry.  Need to extend to fully support NULL/NOT NULL, with
+  multiple constraints and indexes per table, plus ENABLE/DISABLE.
 
 INCOMPATIBLE CHANGES
 
-  Version 0.20 dictionary and block format is incompatible with
+  Version 0.22 dictionary and block format is incompatible with
   previous release.  No upgrade path is supported.
 
 SEE ALSO

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/g3/lib/Genezzo/Row/RCS/RSTab.pm,v 6.1 2004/08/12 09:31:15 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSTab.pm,v 6.2 2004/08/24 21:59:53 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -91,7 +91,8 @@ sub _init
         my $sth = shift @{$s2};
         if (defined($sth))
         {
-            greet $sth->SQLFetch();
+            # XXX XXX XXX XXX 
+#            greet $sth->SQLFetch();
 #            greet $s2;
         }
         else
@@ -403,6 +404,7 @@ sub HPush
 
     my $toobig  = 0;
     my $maxsize = 2 * $self->{small_row}; 
+
     my $packstr = PackRowCheck($value, $maxsize);
 
     if (defined($packstr))
@@ -1348,6 +1350,8 @@ substring byte offset -- the inverse functionality of PackRow2/HSuck
 
 =item DBI - support Bind and projection (returning only certain
 specified columns, versus all columns)
+
+=item _init: change to use TSTableAFU support versus href->{filesused}
 
 =back
 

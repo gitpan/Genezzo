@@ -1,5 +1,19 @@
 Revision history for Perl extension Genezzo
 
+0.22  Fri Aug 27 15:11:13 2004
+        - slightly better line-mode "help"
+        - remove trailing semicolons with trailing blanks
+        - clarify gendba, genDBI docs
+        - improve constraint support: UNIQUE and PRIMARY KEY
+        - create table: convert CHAR, VARCHAR, NUMBER, NUMERIC, INT,
+          DEC, SMALLINT, FLOAT, DOUBLE, REAL types to internal "c", "n"
+        - Util:PackRow mutated $value array, converting undefs to 
+          zero-length strings, which broke primary key/not null 
+          enforcement.  
+
+0.21  Thu Aug 12 09:31:15 2004
+        - cleanup for CPAN upload
+
 0.20  Wed Jul 28 23:20:33 2004
         - Dict changes:
            use _get_col_hash to replace hard-coded column indexes in

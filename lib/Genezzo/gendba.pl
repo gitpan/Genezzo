@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/g3/lib/Genezzo/RCS/gendba.pl,v 6.2 2004/08/12 09:46:48 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/gendba.pl,v 6.3 2004/08/19 21:41:22 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -12,7 +12,7 @@ use Pod::Usage;
 
 =head1 NAME
 
-B<gendba.pl> - line mode for Genezzo system
+B<gendba.pl> - line mode for Genezzo database system
 
 =head1 SYNOPSIS
 
@@ -63,13 +63,66 @@ Options:
 
 =head1 DESCRIPTION
 
-Genezzo is an extensible, persistent datastore, that uses a pidgin,
-SQL-like syntax.
+Genezzo is an extensible, persistent datastore that uses a subset of
+SQL.  The gendba line-mode tool lets users interactively perform
+management tasks, as well as define and modify tables, and manipulate
+table data with updates and queries.
 
 =head2 Commands
 
-Genezzo understands a SQL-like insert, update, select, and delete,
-and it supports the following "short" commands: ct, dt, s, i, d, u
+Genezzo supports some very basic SQL create/drop/alter/describe table,
+select, insert, update and delete syntax, but unlike standard SQL,
+table and column names are case-sensitive.  More complex SQL, such as
+joins, parses, but is ignored.  The only supported functions are
+count(*) and ecount, a non-blocking count estimation function.  The
+database also supports commit to force changes to disk, but no
+rollback.  NOTE: Data definition (such as create table or ct) must be
+manually committed to keep the database in a consistent state.
+Uncommitted inserts and updates will only be block-consistent -- there
+is no guarantee that the data will get flushed to disk, and no
+guarantee whether the changes will or will not take effect.
+
+    rem  Some simple SELECTs
+    select * from _col1;
+    select rid, rownum, tname, colname from _col1;
+    select count(*) from _col1;
+    select ecount from _col1;
+
+    rem  SELECTs with WHERE, perl and SQL style.
+    rem  This functionality is somewhat fragile
+    rem
+    rem  note use of /x in regexp - fix problem when parser adds extra space
+    select * from _tab1 where tname =~ m/col/x;
+    select * from _tab1 where tid < 5;
+    select * from _tab1 where (numcols > 3) && (numcols < 6);
+    select tid as Table_ID, tname Name from _tab1;
+
+    rem  Basic INSERT
+    insert into test1 values (a,b,c,d);
+    insert into test1(col2, col1) values (a,b,c,d);
+
+    rem CREATE TABLE and INSERT...SELECT
+    create table test2(col1 char, col2 char);
+    insert into test2 (col1) select col1 from test1;
+
+    rem  DELETE with WHERE
+    delete from test1 where (col1 < "bravo") && (col2 > 5);
+
+    rem  UPDATE with WHERE (no subqueries supported)
+    update test2 set col2 = "foo" where col2 is null;
+
+    rem CREATE an INDEX
+    create index test1_ix on test1(col1);
+
+    rem ADD a CHECK CONSTRAINT
+    alter table test2 add constraint t2_cn1 check (col2 =~ m/(a|b|c|d)/x );
+
+
+    commit
+
+
+
+Genezzo also supports the following "short" commands: ct, dt, s, i, d, u
 
 =over 8
 

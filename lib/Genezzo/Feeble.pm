@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/g3/lib/Genezzo/RCS/Feeble.pm,v 6.1 2004/08/12 09:31:15 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Feeble.pm,v 6.2 2004/08/19 21:45:27 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -101,7 +101,7 @@ sub Parseall
     my $self = shift;
     my $line = shift;
 
-    $line =~ s/\;$//; # XXX : remove the semicolon
+    $line =~ s/;(\s*)$//; # XXX : remove the semicolon
     $self->{feeb}->Parseall($line);
 
     $line =~ s/^\s+//;
@@ -743,7 +743,7 @@ sub grouporder_list2
 # create table (col1 type, col2 type...)
 sub cr_table_clause2
 {
-    whoami;
+#    whoami;
     my $self = shift;
 
     my $badparse = 0;
@@ -973,6 +973,7 @@ sub add_list2
     my $currhash;
     my $add_item;
     my $get_cons;
+    my $get_name;
     my $cons_name;
 
     my $got_last    = 0;
@@ -1020,7 +1021,8 @@ sub add_list2
         if (!defined($add_item))
         {
 #            greet $token;
-            unless ($token->{val} =~ m/^constraint$/i)
+            my $cons_thing = "constraint|not|null|check|unique|primary";
+            unless ($token->{val} =~ m/^($cons_thing)$/i)
             {
                 $badparse = 1;
                 $msg = "invalid token (" .  $token->{val} 
@@ -1033,12 +1035,18 @@ sub add_list2
             $add_item = lc($token->{val});
 #            greet $add_item;
             $currhash = {};
-            $currhash->{type} = $add_item;
-            next;
+            $currhash->{type} = "constraint";
+            if ($add_item eq "constraint")
+            {
+                # advance the token if CONSTRAINT - next token should be name
+                $get_name = 1;
+                next;
+            }
+            # else fall through (unnamed constraint)
         }
         if ($get_cons)
         {
-            if (!defined($cons_name))
+            if ($get_name && !defined($cons_name))
             {
                 unless ($token->{type} eq 'IDENTIFIER')
                 {
@@ -1069,15 +1077,56 @@ sub add_list2
                         }
                         last;
                     }
-                    elsif ($token->{val} =~ m/^unique$/i)
+                    elsif ($token->{val} =~ m/^(unique|primary)$/i)
                     {
-                        $currhash->{cons_type} = lc($token->{val});
+                        my $ct1 = ($token->{val} =~ m/^unique$/i) ?
+                            "unique" : "primary_key";
+
+                        $currhash->{cons_type} = $ct1;
+
+                        if ($currhash->{cons_type} eq "primary_key")
+                        {
+                            my $next_token;
+                            ($next_token, $badparse, $msg) = 
+                                $self->{feeb}->Peek($badparse, 2)
+                                unless (($badparse) ||
+                                        !(defined($token)));
+                            last
+                                if ($badparse); 
+
+                            if (!(defined($next_token)))
+                            {
+                                $msg = "missing KEY";
+                                $badparse = 1;
+                                next;
+                            }
+                            
+                            # look for key
+                            greet $next_token;
+
+                            unless ($next_token->{val} =~ m/^key$/i)
+                            {
+                                $msg = "missing KEY";
+                                $badparse = 1;
+                                next;
+                            }
+                            ($token, $badparse, $msg) = 
+                                $self->{feeb}->Pop($badparse);
+                            
+                            next # error check
+                                if (($badparse) ||
+                                    !(defined($token)));
+
+                            ($token, $badparse, $msg) = 
+                                $self->{feeb}->Peek($badparse);
+                        }
+
                         my $col_list;
 
                         # Note: UNIQUE column list same as insert,
                         # create table
                         ($col_list, $badparse, $msg)  =
-                            $self->ins_list2("unique constraint column list");
+                            $self->ins_list2("$ct1 constraint column list");
                         if (!$badparse && (defined($col_list)))
                         {
                             $currhash->{col_list} = $col_list;
@@ -1207,7 +1256,7 @@ sub alt_table_clause2
 # main CREATE parsing
 sub sql_create
 {
-   whoami;
+#   whoami;
     my $self = shift;
     
     my ($pretty, $allwords) = @_;
@@ -3045,9 +3094,13 @@ __END__
 
 =head1 NAME
 
+Feeble.pm - a feeble parser
+
 =head1 SYNOPSIS
 
 =head1 DESCRIPTION
+
+  The Feeble parser parses a (very) limited subset of SQL.
 
 =head1 ARGUMENTS
 
@@ -3057,11 +3110,13 @@ __END__
 
 =head1 LIMITATIONS
 
-various
+many
 
-=head1 #TODO
+=head1 TODO
 
 =over 4
+
+=item Use antlr (see antlr.org) to generate a parser, and toss this code.
 
 =back
 

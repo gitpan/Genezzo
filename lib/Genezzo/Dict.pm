@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/g3/lib/Genezzo/RCS/Dict.pm,v 6.1 2004/08/12 09:31:15 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 6.4 2004/08/24 21:58:23 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -18,7 +18,7 @@ use Genezzo::Index::btHash;
 
 BEGIN {
     our $VERSION;
-    $VERSION = do { my @r = (q$Revision: 6.1 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 6.4 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -1386,8 +1386,8 @@ sub _get_table
             my $cfn = $self->_make_constraint_check_fn($args{object_id});
             if (defined($cfn))
             {
-                greet "got constraint for $tablename\n";
-                print ref($tabi), "\n";
+#                greet "got constraint for $tablename\n";
+#                print ref($tabi), "\n";
                 my $realtie = tied(%{$tabi});
                 $realtie->_constraint_check($cfn);
             }
@@ -1959,8 +1959,9 @@ sub DictTableUseFile
 {
     my $self = shift;
 
-    local $Genezzo::Util::QUIETWHISPER = 0; # XXX: unquiet the whispering
-    whoami;
+    # XXX XXX XXX XXX XXX
+#    local $Genezzo::Util::QUIETWHISPER = 0; # XXX: unquiet the whispering
+#    whoami;
 
     if ($self->{dictinit})
     {
@@ -1996,17 +1997,15 @@ sub DictTableUseFile
 #        my $objid  = $self->{dict_tables}->{$tablename}->{object_id};
         my $objid  = $object_id;
 
-        greet $tablename, $objid, $fileno;
+#        greet $tablename, $objid, $fileno;
 
         # XXX XXX: objid not defined at startup ??? problem removing
         # href in rstab due to deep recursion?
 
         if (defined($objid) && defined($fileno) && 
             $self->{afu_tid_tv}->EXISTS([$objid, $fileno]))
-#            exists($self->{afu_tid_idx}->{$objid . "." . $fileno}))
         {
-#            greet $self->{afu_tid_idx}->{$objid . "." . $fileno};
-            greet $self->{afu_tid_tv}->FETCH([$objid, $fileno]);
+#            greet $self->{afu_tid_tv}->FETCH([$objid, $fileno]);
 #            return 2; # already in use
         }
         else
@@ -2346,6 +2345,12 @@ sub DictTableAddConstraint
     my $tspace  = $self->{dict_tables}->{$tablename}->{tablespace};
     my $tid     = $self->{dict_tables}->{$tablename}->{object_id};
 
+    my $cons_name;
+    if (exists($args{cons_name}))
+    {
+        $cons_name = $args{cons_name};            
+    }
+
     if ($args{cons_type} =~ m/check/i)
     {
         unless (exists($args{where_clause}))
@@ -2355,13 +2360,6 @@ sub DictTableAddConstraint
         }
 
         my $where_clause = $args{where_clause};
-        unless (exists($args{cons_name}))
-        {
-            whisper "no constraint name";
-            return 0;
-        }
-
-        my $cons_name = $args{cons_name};
 
         # insert the check constraint
         # XXX XXX: check for duplicate names? 
@@ -2371,6 +2369,12 @@ sub DictTableAddConstraint
 
         my $consid = $tv->HCount(); # XXX XXX: need max consid function!
         $consid++;
+
+        unless (exists($args{cons_name}))
+        {
+            $cons_name = "SYS_C" . $consid;
+        }
+
         my $constype = "CK";
         
         my @rowarr = ($consid, $cons_name, $constype, $tid, $where_clause);
@@ -2383,20 +2387,34 @@ sub DictTableAddConstraint
             return 0;
         }
     }
-    elsif ($args{cons_type} =~ m/primary/i)
+    elsif ($args{cons_type} =~ m/primary|unique/i)
     {
-        # XXX XXX XXX: need a unique index name!!
+        my $isPrimaryKey = ($args{cons_type} =~ m/primary/i);
 
-        my $index_name = $tablename . '_pk';
+        # XXX XXX XXX: need a unique index name!!
+        my $index_name = $tablename . 
+            ($isPrimaryKey ? '_pk' : '_uq');
+
+        my $itype =
+            ($isPrimaryKey ? "PRIMARY KEY" : "UNIQUE");
+
+        my %nargs = (tname => $tablename,
+                     index_name => $index_name,
+                     cols => $args{cols},
+                     tablespace => $tspace,
+                     itype => $itype
+                     );
+
+        if (exists($args{cons_name}))
+        {
+            # get the constraint name if it exists
+            $nargs{cons_name} = $cons_name;
+        }
+
 
         # XXX XXX XXX: might specify alternate tspace in constraint def
 
-        return ($self->DictIndexCreate(tname => $tablename,
-                                       index_name => $index_name,
-                                       cols => $args{cols},
-                                       tablespace => $tspace,
-                                       itype => "UNIQUE"
-                                       ));
+        return ($self->DictIndexCreate(%nargs));
 
     }
     else
@@ -2683,9 +2701,7 @@ sub DictIndexCreate
                     );
 
     my %optional = (
-                    itype => "UNIQUE" # XXX XXX XXX XXX: need to
-                    # distinguish between unique and primary key for
-                    # index creation
+                    itype => "nonunique" 
                     );
 
 
@@ -2703,8 +2719,19 @@ sub DictIndexCreate
     my $i_name = $args{index_name};
     my $tspace = $args{tablespace};
 
-    my $unique = ($args{itype} =~ m/^UNIQUE/);
-    
+    my $unique = ($args{itype} =~ m/^(UNIQUE|PRIMARY)/);
+    my $constype;
+
+    if ($unique)
+    {
+        # unique or primary key
+        $constype = ($args{itype} =~ m/^UNIQUE/) ? "UQ" : "PK";
+    } 
+    else
+    {   # non-unique index
+        $constype = "IK";
+    }
+
     my $thsh   = $self->{dict_tables}->{$tablename};
     my $tid    = $thsh->{object_id};
 
@@ -2714,10 +2741,20 @@ sub DictIndexCreate
     # XXX XXX: need max consid functions!
     my $consid = $tv->HCount(); # XXX XXX: won't work if delete constraints
     $consid++;
+
+    my $cons_name;
+    if (exists($args{cons_name}))
+    {
+        $cons_name = $args{cons_name};            
+    }
+    else
+    {
+#            whisper "no constraint name";
+        $cons_name = "SYS_C" . $consid;
+#            return 0;
+    }
         
-    my $constype = $unique ? "PK" : "IK";
-        
-    my @rowarr = ($consid, "SYS_$consid", $constype, $tid);
+    my @rowarr = ($consid, $cons_name, $constype, $tid);
     my $ihsh  = $self->{dict_tables}->{$i_name};
     my $iid   = $ihsh->{object_id};
             
@@ -3091,7 +3128,7 @@ sub dictp2_define_cons
 
         my $thsh   = $self->{dict_tables}->{$tname};
         my $tid    = $thsh->{object_id};
-        my @rowarr = ($consid, "SYS_$consid", $constype, $tid);
+        my @rowarr = ($consid, "SYS_C$consid", $constype, $tid);
         my @irow   = (   # index row
                       0,        # index id [replace]
                       1,        # tablespace id
@@ -3233,7 +3270,7 @@ sub _make_constraint_check_fn
 
         my $cons_func = ();
 
-        if ($cons_type =~ m/^(IK|PK)$/) # index or primary key
+        if ($cons_type =~ m/^(IK|PK|UQ)$/) # index or primary key or unique
         {
 
             my @iid = split(':', $check_text);
@@ -3318,7 +3355,7 @@ sub _make_cons_pk_check
 #    $ts1->{tabsp_tables}->{$i_name}->{desc} = ()
 #        unless (exists($ts1->{tabsp_tables}->{$i_name}->{desc}));
 
-    my $unique = ($cons_type eq "PK") ? 1 : 0;
+    my $unique = ($cons_type =~ m/(UQ|PK)/) ? 1 : 0;
 
     my %btargs = (
                   tname     => $i_name,
@@ -3381,6 +3418,25 @@ sub _make_cons_pk_check
         {
             push @rowarr, $keyval->[$colnum - 1];
         }
+
+       if ($cons_type eq "PK")
+       { 
+#           greet "pk:", $i_name, @rowarr, scalar(@rowarr);
+           my $allnull = 1;
+           for my $c1 (@rowarr)
+           {
+               if (defined($c1))
+               {
+                   $allnull = 0;
+                   last;
+               }
+           }
+           if ($allnull)
+           {
+               print "null key violated PRIMARY KEY constraint $cons_name\n";
+               return 1;
+           }
+       }
             
         unless ( $bt->insert(\@rowarr, $place))
         {
@@ -3775,6 +3831,8 @@ Checking for the existance of a table would be something like:
 
 =item  check usage of HCount for max tid, max fileidx, max consid.
        This won't work if have deletions
+
+=item DictTableUseFile: update space management to use this function correctly
 
 =back
 
