@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Block/RCS/Std.pm,v 6.2 2004/09/05 23:38:19 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Block/RCS/Std.pm,v 6.2 2004/09/05 23:38:19 claude Exp $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #

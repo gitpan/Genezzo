@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSFile.pm,v 6.2 2004/09/27 08:50:55 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSFile.pm,v 6.3 2004/10/04 07:59:38 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -671,6 +671,8 @@ __END__
 # Below is stub documentation for your module. You better edit it!
 
 =head1 NAME
+
+Genezzo::Row::RSFile - Row Source File
 
 =head1 SYNOPSIS
 

@@ -87,7 +87,7 @@ rmtree($gnz_home, 1, 1);
         not_ok ("could not startup");
     }
 
-    if ($dbh->do("create table havok (hid n, modname c, owner c, creationdate c)"))
+    if ($dbh->do("create table havok (hid n, modname c, owner c, creationdate c, flag c)"))
     {       
         ok();
     }
@@ -95,19 +95,19 @@ rmtree($gnz_home, 1, 1);
     {
         not_ok ("could not create table havok");
     }
-    if ($dbh->do("create table UserExtend (xid n, xtype c, xname c, args c, owner c, creationdate c)"))
+    if ($dbh->do("create table user_extend (xid n, xtype c, xname c, args c, owner c, creationdate c)"))
     {       
         ok();
     }
     else
     {
-        not_ok ("could not create table UserExtend");
+        not_ok ("could not create table user_extend");
     }
 
     my $now = now();
 
     if ($dbh->do(
-        "insert into havok values (1, Genezzo::Havok::UserExtend, SYSTEM, $now)"))
+        "insert into havok values (1, Genezzo::Havok::UserExtend, SYSTEM, $now, 0)"))
     {       
         ok();
     }
@@ -116,16 +116,14 @@ rmtree($gnz_home, 1, 1);
         not_ok ("could not insert into havok");
     }
 
-    my $soundx = '"qw(soundex)"'; # quoting quotes
-
     if ($dbh->do(
-        "insert into UserExtend values (1, require, Text::Soundex, $soundx, SYSTEM, $now)"))
+        "insert into user_extend values (1, require, Text::Soundex, soundex, SYSTEM, $now)"))
     {       
         ok();
     }
     else
     {
-        not_ok ("could not insert into UserExtend");
+        not_ok ("could not insert into user_extend");
     }
 
     if ($dbh->do("commit"))
@@ -222,8 +220,8 @@ Lissajous
 
         my $s1 = 
                "select sname from sonictest where " .
-               ' Text::Soundex::soundex(sname) = ' .
-               ' Text::Soundex::soundex("'. $a2 . '") ' ;
+               ' soundex(sname) = ' .
+               ' soundex("'. $a2 . '") ' ;
 
         greet $s1;
 

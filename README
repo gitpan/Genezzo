@@ -349,14 +349,19 @@ NEW FEATURES - System/User Extensibility
   Genezzo::Havok for more details.  The script "havok.sql" can be used
   add extensibility tables to your database.  It can be invoked as
   "@havok.sql" from the gendba command line.  In particular, the table
-  UserExtend can be used to load new functions or perl modules into
+  user_extend can be used to load new functions or perl modules into
   Genezzo.  For example, the havok.sql script loads "Text::Soundex", so
   queries can use Text::Soundex::soundex in the WHERE clause.
-  
+
+  Version 0.28 of Genezzo slightly modifies the havok and user_extend
+  tables, and it provides the capability to import functions into the
+  default Genezzo namespace.  For example, if the "soundex" function is
+  imported, then the query can just call soundex(), versus using the 
+  fully-qualified name Text::Soundex::soundex.
 
 INCOMPATIBLE CHANGES
 
-  Version 0.25 dictionary and block format is incompatible with
+  Version 0.28 dictionary and block format is incompatible with
   previous release.  No upgrade path is supported.
 
 SEE ALSO

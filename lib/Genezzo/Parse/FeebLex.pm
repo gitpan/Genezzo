@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/g3/lib/Genezzo/Parse/RCS/FeebLex.pm,v 6.1 2004/08/12 09:31:15 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Parse/RCS/FeebLex.pm,v 6.2 2004/10/04 07:58:38 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -619,6 +619,8 @@ __END__
 # Below is stub documentation for your module. You better edit it!
 
 =head1 NAME
+
+Genezzo::Parse::FeebLex - Feeble Lexer
 
 =head1 SYNOPSIS
 

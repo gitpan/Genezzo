@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Havok.pm,v 1.2 2004/09/27 08:44:12 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Havok.pm,v 1.3 2004/10/04 08:02:49 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -15,11 +15,19 @@ use warnings::register;
 
 use Carp;
 
+sub Install
+{
+
+
+}
+
+
 sub HavokInit
 {
 #    whoami;
     my %optional = (phase => "init");
-    my %required = (dict  => "no dictionary!"
+    my %required = (dict  => "no dictionary!",
+                    flag  => "no flag"
                     );
 
     my %args = (%optional,
@@ -52,6 +60,7 @@ sub HavokInit
         my $modname = $vv->[$getcol->{modname}];
         my $owner   = $vv->[$getcol->{owner}];
         my $dat     = $vv->[$getcol->{creationdate}];
+        my $flag    = $vv->[$getcol->{flag}];
 
 #        greet $vv;
 
@@ -62,19 +71,23 @@ sub HavokInit
             next;
         }
 
-        my $stat;
+        my %nargs;
+        $nargs{dict} = $dict;
+        $nargs{flag} = $flag;
+
+        my @stat;
         if ($phase =~ m/^(init|cleanup)$/i)
         {
             my $p2   = ucfirst($phase);
             my $func = $modname . "::" . "Havok" . $p2;
             no strict 'refs' ;
-            eval {$stat = &$func(%args) };
+            eval {@stat = &$func(%nargs) };
             if ($@)
             {
-                whisper "bad lc($phase) : $modname";
+                whisper "bad " . lc($phase) . " : $modname";
             }
             whisper "bad return status : $func"
-                unless ($stat);
+                unless ($stat[0]);
         }
         else
         {
@@ -111,10 +124,45 @@ Genezzo::Havok - Cry Havok! And Let Slip the Dogs of War!
 
 use Genezzo::Havok; # Wreak Havok
 
+create table havok (
+    hid number,
+    modname char,
+    owner char,
+    creationdate char, 
+    flag char
+);
+
+=over 4
+
+=item  hid - a unique id number
+
+=item  modname - a havok module name
+=item  owner - module owner
+=item  creationdate - date of row creation
+=item  flag - special flag for loading the module 
+
+=back
+
 =head1 DESCRIPTION
 
 After database startup, the Havok subsystem runs arbitrary
 code to modify your Genezzo installation.  
+
+=head2 WHY?
+
+Havok lets you construct novel, sophisticated extensions to Genezzo as
+"plug-ins".  The basic Genezzo database kernel can remain small, and
+users can download and install additional packages to extend Genezzo's
+functionality.  This system also gives you a modular upgrade capability.
+
+=head2 Examples
+
+See L<Genezzo::Havok::UserExtend>, a module that lets users install
+custom functions or entire packages.  The Havok regression test,
+B<t/Havok1.t>, loads L<Text::Soundex> and demonstrates a soundex
+comparison of strings in a table.  You can easily add other string or
+mathematical functions.
+
 
 =head1 ARGUMENTS
 
@@ -138,13 +186,29 @@ code to modify your Genezzo installation.
 
 =head1 LIMITATIONS
 
+Havok is intended for specialized packages which extend the
+fundamental database mechanisms.  If you only want to add new SQL
+functions, then you should use L<Genezzo::Havok::UserExtend>.
 
 
 =head1 TODO
 
 =over 4
 
-=item  Create dictionary initialization havok
+=item  Create dictionary initialization havok (vs post-startup havok)
+
+=item  Need some type of first-time registration function.  For
+example, if your extension module needs to install new dictionary
+tables.  Probably can add arg to havokinit, and add a flag to havok
+table to track init status.
+
+=item  Safety/Security: could load modules using Safe package to
+restrict their access (not a perfect solution).  May also want to
+construct a dictionary wrapper to restrict dictionary capabilities for
+certain clients, e.g. let a package read, but not update, certain
+dictionary tables.
+
+=item  Force Init/ReInit when new package is loaded.
 
 =back
 

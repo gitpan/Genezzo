@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/g3/lib/Genezzo/PushHash/RCS/PHNoUpdate.pm,v 6.1 2004/08/12 09:31:15 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/PushHash/RCS/PHNoUpdate.pm,v 6.2 2004/10/04 07:59:05 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -50,6 +50,8 @@ __END__
 # Below is stub documentation for your module. You better edit it!
 
 =head1 NAME
+
+Genezzo::PushHash::PHNoUpdate - Push Hash that only supports delete and insert
 
 =head1 SYNOPSIS
 

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/UserExtend.pm,v 1.2 2004/09/27 08:45:05 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/UserExtend.pm,v 1.5 2004/10/04 08:05:12 claude Exp claude $
 #
 # copyright (c) 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -18,60 +18,92 @@ sub HavokInit
 {
 #    whoami;
     my %optional = (phase => "init");
-    my %required = (dict  => "no dictionary!"
+    my %required = (dict  => "no dictionary!",
+                    flag  => "no flag"
                     );
 
     my %args = (%optional,
 		@_);
 #		
+    my @stat;
 
+    push @stat, 0, $args{flag};
 #    whoami (%args);
 
-    return 0
+    return @stat
         unless (Validate(\%args, \%required));
 
     my $dict   = $args{dict};
     my $phase  = $args{phase};
 
-    return 0
-        unless ($dict->DictTableExists(tname => "UserExtend",
+    return @stat
+        unless ($dict->DictTableExists(tname => "user_extend",
                                        silent_notexists => 1));
 
-    my $hashi  = $dict->DictTableGetTable (tname => "UserExtend") ;
+    my $hashi  = $dict->DictTableGetTable (tname => "user_extend") ;
 
-    return 0 # no User Extensions
+    return @stat # no User Extensions
         unless (defined ($hashi));
 
     my $tv = tied(%{$hashi});
 
     while ( my ($kk, $vv) = each ( %{$hashi}))
     {
-        my $getcol  = $dict->_get_col_hash("UserExtend");  
-        my $xid     = $vv->[$getcol->{xid}];
-        my $xtype   = $vv->[$getcol->{xtype}];
-        my $xname    = $vv->[$getcol->{xname}];
-        my $owner   = $vv->[$getcol->{owner}];
-        my $dat     = $vv->[$getcol->{creationdate}];
+        my $getcol = $dict->_get_col_hash("user_extend");  
+        my $xid    = $vv->[$getcol->{xid}];
+        my $xtype  = $vv->[$getcol->{xtype}];
+        my $xname  = $vv->[$getcol->{xname}];
+        my $owner  = $vv->[$getcol->{owner}];
+        my $dat    = $vv->[$getcol->{creationdate}];
         my $xargs  = $vv->[$getcol->{args}];
 
 #        greet $vv;
 
         if ($xtype =~ m/^require$/i)
         {
-            whisper "require $xname";
             unless (eval "require $xname")
             {
+                whisper "no such package - $xname";
                 carp "no such package - $xname"
                     if warnings::enabled();
                 next;
             }
+
             no strict 'refs';
-            unless (1) ### XXX: (eval "import $xname $xargs")
+
+            my @inargs;
+
+            if ($xargs =~ m/\s/)
             {
-                carp "bad import of $xargs for  package - $xname"
-                    if warnings::enabled();
-                next;
+                @inargs = split(/\s/, $xargs);
             }
+            else
+            {
+                push @inargs, $xargs;
+            }
+
+
+            for my $fname (@inargs)
+            {
+                # Note: add functions to "main" namespace...
+
+                my $mainf = "Genezzo::GenDBI::" . $fname;
+                my $packf =  $xname . "::" . $fname;
+
+                my $func = "sub " . $mainf ;
+                $func .= "{ " . $packf . '(@_); }';
+            
+#            whisper $func;
+
+#            eval {$func } ;
+                eval " $func " ;
+                if ($@)
+                {
+                    whisper "bad function : $func";
+                }
+
+            }
+
             
         }
         elsif ($xtype =~ m/^function$/i)
@@ -105,7 +137,8 @@ sub HavokInit
 
     } # end while
 
-    return 1;
+    $stat[0] = 1; # ok!
+    return @stat;
 }
 
 sub HavokCleanup
@@ -130,10 +163,60 @@ Genezzo::Havok::UserExtend - load the UserExtend table
 
 =head1 SYNOPSIS
 
+ # don't say "use Genezzo::Havok::UserExtend".  Update the
+ # dictionary havok table:
+
+insert into havok values (1, "Genezzo::Havok::UserExtend", "SYSTEM", 
+"2004-09-21T12:12", 0);
+
 
 =head1 DESCRIPTION
 
 Basic Havok module - load the UserExtend table
+
+create table user_extend (
+    xid   number,
+    xtype char,
+    xname char,
+    args  char,
+    owner char, 
+    creationdate char
+    );
+
+=over 4
+
+=item xid - a unique id number
+  
+
+=item  xtype - the string "require" or "function"
+
+
+=item xname - if xtype = "require", then xname is a package name, like
+"Text::Soundex".  if xtype = "function", xname is a function name.  A
+function name may be qualified with a package.
+
+
+=item args - if xtype = "require", an (optional) blank-separated list
+of functions to import to the default Genezzo namespace.  if xtype =
+"function", supply an actual function body in curly braces.
+
+=item owner - owner of the package or function
+
+=item creationdate - date row was created
+
+=back
+
+=head2 Example:
+
+insert into user_extend (1, "require", "Genezzo::Havok::RedGreen",  
+"isRedGreen", "SYSTEM", "2004-09-21T12:12");
+
+The row causes UserExtend to "require Genezzo::Havok::RedGreen", and
+it imports "isRedGreen" into the default Genezzo namespace* (actually,
+it creates a stub function that calls
+Genezzo::Havok::RedGreen::isReadGreen").
+
+
 
 =head1 ARGUMENTS
 
@@ -160,11 +243,12 @@ Basic Havok module - load the UserExtend table
 =over 4
 
 =item Need to fix "import" mechanism so can load specific functions
-into Genezzo::GenDBI namespace.
+into Genezzo::GenDBI namespace, versus creating stub functions.
+Use "import" and "export_to_level".
+
+=item Could just load Acme::Everything and we'd be done...
 
 =back
-
-
 
 =head1 AUTHOR
 

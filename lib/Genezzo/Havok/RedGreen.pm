@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RedGreen.pm,v 1.2 2004/09/27 08:44:25 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/RedGreen.pm,v 1.3 2004/09/29 07:00:06 claude Exp claude $
 #
 # copyright (c) 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
