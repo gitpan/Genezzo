@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 6.19 2005/01/23 09:58:48 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 6.21 2005/01/30 09:36:11 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -19,7 +19,7 @@ use Genezzo::Havok;
 
 BEGIN {
     our $VERSION;
-    $VERSION = do { my @r = (q$Revision: 6.19 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 6.21 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -177,6 +177,7 @@ sub _init
                     name      => "default",
                     dbsize    => $Genezzo::Util::DEFDBSIZE,
                     blocksize => $Genezzo::Util::DEFBLOCKSIZE,
+                    use_havok => 1      # use havok if available
                     );
 
     my %required = (
@@ -209,6 +210,16 @@ sub _init
                                     name => "db file size"); 
     $self->{blocksize}   = HumanNum(val  => $args{blocksize},
                                     name => "blocksize"); 
+
+    if ($args{use_havok} eq "0")
+    {
+        whisper "havok is disabled";
+        $self->{use_havok} = 0; # disable havok
+    }
+    else
+    {
+        $self->{use_havok} = 1;
+    }
 
     return 0
         unless (defined($self->{dbsize}) 
@@ -569,6 +580,7 @@ sub DictDump
     return 1;
 }
 
+##sub dicthook1 { print "original\n";}
 sub DictStartup
 {
     my $self = shift;
@@ -632,13 +644,16 @@ sub DictStartup
         $self->{use_constraints} = 1; # Note: used in get_table
     }
 
-    $Genezzo::Havok::GZERR = 
-        sub {
-            my $err_cb = $self->{GZERR};
-            return &$err_cb(@_);
-        };
-    return 0
-        unless Genezzo::Havok::HavokInit(dict => $self, flag => 0);
+    if ($self->{use_havok})
+    {
+        $Genezzo::Havok::GZERR = 
+            sub {
+                my $err_cb = $self->{GZERR};
+                return &$err_cb(@_);
+            };
+        return 0
+            unless Genezzo::Havok::HavokInit(dict => $self, flag => 0);
+    }
 
     # use sys_hook to define a dictionary startup hook
     if (defined(&dicthook1))  
@@ -1043,7 +1058,7 @@ sub DictSave
 sub DictRollback
 {
     my $self = shift;
-    
+
     unless ($self->{started})
     {
         greet "dict not started";
@@ -4981,6 +4996,12 @@ Checking for the existance of a table would be something like:
 =head1 TODO
 
 =over 4
+
+=item  IDXTAB indexed tables don't give a constraint error, or primary
+       key error.  They don't have constraints because they are themselves
+       indexes.  Need to give better error message.
+
+=item  Fix t/Cons1 constraint error
 
 =item  DictTableAllTab: need index on allfileused for delete
 

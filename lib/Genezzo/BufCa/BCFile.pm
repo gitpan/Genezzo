@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BCFile.pm,v 6.5 2005/01/23 09:58:01 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BCFile.pm,v 6.7 2005/01/30 09:35:38 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -60,6 +60,7 @@ sub _init
     $self->{bc} = Genezzo::BufCa::BufCa->new(@_);
     $self->{cache_hits}   =  0;
     $self->{cache_misses} =  0;
+    $self->{read_only}    =  0; # TODO: set for read-only database support
 
     return 1;
 }
@@ -219,6 +220,9 @@ sub _filewriteblock
 {
     my ($self, $fname, $fnum, $fh, $bnum, $refbuf, $hdrsize) = @_;
 
+    return 0
+        if ($self->{read_only});
+
     my $blocksize = $self->{bc}->{blocksize};
 
     $fh->sysseek (($hdrsize+($bnum * $blocksize)), 0 )
@@ -246,7 +250,7 @@ sub _filewriteblock
 #        substr($$refbuf, $blocksize-$packlen, $packlen) = $basicftr;
 
         my $ckTempl  = '%32C' . ($blocksize - $packlen); # skip the footer
-        my $cksum = unpack($ckTempl, $$refbuf) % 65535;
+        my $cksum    = unpack($ckTempl, $$refbuf) % 65535;
         my $basicftr = pack($Genezzo::Block::Std::FtrTemplate, 0, 0, $cksum);
         # add the checksum to the end of the block
         substr($$refbuf, $blocksize-$packlen, $packlen) = $basicftr;
@@ -273,6 +277,8 @@ sub ReadBlock
                     filenum  => "no filenum !",
                     blocknum => "no blocknum !"
                     );
+                    
+#    my %optional ;# XXX XXX XXX: dbh_ctx
 
     my %args = (
                 @_);
@@ -388,6 +394,8 @@ sub WriteBlock
                     filenum  => "no filenum !",
                     blocknum => "no blocknum !"
                     );
+
+#    my %optional ;# XXX XXX XXX: dbh_ctx
 
     my %args = (
                 @_);
@@ -675,6 +683,11 @@ Currently requires 2 blocks per open file.
 =head1 TODO
 
 =over 4
+
+=item  need to move TSExtendFile functionality here if want to overload
+       syswrite with encryption
+
+=item  read_only database support
 
 =item  buffer cache block zero should contain description of buffer cache 
        layout

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/SysHook.pm,v 1.2 2005/01/23 10:02:03 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/SysHook.pm,v 1.4 2005/01/30 09:37:45 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -17,9 +17,13 @@ use Carp;
 
 our $VERSION;
 
-BEGIN {
-    $VERSION = do { my @r = (q$Revision: 1.2 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+our $Got_Hooks;       # set to 1 after all hooks get loaded
+our %SysHookOriginal; # save original value of all hooks for posterity
 
+BEGIN {
+    $VERSION = do { my @r = (q$Revision: 1.4 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+
+    $Got_Hooks = 0;
 }
 
 our $GZERR = sub {
@@ -51,10 +55,11 @@ sub MakeSQL
 #REM
 #REM 
 #ct sys_hook xid=n pkg=c hook=c replace=c xtype=c xname=c args=c owner=c creationdate=c version=c
-#i havok 3 Genezzo::Havok::SysHook SYSTEM TODAY 0 0
+#i havok 3 Genezzo::Havok::SysHook SYSTEM TODAY 0 HAVOK_VERSION
 #
 #REM HAVOK_EXAMPLE
-#i sys_hook 1 Genezzo::Dict dicthook1 repl require Genezzo::Havok::Examples Howdy SYSTEM TODAY 0
+#i sys_hook 1 Genezzo::Dict dicthook1 Howdy_Hook require Genezzo::Havok::Examples Howdy SYSTEM TODAY 0
+#i sys_hook 2 Genezzo::Dict dicthook1 Ciao_Hook  require Genezzo::Havok::Examples Ciao SYSTEM TODAY 0
 #
 #
 #
@@ -90,6 +95,19 @@ sub HavokInit
     return @stat
         unless (Validate(\%args, \%required));
 
+    if ($Got_Hooks)
+    {
+
+        # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
+        # don't load hooks twice to avoid circular links!!  Is it
+        # sufficient to call the first entry for each hook and reset
+        # the hook to its "replace" var, i.e for dicthook1, set
+        # dicthook1 = &Howdy_Hook ? Or use SysHookOriginal hash?
+        # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
+        $stat[0] = 1; # ok!
+        return @stat;
+    }
+
     my $dict   = $args{dict};
     my $phase  = $args{phase};
 
@@ -120,9 +138,72 @@ sub HavokInit
             
 #        greet $vv;
 
+        my $save_previous_hook;
+
+        {
+            my $mainf = $xpkg . "::"  . $hook;
+
+            my @varlist; # list of variables to hold previous value of coderef
+
+            if (defined($repl)
+                && length($repl))
+            {
+                
+                # build name of variable to hold previous value of
+                # hook coderef
+
+                $repl = $xname . "::" . $repl; # scope for require package
+                push @varlist, $repl;
+            }
+
+            # have we seen this hook before?
+            unless (exists($SysHookOriginal{"$mainf"}))
+            {
+
+                # create a placeholder, even for non-existant
+                # functions.  Then we know to "undef" them if we
+                # re-initialize...
+
+                $SysHookOriginal{"$mainf"} = undef;
+
+                # save the original value for a hook variable if necessary
+                my $orig_var = 'SysHookOriginal{"'. $mainf . '"}';
+                push @varlist, $orig_var;
+            }
+
+            if (scalar(@varlist))
+            {
+                # we have a hook that needs saving...
+                $save_previous_hook = "";
+
+                # save to modules "replace" var and SysHookOriginal 
+                # if necessary
+                for my $varname (@varlist)
+                {
+                    $save_previous_hook .= '$' . $varname . ' = \&' . $mainf .
+                        ' if defined(&' . $mainf . ');';
+                }
+                greet $save_previous_hook;
+
+            }
+            else
+            {
+                # do nothing
+                $save_previous_hook = undef;
+            }
+
+        }
+
         if ($xtype =~ m/^require$/i)
         {
-            unless (eval "require $xname")
+            my $req_str = "require $xname";
+
+            eval "$save_previous_hook"
+                if (defined($save_previous_hook));
+            
+            greet $req_str;
+
+            unless (eval $req_str)
             {
                 my %earg = (#self => $self,
                             msg => "no such package - $xname - for table sys_hook, row $xid");
@@ -132,6 +213,7 @@ sub HavokInit
 
                 next;
             }
+
 
             # XXX XXX: check for existance of "args" function...
 
@@ -216,6 +298,10 @@ sub HavokInit
 
     } # end while
 
+    $Got_Hooks = 1;
+
+    greet %SysHookOriginal;
+
     $stat[0] = 1; # ok!
     return @stat;
 }
@@ -274,13 +360,12 @@ create table sys_hook (
 
 =item hook - name of hook function
 
-=item replace - replacement strategy.  If blank, null, or "replace", 
-just replace existing hook.  If "precede", new hook runs first, then
-activates previous, if it exists.  If "follow", if old hook exists, 
-it runs first, then activate new hook.
+=item replace - unique name for previous hook coderef.  
+If blank or null, just replace existing hook, 
+otherwise is variable name for
+previous version of the hook, and may get called from new hook
 
 =item  xtype - the string "require" or "function"
-
 
 =item xname - if xtype = "require", then xname is a package name, like
 "Text::Soundex".  if xtype = "function", xname is a function name.  A
@@ -299,17 +384,16 @@ of functions to import to the default Genezzo namespace.  if xtype =
 
 =head2 Example:
 
-insert into sys_hook (1, "Genezzo::Dict", "dicthook1", 
+insert into sys_hook (1, "Genezzo::Dict", "dicthook1", "Howdy_Hook",
 "require", "Genezzo::Havok::Examples",  
 "Howdy", "SYSTEM", "2004-09-21T12:12");
 
 The row causes SysHook to "require Genezzo::Havok::Examples", and
 calls the "Howdy" function from the hook function "dicthook1" in the
-package Genezzo::Dict.
-
-? should it import unpackaged functions into the "pkg" package?
-Maybe if they don't have '::' in name...
-
+package Genezzo::Dict.  The previous coderef for the function "dicthook1"
+(if it exists) is assigned to $Genezzo::Havok::Examples::Howdy_Hook. 
+The Howdy function can call &$Howdy_Hook() to activate the original
+"dicthook1" function.
 
 
 =head1 ARGUMENTS
@@ -318,9 +402,14 @@ Maybe if they don't have '::' in name...
 
 =over 4
 
-=item  isRedGreen
-
 =back
+
+=head1 RISKS 
+
+Replacing system functions in an operational database has
+approximately the same level of risk exposure as running with the
+bulls at Pamploma with your pants around your ankles.  Which is to
+say, "somewhat foolhardy".  
 
 =head2 EXPORT
 
@@ -336,11 +425,10 @@ Maybe if they don't have '::' in name...
 
 =over 4
 
-=item Need to fix "import" mechanism so can load specific functions
-into Genezzo::GenDBI namespace, versus creating stub functions.
-Use "import" and "export_to_level".
+=item should be able to dynamically create hook vars, versus using
+existing "our" vars.
 
-=item Could just load Acme::Everything and we'd be done...
+=item should we do something smart on dictionary shutdown, like unload hooks?  Or have a clever way to re-init and reload a hook?
 
 =back
 

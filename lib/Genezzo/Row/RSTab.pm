@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSTab.pm,v 6.12 2005/01/01 07:53:11 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSTab.pm,v 6.13 2005/01/30 09:38:58 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -99,6 +99,7 @@ sub _init
                       bufcache  => "no buffer cache"
                       );
     my %optional  =  (
+                      dbh_ctx  => {}
                       );
     
     my %args = (@_);

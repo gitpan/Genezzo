@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSBlock.pm,v 6.2 2004/10/04 07:59:38 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSBlock.pm,v 6.3 2005/01/30 09:38:58 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -28,7 +28,8 @@ sub TIEHASH
     my $self = { };
 
     my %optional = (
-                    RDBlock_Class => "Genezzo::Block::RDBlock"
+                    RDBlock_Class => "Genezzo::Block::RDBlock",
+                    dbh_ctx       => {}
                     );
 
     my %args = (

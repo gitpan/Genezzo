@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/SpaceMan/RCS/SMFile.pm,v 6.3 2004/12/26 01:04:41 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/SpaceMan/RCS/SMFile.pm,v 6.4 2005/01/30 09:42:43 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -21,7 +21,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 6.3 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 6.4 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
     @EXPORT      = ( ); # qw(&NumVal);
@@ -46,6 +46,8 @@ sub new
 
     # buffer cache
     $self->{realbc} = shift;
+
+    $self->{read_only} = 0; # TODO: set for read-only database
     
     $self->{bc} = {};
     my $bc = $self->{bc};
@@ -67,21 +69,18 @@ sub new
     # get the index for the freelist row
     my $flidx = $fileheader->{RealTie}->_fetchmeta("FL");
 
-#    unless (exists($href->{usedextents}))
     {
         # currently have a free extent starting at block _1_
         # of _numblocks_ [i.e. all] blocks
 
         # block 0 for file header
 
-#        $href->{freeextents} = [[1, $self->{numblocks}-1]];
- 
         unless (defined($flidx))
         {
 
             # fileheader - last col indicates that a single extent
             # (block 0, length 1 block) is used for the header 
-            # $$$ $$$ extend to support additional blocks of file header
+            # XXX XXX: extend to support additional blocks of file header
             # information
 
             my $packstr = 
@@ -120,11 +119,13 @@ sub new
             return undef
                 unless (defined($stat));
 
+            # flush not necessary unless update block 
+
+            return undef
+                unless ($self->flush());
         }
         $self->{freelist_idx} = $flidx;
 
-        return undef
-            unless ($self->flush());
     }
 
     return $blessref;
@@ -360,7 +361,20 @@ sub _get_current_info
 
     # NOTE: assume valid spacelist
 
-    my $currBlocknum = $spacelist->[1];
+    my ($currBlocknum, $freeBlocknum);
+
+    if ($spacelist->[1] =~ m/\d+/)
+    {
+        # no free list
+        $currBlocknum = $spacelist->[1];
+    }
+#    else
+#    {
+#        # have free list
+#        my @foo =  split('F', $spacelist->[1]);
+#        $currBlocknum = shift @foo;
+#        $freeBlocknum = shift @foo;
+#    }
         
     my @currExtent = split(':', $spacelist->[2]);
 
@@ -532,9 +546,6 @@ sub nextfreeblock
     {
         
         ($currBlocknum, @currExtent) = _get_current_info($spacelist);  
-#        $currBlocknum = $spacelist->[1];
-        
-#        @currExtent = split(':', $spacelist->[2]);
 
         if (scalar(@currExtent) < 2)
         {
@@ -555,6 +566,8 @@ sub nextfreeblock
             # e.g. pct=50 -> 1.5 to get 50% larger (which is really
             # 150% of the previous size)
             my $pctincrease = ($args{pctincrease}/100) + 1;
+
+            # XXX XXX: this won't work if add freelist at end of extent list...
             my @LastExtent = split(':', $spacelist->[-1]);
             greet @LastExtent;
             my $lastsize = pop @LastExtent;
@@ -766,9 +779,6 @@ sub currblock
         unless (_is_valid_spacelist($spacelist));
  
     my ($currBlocknum, @currExtent) = _get_current_info($spacelist);       
-#    my $currBlocknum = $spacelist->[1];
-        
-#    my @currExtent = split(':', $spacelist->[2]);
 
     if (scalar(@currExtent) < 2)
     {
@@ -800,7 +810,7 @@ sub firstblock
     return (undef)
         unless (_is_valid_spacelist($spacelist));
         
-    my $currBlocknum = $spacelist->[1];
+    my ($currBlocknum, @currExtent) = _get_current_info($spacelist);       
         
     my @firstExtent = split(':', $spacelist->[3]);
 
@@ -919,8 +929,6 @@ sub countblock
         unless (_is_valid_spacelist($spacelist));
 
     my ($currBlocknum, @currExtent) = _get_current_info($spacelist);       
-#    my $currBlocknum = $spacelist->[1];        
-#    my @currExtent = split(':', $spacelist->[2]);
 
     # shift off the current block info
     splice (@{$spacelist}, 0, 3);
@@ -1079,6 +1087,9 @@ sub flush
 {
     my $self = shift;
 
+    return 1
+        if ($self->{read_only});
+
     my $bc = $self->{bc};
 
     # XXX XXX: need to support flush of all blocks associated with
@@ -1195,6 +1206,8 @@ extent lists spread over multiple blocks.
 =head1 TODO
 
 =over 4
+
+=item  read_only database support
 
 =item  support for non-table objects like indexes - done? 
 

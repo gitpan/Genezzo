@@ -387,14 +387,16 @@ NEW FEATURES - database export, rollback, quoted strings,
   data in this case.  Single-quoted strings in SQL expressions now
   support backslash quoting, so 'foo\\bar\'s' is interpreted as
   foo\bar's.  Finally, a new Havok module called SysHook supports 
-  extensions to basic Genezzo database functions.  
+  extensions to basic Genezzo database functions.  SysHook is 
+  restructured in version 0.34.
+ 
 
 
 INCOMPATIBLE CHANGES
 
   Version 0.31 dictionary and block format is incompatible with
   previous releases.  No upgrade path is supported.
-  Version 0.33 and 0.32 are compatible with version 0.31.
+  Version 0.34, 0.33 and 0.32 are compatible with version 0.31.
 
 SEE ALSO
 

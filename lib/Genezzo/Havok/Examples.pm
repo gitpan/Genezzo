@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/Examples.pm,v 1.2 2005/01/23 10:01:20 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/Examples.pm,v 1.4 2005/01/30 09:38:04 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -31,6 +31,8 @@ sub isRedGreen
     return ($_[0] =~ m/^(red|green)$/i);
 }
 
+# Example for SysHook function
+our $Howdy_Hook;
 sub Howdy
 {
     my %args = @_;
@@ -45,7 +47,47 @@ sub Howdy
                      msg => "Howdy!!");
         }
     }
-    
+
+   # call the callback
+    {
+        if (defined($Howdy_Hook))
+        {
+            my $foo = $Howdy_Hook;
+            return 0
+                unless (&$foo(self => $args{self}));
+        }
+    }
+
+    return 1;
+}
+
+our $Ciao_Hook;
+sub Ciao
+{
+    my %args = @_;
+
+    if (exists($args{self}))
+    {
+        my $self = $args{self};
+        if (defined($self) && exists($self->{GZERR}))
+        {
+            my $err_cb = $self->{GZERR};
+            &$err_cb(self => $self, severity => 'info',
+                     msg => "Ciao!!");
+        }
+    }
+
+    # call the callback
+    {
+        if (defined($Ciao_Hook))
+        {
+            my $foo = $Ciao_Hook;
+
+            return 0
+                unless (&$foo(self => $args{self}));
+        }
+    }
+
     return 1;
 }
 

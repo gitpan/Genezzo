@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSFile.pm,v 6.4 2005/01/01 07:52:43 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSFile.pm,v 6.5 2005/01/30 09:38:58 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -40,7 +40,8 @@ sub _init
                     tso        => "no tso !"
                     );
     my %optional = (
-                    RDBlock_Class  => "Genezzo::Block::RDBlock"
+                    RDBlock_Class  => "Genezzo::Block::RDBlock",
+                    dbh_ctx        => {}
                     );
     
     my %args = (
@@ -457,9 +458,9 @@ sub _get_a_chunk # override the hph method
     $self->{rowd} = 
         tie %tiebufa, $ROW_DIR_BLOCK_CLASS,
          (RDBlock_Class => $self->{RDBlock_Class},
-         refbufstr => $bce->{bigbuf},
-         blocksize => $bce->{blocksize}, # XXX XXX : get blocksize from bce!!
-         blocknum  => $blocknum);
+          refbufstr => $bce->{bigbuf},
+          blocksize => $bce->{blocksize}, # XXX XXX : get blocksize from bce!!
+          blocknum  => $blocknum);
 
     $bc->{bufblockno} = $blocknum;    
     $self->{reftiebufa} = \%tiebufa;
