@@ -1,0 +1,159 @@
+TODO lib/Genezzo/Block/RDBlkA.pm
+    HSplice: offset calculation must match offset2hkey in RDBlock. Special
+    handling needed if inherited by RDBlk_NN?
+
+TODO lib/Genezzo/Block/RDBlk_NN.pm
+    build simple test cases
+    build complex test cases
+    test thoroughly
+    packdeleted: make this work. It's broken!
+    integration with bt2 - need to packdelete in bsplit, do null checks in
+    leaf blocks (branch blocks should be ok)
+    need a validation function to ensure that block maintains invariant:
+    small number of leading metadata rows starting at row zero, followed by
+    data rows (deletes ok). Easier to support non-split rows initially, but
+    should be able to support head rows (need mods to splice functions to
+    preserve rowstats for this case).
+    need to modify metadata methods so all metadata created in first n rows.
+    could simply have delete really delete the rows, so no changes necessary
+    for rdblock clients (i.e., no "null rows" generated).
+
+TODO lib/Genezzo/Block/RDBlock.pm
+    use row directory rowlen vs len/value for row storage
+    meta row - should binary search for meta id
+    unicode support
+
+TODO lib/Genezzo/BufCa/BCFile.pm
+    buffer cache block zero should contain description of buffer cache
+    layout
+    need a way to free blocks associated with a file that is not currently
+    in use
+
+TODO lib/Genezzo/Dict.pm
+    DictTableAllTab: need index on allfileused for delete
+    DictTableAllTab: update tsfiles for usefile
+    need some combo _get_table/corecolnum/getcol - create a custom iterator
+    that returns specified cols
+    non-unique index support using bt2 use_keycount. Need to separate notion
+    of SQL uniqueness from btree concept of unique, since a non-unique SQL
+    index is a unique btree with the rid as least-significant key col (vs
+    rid as value col).
+    need drop table/drop index linkage, delete constraints for table, etc
+    check usage of HCount for max tid, max fileidx, max consid. This won't
+    work if have deletions
+
+TODO lib/Genezzo/GenDBI.pm
+    This module is a bit of a catch-all, since it contains a DBI-style
+    interface, an interactive loop with an interpreter and some presentation
+    code, plus some expression evaluation and query planning logic. It needs
+    to get split up.
+
+TODO lib/Genezzo/Index/bt2.pm
+    hkey/offset functions: should be able to convert between different
+    "place" formats (Array and Hash prefixes), like the common fetch
+    routine, or ASSERT that prefix matches.
+    add reverse scan to search/SQLFetch
+    support multicol keys, non-unique keys (via combo of key + rid as
+    unique)
+    support transaction unique constraints -- probably via treat key+rid as
+    unique, then turn on true unique key, and scan for duplicates?
+    find out why can't do pctfree=0
+    Work on RDBlk_NN support.
+    search with startkey/stopkey support, vs supplying compare/equal
+    methods. restricting the search api to straight "=","<" comparisons
+    means can try the estimation function
+    need to handle partial startkey/stopkey comparison in searchR/SQLFetch
+    for multi-col keys
+    semantics of nulls in multi-col keys -- sort low?
+    simplify _pack_row with splice and a supplied split position, something
+    like -1 for normal indexes (n-1 key cols, 1 val col, so pop the val) or
+    "N=?" for index-organized tables (N key cols, M val cols, so splice N)
+    reorganize along the lines of "GiST" Generalized Search Trees (Paul
+    Aoki, J. Hellerstein, UCB)
+    ecount support?
+
+TODO lib/Genezzo/Index/bt3.pm
+    new: maybe a way to get blocksize from rstab/rsfile and pass to bt2,
+    versus passing it to each layer separately
+    getMainMeta from first block of tied hash, but no guarantee that space
+    management is nice enough to return blocks in allocation order. Should
+    store block address of leftmost leaf in index table.
+    spacecheck: space cache should simply be free extents allocated to the
+    index. Need to extend smfile to have multiple free extents in spacelist,
+    vs just used extents. Note still an issue for simultaneous inserts --
+    need lots of space for pathological case where each parallel insert
+    splits a separate subtree. That's why transactions were invented.
+
+TODO lib/Genezzo/Index/btHash.pm
+    figure out whether should be a pushhash, hash, or rowsource
+    SQLPrepare/Execute/Fetch: clean up. Shouldn't need to manage a
+    distinction between using btHash as a row source and the old bt2 api.
+    bt2 is wrong - should only have one Fetch style. Should be able to use
+    the index start/stop key vs filtering.
+    NEXTKEY: broken in "dump tsidx" for case where create 2 tables, insert
+    some rows, then drop the first table (and don't COMMIT) and call dump
+    tsidx. Loops in NEXTKEY - never terminates for allfileused index.
+    Add ReadOnly mode so can view indexes, but not insert/update/delete.
+
+TODO lib/Genezzo/Parse/FeebLex.pm
+    quoted string support imperfect - case of WHERE col1="if ($foo->{baz})
+    then blah();" not quite correct...
+
+TODO lib/Genezzo/Row/RSIdx1.pm
+    HSuck:
+    FirstCount/NextCount: do real estimate vs fake
+    should pass leftmost blockno explicitly versus rely on RSTab FIRSTKEY
+    rectify some overlap between btHash and this module
+    could encode multiple column key into single col rid using MIME::Base64
+    encode of a packed row. should check dependency for perl 5.6 and add to
+    Makefile.PL.
+
+TODO lib/Genezzo/Row/RSTab.pm
+    $href: remove - need a dict function to return allfileused via tso
+    HSuck: need a way to specify packing method
+    HSuck: fix trailing zero replacement
+    NextCount: fix quitloop
+    localPush/Store: qualify length packstr as percentage of blocksize
+    (1/3?)
+    localStore: race condition on rowstat
+    localFetchDelete: frag flag info, delete status. Could express this
+    function as a generalized "RowSplice" (as distinct from RDBlkA::HSplice,
+    which is a block splice operator). Would need be able to splice based
+    upon column number/array offset, as well as substring byte offset -- the
+    inverse functionality of PackRow2/HSuck
+    DBI - support Bind and projection (returning only certain specified
+    columns, versus all columns)
+
+TODO lib/Genezzo/SpaceMan/SMFile.pm
+    support for non-table objects like indexes - done?
+    freetable: when last object is freed, need to update _tsfiles as UNUSED
+    need to coalesce adjacent free extents
+    maintain multiple free lists for performance
+    better indexing scheme - maybe a btree
+    chain the block header if necessary -- allocate a new block to hold
+    additional free list information, append extent allocation to HEADER row
+    (after 0:1)
+    check status everywhere where update rows
+    maintain free extents list for each object, so can re-use extents
+    (especially important for updates of large multi-block rows)
+
+TODO lib/Genezzo/Tablespace.pm
+    filearr, used, unused: should match dict _tsfiles fileidx - done 3.21?
+    notion of buffercache associated the tablespace object -- possible
+    multiple active bc's, with different characteristics/semantics, e.g. a
+    bc for temp space with different blocksize, lacking txn recovery? Need
+    to guarantee that all clients of a tso use the same bc for
+    consistency/locking/txn support
+
+TODO lib/Genezzo/Util.pm
+    packrow: store metadata in col0 vs trailing col with next ptr
+    packrow: check pack format for a zero len row of zero cols. Does it need
+    a nullvec?
+    unpackrow: extend to support a prebuilt template when unpacking many
+    rows with the same number of columns. Could probably store in an array.
+    if (defined($a[$numcols])...
+    packrow/unpackrow: in Perl 5.8 could use the nifty repeating templates
+    to our advantage.
+    packrow: could generate skiplists as col zero metadata tracking byte
+    position and column numbers to speed lookups
+

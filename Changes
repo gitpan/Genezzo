@@ -1,0 +1,149 @@
+Revision history for Perl extension Genezzo
+
+0.20  Wed Jul 28 23:20:33 2004
+        - Dict changes:
+           use _get_col_hash to replace hard-coded column indexes in
+           Dict, Tablespace.
+        - bt2 - support for non-unique indexes where rid is part of key.
+        ALTER TABLE ADD CONSTRAINT support
+
+0.19  Thu Jul 22 10:40:15 2004
+        - Gnzo2.t: uncovered issue where RSFile might return 
+          incorrect rid's during push -- a very serious problem
+          for chained rows.  Fixes to RSFile::_get_current_chunk
+        - Dict changes: 
+            add ind1, ind1_cols tables for index information
+            add primary key for cons1_cols, _tsfiles, ind1, ind1_cols
+            dump "help" option
+        - fix fetch from empty index
+
+0.18  Mon Jul 12 22:36:04 2004
+        - extensible datafiles via increase_by
+        - add "increase_by" to AddFile command.  Support fixed size (bytes) 
+          increase or percentage increase.  
+        - Dict changes:  
+            _tspace  - addfile column
+            _tsfiles - increase_by column
+        - add "bigdb.sql" script to reset database to acquire multiple, 
+          auto-extending datafiles
+        - fix month in iso-8601 dates
+        - insert select: check if table exists first
+        - add SHOW command with version, license
+        - convert to GPL
+
+0.17  Sat Jul  3 15:18:54 2004
+        - Gnzo2.t: fixes for long row splitting and updating.  Make sure
+          to write row status bit changes (versus just updating in memory).
+          Always insert the new row pieces first so if run out of
+          space, the original row value is preserved.
+
+0.16  Thu Jul  1 14:48:44 2004
+        - IdxTab filter fixes
+        - btHash Index fetch (fetching from index as a "table") 
+          filter fixes.
+        - Dict changes: 
+            core table "creationdate" columns in iso-8601 format
+            (YYYY-MM-DDtHH:MI:SS) because numeric date "epoch" 
+            not portable.
+            _tab1    - otype to object_type, 
+            _tsfiles - add initial_size, calc_increase
+        - pass filename, size arguments for AddFile
+        - datafile portability: only store relative paths for file names
+          in _tsfiles so can move gnz_home directory
+        - default increase_by=50% for extent allocation
+        - Extensible datafiles via increase_by (in progress)
+        - Gnzo2.t: fixes for long row splitting and updating (still broken)
+
+0.15  Mon Jun 21 21:32:43 2004
+        - Create Index <index_name> on <table_name> (col1 [,...<col_n>])
+        - Use primary key index lookup for equality predicates 
+          (WHERE index_col = "literal")
+        - INDEX object type
+        - core table "creationdate" column as number (not char)
+        - estimation for rsidx/bthash - (placeholder - just straight count)
+        - fixes for primary key constraints
+        - Internal: bt2 - fix SQLFetch to match RSTab api
+                    Dict - define and load primary key indexes in 2 phases
+        - fix "select count(*) from ggg" when ggg is an idxtab
+
+0.14  Thu Jun 17 19:47:13 2004
+        - btree support for unique key (duplicate detection)
+          on insert, added key_type argument to simplify btree
+          api, start_key/stop_key support in index SQLPrepare,
+          IOT's with multiple value columns, WHERE clause support
+          for startkey/stopkey for (=, <, >) operations.
+        - Handle "nearest" start/stopkey, versus an exact match.
+        - Internal: start transitioning to object_id vs tablename
+          in dictionary, space mgmt, row sources
+        - primary key constraints for dictionary tables
+        - primary key index support
+
+0.13  Fri Jun  4 02:24:31 2004
+        - index enhancement to support multicolumn keys,
+          index persistent space management, 
+          fix rowcount on insert failure, index count support,
+          index-only table support via "ct <tabname> index <col=value>...", 
+          limited WHERE clause support for equality keys
+
+0.12  Fri May 21 01:40:43 2004
+        - change packrow - don't need separate len for null bitvec,
+          parameterize numeric pack types to support BER ints.  
+          Add -define parameter to pass key=value pairs for db
+          initialization (e.g. blocksize=2k).  
+          Fix rowcount in DBI fetch (GenDBI::SelectFetch).
+          Cleanup Tablespace handling of filearr,used/unused to match
+          Dict _tsfiles fileidx.
+          Use Util::UNPACK_TEMPL_ARR to cache common unpacking templates
+          to speed up UnPackRow.
+          bt2: faster insertion
+
+0.11  Tue Mar 30 23:14:54 2004
+        - change col1 and pref1 column names so not reserved words,
+          fix bufcache creation to get size from prefs, use all free 
+          blocks before checking pin status, parse IS [NOT] NULL 
+          predicates
+
+0.10  Fri Mar 19 23:59:46 2004
+        - describe table, better string parsing of relop tokens 
+          (e.g. =, <, > ...), primitive sql update (basically single
+          row update column=value, no subqueries), slight fixes on
+          RSFile/SMFile nextblock improve row packing density, remove
+          surrounding quotes on insert/update values, return undef's in 
+          SelectFetch (versus the string "<undef>"), quiet undef warnings
+          for WHERE filters, simple sql create/drop table, deprecate use
+          of pack Z template in fileheader to stay compatible with
+          perl 5.6.  
+
+0.09  Tue Mar  9 20:59:04 2004
+        - metadata support functions, DBI-style interfaces, 
+          column aliases, basic WHERE clause support, sql DELETE,
+          dbi_example.pl script
+        - insert select, additional fileheader fields and checksum,
+          fixes for RSTab row splitting, HCount/ECount fetch
+
+0.08  Tue Feb 10 08:11:20 2004 
+        - row chaining/splitting, block labelling and checksums, 
+          count estimation, variable fileheader with versioning, 
+          HSuck, multiple file support via AddFile
+
+0.07  Sun Nov 02 07:28:33 2003
+        - null handling in blocks, improve parser
+
+0.06  Sat Oct 18 07:53:53 2003
+        - remove SQL::Statement dependency - use Feeble parser, 
+          btree index prototyping, block (vs row) interface: make_new_block
+
+0.05  Wed Oct 01 07:42:33 2003
+        - Dictionary restructure for true tids vs rids
+
+0.04  Tue Sep  2 21:28:29 2003
+        - more comments, testing, configuration, automatic install,
+          single file database with self-describing dictionary
+
+0.03  Experimental
+0.02  Experimental
+
+0.01  Wed Mar 26 11:52:41 2003
+	- original version; created by h2xs 1.20 with options
+		-X Genezzo
+

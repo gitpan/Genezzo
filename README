@@ -1,0 +1,363 @@
+Copyright (C) 2003, 2004 Jeffrey I Cohen.  All rights reserved, worldwide.
+
+NAME
+
+  Genezzo::GenDBI - Genezzo engine
+
+
+DESCRIPTION
+
+  The Genezzo modules implement a hierarchy of persistent
+  hashes using a fixed amount of memory and disk.  This system is
+  designed to be easily configured and extended with custom functions,
+  persistent storage representations, and novel data access methods.
+  In its current incarnation it supports a limited SQL-like
+  language with DBI-style interfaces.
+
+REQUIREMENTS
+
+ Perl 5.6    
+
+INSTALLATION
+
+  If you can read this, then you figured out how to uncompress and
+  untar the archive.  
+
+  perl Makefile.PL  # constructs the makefile
+  make              
+  make test         
+  make install      # (as superuser)
+
+  You should be able to run scripts from the directory containing
+  this file, something like:
+
+  perl -Iblib/lib lib/Genezzo/gendba.pl
+
+
+USAGE
+
+  line mode available via (/usr/bin) gendba.pl.  
+  Try:
+
+    gendba.pl -help
+    gendba.pl -man 
+
+  for more information.
+
+  The GenDBI module supports a subset of DBI-style calls.  See
+  dbi_example.pl for some sample usage.
+
+  Try:
+
+    perl -Iblib/lib lib/Genezzo/dbi_example.pl # runs an example
+    perldoc Genezzo::GenDBI
+
+  for more information.
+
+EXAMPLES
+
+  The simplest way to create an instance of a Genezzo database is to use:
+
+    gendba.pl -init
+
+  This command will create a new database and login to the
+  command-line.  Some very basic SQL create/drop/describe table,
+  select, insert, update and delete syntax is supported, but unlike
+  standard SQL, table and column names are case-sensitive.  More
+  complex SQL, such as joins, parses, but is ignored.  The only
+  supported functions are count(*) and ecount, a non-blocking count
+  estimation function.  The database also supports commit to force
+  changes to disk, but no rollback.  NOTE: Data definition (such as
+  create table or ct) must be manually committed to keep the database
+  in a consistent state.  Uncommitted inserts and updates will only be
+  block-consistent -- there is no guarantee that the data will get
+  flushed to disk, and no guarantee whether the changes will or will
+  not take effect.
+
+    rem  Some simple SELECTs
+    select * from _col1;
+    select rid, rownum, tname, colname from _col1;
+    select count(*) from _col1;
+    select ecount from _col1;
+
+    rem  SELECTs with WHERE, perl and SQL style.
+    rem  This functionality is somewhat fragile
+    rem
+    rem  note use of /x in regexp - fix problem when parser adds extra space
+    select * from _tab1 where tname =~ m/col/x;
+    select * from _tab1 where tid < 5;
+    select * from _tab1 where (numcols > 3) && (numcols < 6);
+    select tid as Table_ID, tname Name from _tab1;
+
+    rem  Basic INSERT
+    insert into test1 values (a,b,c,d);
+    insert into test1(col2, col1) values (a,b,c,d);
+
+    rem CREATE TABLE and INSERT...SELECT
+    create table test2(col1 char, col2 char);
+    insert into test2 (col1) select col1 from test1;
+
+    rem  DELETE with WHERE
+    delete from test1 where (col1 < "bravo") && (col2 > 5);
+
+    rem  UPDATE with WHERE (no subqueries supported)
+    update test2 set col2 = "foo" where col2 is null;
+
+    commit
+
+  By default, the database will autostart -- the gendba.pl command will
+  connect to an active, updateable instance.  The shutdown command will
+  reset the database to a read-only mode that only provides read access
+  to certain dictionary tables.  The startup command will restart the
+  database.
+
+  The Genezzo parser also supports the Feeble query language, as
+  described by gendba.pl -man.  Briefly, the commands are ct (create
+  table), dt (drop table), i (insert), u (update), d (delete), s
+  (select).  The following example creates a table EMP with two
+  columns, NAME (as character) and ID (as number), inserts five rows,
+  and counts them.
+
+    ct EMP NAME=c ID=n
+    i EMP bob 1 orville 2 wilbur 3 harry 4 luke 5
+    s EMP count
+    s EMP ecount
+    commit
+
+  Update and delete only work via rowid.  For example:
+
+    gendba 10> s EMP rid rownum *
+    rid     rownum  NAME    ID
+    ___     ______  ____    __
+
+    1/33/1  1       bob     1
+    1/33/2  2       orville 2
+    1/33/3  3       wilbur  3
+    1/33/4  4       harry   4
+    1/33/5  5       luke    5
+
+    5 rows selected.
+
+    gendba 11> d EMP 1/33/1
+    deleted 1 rows from table EMP.
+
+    gendba 12> u EMP 1/33/5 margo 66
+    updated 1 rows in table EMP.
+
+    gendba 13> !10
+    s EMP rid rownum *
+    rid     rownum  NAME    ID
+    ___     ______  ____    __
+
+    1/33/2  1       orville 2
+    1/33/3  2       wilbur  3
+    1/33/4  3       harry   4
+    1/33/5  4       margo   66
+
+    4 rows selected.
+
+  The default database is stored in a fixed-size 160K file.  You can
+  change the default filesize and the blocksize at database
+  initialization time.  For example:
+
+    gendba.pl -init -define blocksize=8k -define dbsize=10M
+
+  to create a database with a 10 megabyte datafile using 8K blocks.
+  By default, this file is a fixed size, but it can be set to grow
+  using the "increase_by" settings added in version 0.18.  Also, you can
+  add additional files to your database using the "addfile" command.  By
+  default, each file is double the size of the previous.  Type "addfile
+  help" for more options.
+
+
+NEW FEATURES - Indexed Tables
+
+  Version 0.13 introduces an indexed-table type.  An indexed table
+  treats the first column in the table definition as a unique, not-null
+  primary key.  
+
+    gendba 9> ct EMP index id=n name=c
+    Create Table : EMP 
+    with unique index option
+    tablename : EMP
+    column id : n (primary key)
+    column name : c
+    table EMP created 
+
+    gendba 10> i EMP 1 bob 2 orville 3 wilbur 4 harry 5 luke
+    inserted 5 rows into table EMP.
+
+    gendba 11> s EMP rid *
+    rid     id      name
+    ___     __      ____
+
+    1       1       bob
+    2       2       orville
+    3       3       wilbur
+    4       4       harry
+    5       5       luke
+
+    5 rows selected.
+
+    gendba 12> i EMP 1 bob 2 orville 3 wilbur 4 harry 5 luke
+    whisper: duplicate key 1
+    Failed to insert row 1 in table EMP at lib/Genezzo/gendba.pl line 230
+    inserted 0 rows into table EMP.
+
+    gendba 13> select tid, tname, otype from _tab1 where tname = "EMP"
+    tid     tname   otype
+    ___     _____   _____
+
+    14      EMP     IDXTAB
+
+    1 row selected.
+
+
+  Notice that the first column is marked as a primary key when the
+  table is created, and the rids for indexed tables are the primary key,
+  not a physical block address.  
+
+  Indexed tables have an object type of IDXTAB in the data dictionary
+  -- conventional tables are marked as TABLE.
+
+  WHERE clause processing has been enhanced to use equality predicates
+  (e.g. "SELECT * from EMP where id = 2") to drive index scans.  Any
+  series of "AND"ed predicates is a candidate for an efficient index
+  search, but the use of an OR currently requires a full table scan.
+
+  CAVEATS:  The index performance is pretty poor, for a couple reasons.
+  It should improve a lot.  
+
+NEW FEATURES - Primary Key Indexes
+
+  Version 0.14 introduces "ci" - create index.
+  Users can now define their own primary key (unique and not-null)
+  indexes.  The dictionary automatically maintains indexes on its own
+  tables.  In order to create an index called EMP_PK on the ID column
+  of table EMP, the command is:
+  
+      ci EMP_PK EMP ID
+
+  Version 0.15 supports SQL-style Create Index.  The alternative method
+  to create the EMP_PK index is:
+
+      Create Index EMP_PK on EMP (ID)
+
+  You can have arbitrary combinations of numeric and character keys.
+  RESTRICTIONS: only one index per table currently.  Index keys must
+  be less than one-half of the db blocksize.  
+
+  In version 0.15, the query engine will use the index to drive the
+  row fetch for a SELECT if the WHERE clause specifies an equality 
+  predicate on the primary key.  For example:
+
+      Select * from EMP where ID = 5
+ 
+  uses an index.  In general, additional predicates may accompany the
+  equality expression as long as they are ANDed:
+
+      Select * from EMP where ID = 5 and NAME =~ m/BOB/x
+
+  However, the presence of ORs causes the plan to revert to a full
+  table scan:
+
+      Select * from EMP where ID = 5 or ID = 6
+
+
+NEW FEATURES - automatic tablespace and file growth
+
+  In version 0.18, datafiles are no longer a fixed size.  The column
+  "increase_by" in table _tsfiles controls the behavior: if this column
+  is blank, null, or zero, the datafile size is fixed.  If
+  "increase_by" is a non-zero number, the datafile will attempt to grow by 
+  that many bytes if it runs out of free extents.  If "increase_by" is a
+  percentage like "50%", the datafile is extended by the current size
+  multiplied by this percentage.  The AddFile command now takes
+  "increase_by" as an optional argument.  
+
+  Also in version 0.18, each tablespace can be configured to
+  automatically create new datafiles when the current datafile runs out
+  of free extents.  The column "addfile" in table _tspace controls the
+  behavior: if the column is blank or null, then the tablespace must be
+  extended manually.  If the "addfile" column contains a valid argument 
+  list for the AddFile command, then this command will get invoked when 
+  all of the current datafiles are full.  Note that the datafiles can be 
+  of a fixed size, or use the new "increase_by" parameter to grow to some
+  maximum size (currently 2G).
+
+  The script "bigdb.sql" can be used to reset your database for
+  automatic growth.  It can be invoked as "@bigdb.sql" from the
+  gendba command line.
+  
+NEW FEATURES - Non-Unique Indexes
+
+  In version 0.20, all user-defined indexes are non-unique.  Unique
+  indexes should be created as unique constraints (but they aren't
+  implemented yet).
+
+NEW FEATURES - ALTER TABLE ADD CONSTRAINT
+
+  Version 0.20 supports ALTER TABLE ADD CONSTRAINT <name> CHECK (<check-text>).
+
+  The check-text is any basic where clause predicate.  Example:
+
+    gendba 3> create table testcon (col1 c, col2 n);
+    gendba 4> alter table testcon add constraint cn1 
+               check ((col2 > 5) && col1 =~ m/(a|b|c)/x )
+
+    gendba 5> insert into testcon values ("a", 7);
+    inserted 1 row into table testcon.
+
+    gendba 6> insert into testcon values ("b", 8);
+    inserted 1 row into table testcon.
+
+    gendba 7> insert into testcon values ("d", 8);
+    violated constraint cn1
+    whisper: undo insert!!
+    Failed to insert row 1 in table testcon at lib/Genezzo/gendba.pl line 244
+    inserted 0 rows into table testcon.
+
+    gendba 8> insert into testcon values ("a", 1);
+    violated constraint cn1
+    whisper: undo insert!!
+    Failed to insert row 1 in table testcon at lib/Genezzo/gendba.pl line 244
+    inserted 0 rows into table testcon.
+
+  Currently, it only supports a single constraint or single index
+  per table.  Also, it parses ADD CONSTRAINT <name> UNIQUE (<column-list>), 
+  but does not execute.  Sorry.  Need to extend to fully support UNIQUE,
+  NOT NULL, PRIMARY, with multiple constraints and indexes per table, 
+  plus ENABLE/DISABLE.
+
+
+INCOMPATIBLE CHANGES
+
+  Version 0.20 dictionary and block format is incompatible with
+  previous release.  No upgrade path is supported.
+
+SEE ALSO
+
+  The project homepage at http://genezzo.com
+
+
+AUTHOR
+
+  Original author: Jeffrey I Cohen <jeff@genezzo.com>
+
+  Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program; if not, write to the Free Software
+    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+Address bug reports and comments to: jcohen@genezzo.com

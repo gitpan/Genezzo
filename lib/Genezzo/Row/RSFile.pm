@@ -1,0 +1,721 @@
+#!/usr/bin/perl
+#
+# $Header: /Users/claude/g3/lib/Genezzo/Row/RCS/RSFile.pm,v 6.1 2004/08/12 09:31:15 claude Exp claude $
+#
+# copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
+#
+#
+use strict;
+use warnings;
+
+use Carp qw(cluck);
+use Genezzo::Row::RSBlock;
+
+package Genezzo::Row::RSFile;
+use Genezzo::Util;
+use Genezzo::BufCa::BCFile;
+use Genezzo::SpaceMan::SMFile;
+use Genezzo::PushHash::HPHRowBlk;
+
+use Carp;
+use warnings::register;
+
+our @ISA = qw(Genezzo::PushHash::HPHRowBlk) ;
+
+our $ROW_DIR_BLOCK_CLASS  = 'Genezzo::Row::RSBlock';
+
+# private
+sub _init
+{
+    #whoami;
+    #greet @_;
+    my $self = shift;
+    my %required = (
+                    tablename  => "no tablename !",
+                    object_id  => "no object id !",
+                    filename   => "no filename !",
+                    numbytes   => "no bytes !",
+                    numblocks  => "no blocks !",
+                    bufcache   => "no bufcache !",
+                    tso        => "no tso !"
+                    );
+    my %optional = (
+                    RDBlock_Class  => "Genezzo::Block::RDBlock"
+                    );
+    
+    my %args = (
+                %optional,
+                @_);
+
+    return 0
+        unless (Validate(\%args, \%required));
+
+    # array of push hashes from make_new_chunk
+    $self->{filename}  = $args{filename};
+
+    $self->{numbytes}  = $args{numbytes};
+    $self->{numblocks} = $args{numblocks};
+    $self->{tablename} = $args{tablename};
+    $self->{realbc}    = $args{bufcache};
+    $self->{object_id} = $args{object_id};
+    $self->{tso}       = $args{tso};
+
+#    $self->{initial_extent} = $args{initial_extent};
+#    $self->{next_extent} = $args{next_extent};
+
+    $self->{smf} = Genezzo::SpaceMan::SMFile->new($args{filename},
+                                               $args{numbytes},
+                                               $args{numblocks},
+                                               $args{bufcache});
+
+    return 0
+        unless (defined($self->{smf}));
+
+    my $blockpkg = $args{RDBlock_Class};
+    
+    # NOTE: check if the rdblock class for RSBlock tie exists...
+    unless (eval "require $blockpkg")
+    {
+        whisper "could not load class $blockpkg";
+        return 0;
+    }
+    $self->{RDBlock_Class} = $blockpkg;
+
+    # keep track of which block is currently buffered.
+    $self->{bc} = {};
+
+    my $bc = $self->{bc};
+
+    $bc->{bufblockno} = ();  
+    $bc->{bceref} = ();
+    $bc->{realbcfileno} = 
+        $self->{realbc}->FileReg(FileName => "$self->{filename}");
+
+    # current insertion point - (not necessarily the current block)
+    $self->{current_chunk_for_insert} = (); 
+
+    return 1;
+}
+
+sub TIEHASH
+{ #sub new 
+#    greet @_;
+    my $invocant = shift;
+    my $class = ref($invocant) || $invocant ; 
+    my $self = $class->SUPER::TIEHASH(@_);
+
+    my %args = (@_);
+    return undef
+        unless (_init($self,%args));
+
+    return bless $self, $class;
+
+} # end new
+
+# private routines
+sub _buffered_blockno  # current buffered block, as distinct from currchunkno
+{
+#    whoami;
+    local $Genezzo::Util::QUIETWHISPER = 1; # XXX: quiet the whispering
+
+    my $self = shift;
+#    greet $self->{tablename};
+
+    my $bc        = $self->{bc};
+    my $blockno   = $bc->{bufblockno};
+    return $blockno if (defined($blockno));
+
+    # load the first block if don't have it yet
+    my $smf       = $self->{smf};
+    my $tablename = $self->{tablename};
+    my $object_id = $self->{object_id};
+
+    # NOTE: some tricky stuff here -- first always define bufblockno.
+    $bc->{bufblockno} = $self->_currchunkno();
+
+    # NOTE: calling get_a_chunk will call currchunkno again, but since
+    # bufblockno is defined it should exit at the first return.
+
+    if (defined($bc->{bufblockno}))
+    {
+        whisper "try to load first chunk";
+        my $chunk1 = $self->_get_a_chunk($bc->{bufblockno});
+        unless (defined($chunk1))
+        {
+            whisper "could not load 1st chunk!";
+            return undef;
+        }
+    }
+    return ($bc->{bufblockno});
+
+}
+
+sub _currchunkno     # override the hph method
+{
+#    whoami;
+    my $self = shift;
+#    greet $self->{tablename};
+
+    # load the first block if don't have it yet
+    my $smf       = $self->{smf};
+    my $tablename = $self->{tablename};
+    my $object_id = $self->{object_id};
+
+    unless (defined($self->{current_chunk_for_insert}))
+    {
+        $self->{current_chunk_for_insert} = 
+            $smf->currblock(tablename => $tablename,
+                            object_id => $object_id);
+    }
+
+    return ($self->{current_chunk_for_insert});
+}
+
+sub _get_current_chunk # override the hph method
+{
+#    whoami;
+    local $Genezzo::Util::QUIETWHISPER = 1; # XXX: quiet the whispering
+
+    my $self = shift;
+#    greet $self->{tablename};
+
+    my $blockno = $self->_currchunkno();
+
+    unless (defined($blockno))
+    {
+        return $self->_make_new_chunk();
+    }
+
+    # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX
+    #
+    # Note: currchunkno is the current insertion point, not the
+    # current _buffered_ block.  BE SURE TO CLEAR OUT THE BUFFERED BLOCK
+    # so we can load the current insertion point.
+    #
+    # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX
+    my $bc = $self->{bc};
+    
+    if (defined($bc->{bufblockno})
+        && ($bc->{bufblockno} != $blockno)) # no match!
+    {
+        $bc->{bufblockno} = ();  
+        $bc->{bceref}     = ();
+
+        # clear out the current tied block if it's not current
+        # insertion point
+
+        my $reftb     = $self->{reftiebufa};
+        $self->{rowd} = ();  # clear out to force reload
+
+        if (defined($reftb))
+        {
+            untie $reftb;
+        }
+    } # buffered block didn't match
+
+    unless (defined ($self->{rowd}))
+    {
+        whisper "try to load first chunk";
+        my $chunk1 = $self->_get_a_chunk($blockno);
+        unless (defined($chunk1))
+        {
+            whisper "could not load 1st chunk!";
+            return undef;
+        }
+    }
+    return ($self->{rowd})
+}
+
+sub _make_new_chunk # override the hph method
+{
+#    whoami;
+    my $self = shift;
+
+    my $smf  = $self->{smf};
+    my $bc   = $self->{bc};
+    my $tso  = $self->{tso};
+    my $tablename = $self->{tablename};
+    my $object_id = $self->{object_id};
+    
+    my $reftb = $self->{reftiebufa};
+    $self->{rowd} = ();
+    if (defined($reftb))
+    {
+        untie $reftb;
+    }
+
+    my (@blockinfo, $blockno);
+    for my $num_tries (1..2)
+    {
+        my %nargs = (tablename   => $tablename,
+                     object_id   => $object_id,
+                     );
+
+        # XXX XXX: get from TSO
+        $nargs{pctincrease} = 50;
+
+        @blockinfo =
+            $smf->nextfreeblock(%nargs);
+
+#    greet @blockinfo
+#        if (scalar(@blockinfo) > 1);
+
+        $bc->{bufblockno} = $blockinfo[0];
+
+        $blockno   = $bc->{bufblockno};
+
+        last if (defined ($blockno));
+
+        # no space left?  See if can extend this file.
+        # need to update numbytes, numblocks
+        last unless ($tso->TSGrowFile(smf => $smf,
+                                      tablename => $tablename,
+                                      object_id => $object_id,
+                                      pctincrease => 50 # extent size increase
+                                      ));
+    }
+#    greet $blockno;
+
+    unless (defined ($blockno))
+    {
+        whisper "out of free blocks!";
+        return undef; 
+    }
+
+    $self->{current_chunk_for_insert} = $blockno;
+
+    $bc->{bceref} = 
+        $self->{realbc}->ReadBlock(filenum => $bc->{realbcfileno},
+                                   blocknum => $blockno);
+    
+    unless ($bc->{bceref})
+    {
+        whisper "failed to read block!";
+        return (undef);
+    }
+
+    my $bce = ${$bc->{bceref}};
+#    $smf->flush();
+#    greet $bce;
+
+    my %tiebufa;
+    # tie array to buffer
+    $self->{rowd} = 
+        tie %tiebufa, $ROW_DIR_BLOCK_CLASS,
+        (RDBlock_Class => $self->{RDBlock_Class},
+         refbufstr => $bce->{bigbuf}, blocknum => $blockno, 
+         blocksize => $bce->{blocksize}); # XXX XXX : get blocksize from bce!!
+    
+    $self->{reftiebufa} = \%tiebufa;
+    
+    return ($self->{rowd});
+}
+
+# NOTE: block routine for index operations
+sub _make_new_block # override HPHRowBlk
+{
+    my $self = shift;
+
+#    whoami;
+
+    my $chunk = $self->_make_new_chunk();
+
+    return undef
+        unless (defined($chunk));
+    my $blockno = $self->_currchunkno();
+    # NOTE: add 0 as slotnumber
+    return $self->_joinrid($blockno, '0');
+}
+
+# NOTE: block routine for index operations and row splitting
+sub _get_current_block # override HPHRowBlk
+{
+    my $self = shift;
+
+#    whoami;
+
+    my $chunk = $self->_get_current_chunk();
+
+    return undef
+        unless (defined($chunk));
+
+    my $blockno = $self->_currchunkno();
+    # NOTE: add 0 as slotnumber
+    return $self->_joinrid($blockno, '0');
+}
+
+# NOTE: block routine for index operations
+sub _get_block_and_bce # override HPHRowBlk
+{
+    my ($self, $place) = @_;
+
+    my ($chunk, $sliceno) = $self->_get_chunk_and_slice($place);
+
+    return undef
+        unless (defined($chunk));
+ 
+    my $bc = $self->{bc};
+    my $blockno = $self->_currchunkno();
+
+    # XXX XXX : need method to get tie rdblock
+    #   tiedblock , block number, bceref,  tied hash
+    return ($chunk->{tie_rdblock}, 
+            $blockno, 
+            ($bc->{bceref}), 
+            ($self->{reftiebufa}));
+}
+
+sub _get_a_chunk # override the hph method
+{
+    my ($self, $blocknum) = @_;
+#    whoami @_;
+
+    if ($blocknum !~ /\d+/)
+    {
+        carp "Non-numeric key: $blocknum "
+            if warnings::enabled();
+        return (undef); # protect us from non-numeric array offsets
+    }
+
+    my $buffered_blockno = $self->_buffered_blockno();
+    #
+    # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
+    #
+    # NOTE: we might get called from within currchunkno for the very
+    # first time.  In this case, the above call to to currchunkno
+    # shouldn't recurse forever because the bufblockno is defined at
+    # the beginning of the first call to currchunkno.  
+    # 
+    # However, in this routine, we need to check if self->rowd exists.
+    # On the first pass currchunkno gets defined, but we haven't
+    # loaded the first tie for the block, so rowd is undefined.  In
+    # this case drop thru and read the block and tie it.  For
+    # subsequent cases rowd will exists and we don't have to keep
+    # going to read the block and retie.  May need to rethink this
+    # strategy for more complicated locking model.
+    #
+    # In one case, might try to read the hash first, so call to
+    # FIRSTKEY/NEXTKEY will call smf->firstblock (via _First_Chunkno),
+    # and then this function.  In get_a_chunk we call currchunkno to
+    # see if the chunkno = current.  currchunkno will set bufblockno
+    # via smf->currblock, and then call this function *AGAIN* to load
+    # the block.  Which calls currchunkno again, but bufblockno is
+    # set, so it short-circuits.  Then this function finally loads the
+    # block.
+    #
+    # In other case, might try to insert into the hash.  STORE can
+    # call get_chunk_and_slice, which calls get_a_chunk, or HPush can
+    # call get_current_chunk.  Either way currchunkno gets called
+    # which loads the current block.  We need a smarter optimization
+    # to avoid loading the current block for NEXTKEY, since we will
+    # immediately discard it for the first block.
+    #
+    # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
+    #
+    if (    (defined($buffered_blockno))
+         && (defined($self->{rowd})))
+    {
+        return ($self->{rowd})
+            if  ($buffered_blockno == $blocknum);
+    }
+
+    my $smf  = $self->{smf};
+    my $bc   = $self->{bc};
+    my $tablename = $self->{tablename};
+    my $object_id = $self->{object_id};
+
+    unless ($smf->hasblock(tablename => $tablename,
+                           object_id => $object_id, 
+                           blocknum  => $blocknum))
+    {
+        carp "key out of range: $blocknum "
+            if warnings::enabled();
+        return (undef);
+    }
+
+    my $reftb = $self->{reftiebufa};
+    $self->{rowd} = ();
+    if (defined($reftb))
+    {
+        untie $reftb;
+    }
+
+    $bc->{bceref} = 
+        $self->{realbc}->ReadBlock(filenum => $bc->{realbcfileno},
+                                   blocknum => $blocknum);
+    
+    unless ($bc->{bceref})
+    {
+        whisper "failed to read block!";
+        return (undef);
+    }
+
+    my $bce = ${$bc->{bceref}};
+
+    my %tiebufa;
+    # tie array to buffer
+    $self->{rowd} = 
+        tie %tiebufa, $ROW_DIR_BLOCK_CLASS,
+         (RDBlock_Class => $self->{RDBlock_Class},
+         refbufstr => $bce->{bigbuf},
+         blocksize => $bce->{blocksize}, # XXX XXX : get blocksize from bce!!
+         blocknum  => $blocknum);
+
+    $bc->{bufblockno} = $blocknum;    
+    $self->{reftiebufa} = \%tiebufa;
+    
+    return ($self->{rowd});
+
+}
+
+sub _First_Chunkno # override the hph method
+{
+#    whoami;
+    my $self = shift;
+    my $smf  = $self->{smf};
+    my $tablename = $self->{tablename};
+    my $object_id = $self->{object_id};
+
+    my $chunkno = 
+        $smf->firstblock(tablename => $tablename,
+                         object_id => $object_id);
+
+    return ($chunkno);
+}
+
+sub _Next_Chunkno # override the hph method
+{
+#    whoami;
+    my ($self, $prevkey) = @_;
+    my $smf  = $self->{smf};
+    my $tablename = $self->{tablename};
+    my $object_id = $self->{object_id};
+
+    return (undef)
+        unless (defined ($prevkey));
+
+    my $chunkno = $smf->nextblock(tablename => $tablename,
+                                  object_id => $object_id,
+                                  prevblock => $prevkey);
+    return $chunkno;
+}
+
+# count estimation
+sub FirstCount
+{
+#    whoami;
+    my $self = shift;
+    my $smf  = $self->{smf};
+    my $tablename = $self->{tablename};
+    my $object_id = $self->{object_id};
+
+    my ($sum, $sumsq) = (0,0);
+
+    my $totchunk = 
+        $smf->countblock(tablename => $tablename,
+                         object_id => $object_id);
+
+    my $chunkno = $self->_First_Chunkno();
+
+    my $chunkcount = 0;
+
+    while (defined($chunkno))
+    {
+#        greet $chunkno, $sum;
+        my $chunk = $self->_get_a_chunk($chunkno);
+        $chunkcount++;
+
+        if (defined($chunk))
+        {
+            $sum += $chunk->HCount();
+            $sumsq = $sum ** 2; # variance is (0-count) ^ 2
+            last;
+        }
+        
+        $chunkno = $self->_Next_Chunkno($chunkno);
+    }
+
+    my @outi;
+
+    my $sliceno = 0;
+    my $keyplace;
+    $keyplace = $self->_joinrid($chunkno, $sliceno)
+        if (defined($chunkno));
+
+    my $esttot = 0;
+    $esttot = $sum * ($totchunk/$chunkcount)
+        if (($sum > 0) && ($chunkcount > 0) && ($totchunk > 0));
+
+    push @outi, $keyplace, $esttot;
+    push @outi, $sum, $sumsq, $chunkcount, $totchunk;
+
+    return (@outi); 
+} # FirstCount
+
+# count estimation
+sub NextCount
+{
+#    whoami;
+    my ($self, $prevkey, $esttot, $sum, $sumsq, $chunkcount, $totchunk) = @_;
+
+    return undef
+        unless (defined($prevkey));
+    my ($chunkno, $prevsliceno) = $self->_splitrid($prevkey);
+
+    $chunkno = $self->_Next_Chunkno($chunkno);
+
+    my $quitLoop = 1; # XXX XXX 
+    my $loopCnt  = 0;
+    my $lastone  = 0;
+
+    while (1)
+    {
+        my $oldChunkno;
+
+        $loopCnt++;
+
+        unless (defined($chunkno))
+        {
+            $totchunk = $chunkcount; # NOTE: we are done - 
+                                     # fix the total chunk count
+            $chunkno = $oldChunkno;
+            $lastone = 1;
+            last;
+        }
+#        greet $chunkno, $sum;
+        my $chunk = $self->_get_a_chunk($chunkno);
+        $chunkcount++;
+     
+        # readjust the estimated total if chunkcount now exceeds it --
+        # make it slightly larger so pct_complete < 100%...
+        $totchunk = $chunkcount + 1
+            if ($chunkcount >= $totchunk);
+
+        if (defined($chunk))
+        {
+            my $hcnt  = $chunk->HCount();
+            $sum     += $hcnt;
+
+#            my $mean = 0;
+#            $mean = $hcnt/$chunkcount
+#                if ($chunkcount);
+
+            # variance = 1/n-1 * Sum( (observed - mean)^2 )
+
+#            $sumsq   += (($hcnt - $mean)**2);
+            $sumsq   += (($hcnt)**2);
+
+            last if $quitLoop;
+        }
+
+        $oldChunkno = $chunkno;
+        $chunkno = $self->_Next_Chunkno($chunkno);
+
+        # XXX XXX: add logic here
+        $quitLoop = 1
+            if $loopCnt > 10;
+    }
+
+    my @outi;
+
+    my $sliceno = 0;
+    my $keyplace;
+    $keyplace = $self->_joinrid($chunkno, $sliceno)
+        if (defined($chunkno));
+
+    # current sum + (current avg * remaining chunks)
+#    $esttot = $sum + (($sum/$chunkcount)*($totchunk-$chunkcount))
+    if (($sum > 0) && ($chunkcount > 0) && ($totchunk > 0))
+    {
+        if ($lastone)
+        {
+            $esttot = $sum;
+        }
+        else
+        {
+            $esttot = $sum * ($totchunk/$chunkcount);
+        }
+    }
+    push @outi, $keyplace, $esttot;
+    push @outi, $sum, $sumsq, $chunkcount, $totchunk;
+
+#    greet @outi;
+
+    return (@outi); 
+} # NextCount
+
+sub CLEAR
+{
+#    whoami;
+    my $self = shift;
+    my $smf  = $self->{smf};
+    my $tablename = $self->{tablename};
+    my $object_id = $self->{object_id};
+
+    $self->SUPER::CLEAR();
+
+    $smf->freetable(tablename => $tablename,
+                    object_id => $object_id);
+}
+
+
+END {
+
+}
+
+
+1;
+
+__END__
+
+# Below is stub documentation for your module. You better edit it!
+
+=head1 NAME
+
+=head1 SYNOPSIS
+
+=head1 DESCRIPTION
+
+=head1 ARGUMENTS
+
+=head1 FUNCTIONS
+
+=head2 EXPORT
+
+=head1 LIMITATIONS
+
+various
+
+=head1 #TODO
+
+=over 4
+
+=back
+
+=head1 AUTHOR
+
+Jeffrey I. Cohen, jcohen@genezzo.com
+
+=head1 SEE ALSO
+
+L<perl(1)>.
+
+Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program; if not, write to the Free Software
+    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+Address bug reports and comments to: jcohen@genezzo.com
+
+=cut
