@@ -24,6 +24,7 @@ lib/Genezzo/bigdb.sql
 lib/Genezzo/havok.sql
 lib/Genezzo/dbi_example.pl
 lib/Genezzo/gendba.pl
+lib/Genezzo/genexp.pl
 lib/Genezzo/Row/RSIdx1.pm
 lib/Genezzo/Row/RSTab.pm
 lib/Genezzo/Row/RSFile.pm
@@ -36,8 +37,9 @@ lib/Genezzo/BufCa/DirtyScalar.pm
 lib/Genezzo/BufCa/PinScalar.pm
 lib/Genezzo/Dict.pm
 lib/Genezzo/Havok.pm
+lib/Genezzo/Havok/SysHook.pm
 lib/Genezzo/Havok/UserExtend.pm
-lib/Genezzo/Havok/RedGreen.pm
+lib/Genezzo/Havok/Examples.pm
 lib/Genezzo/TSHash.pm
 lib/Genezzo/Feeble.pm
 lib/Genezzo/Parse/FeebLex.pm

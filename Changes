@@ -1,5 +1,11 @@
 Revision history for Perl extension Genezzo
 
+0.33  Sun Jan 23 01:53:03 2005
+        - genexpl.pl: export database
+        - handle backslashes in single-quoted strings.
+        - add rollback support.
+        - havok SysHook tables for system extensions.
+
 0.32  Sat Jan  1 00:27:35 2005
         - More error reporting (Feeble parser).
           (Tip o' the hat to Eric Rollins)

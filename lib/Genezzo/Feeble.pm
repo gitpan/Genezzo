@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Feeble.pm,v 6.6 2005/01/01 07:04:01 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Feeble.pm,v 6.7 2005/01/23 10:04:48 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -166,6 +166,7 @@ sub Parseall
             unless (defined($ww) && length($ww));
         push @words, $ww;
     }
+#    greet @words;
 
     my ($sql_cmd, $pretty, $badparse);
     my $op = $words[0];

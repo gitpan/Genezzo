@@ -1,11 +1,11 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/RedGreen.pm,v 1.4 2004/12/14 07:48:17 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/Examples.pm,v 1.2 2005/01/23 10:01:20 claude Exp claude $
 #
-# copyright (c) 2004 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
-package Genezzo::Havok::RedGreen;
+package Genezzo::Havok::Examples;
 require Exporter;
 
 @ISA = qw(Exporter);
@@ -18,15 +18,35 @@ use warnings;
 
 use Carp;
 
-# select * from mytable where Genezzo::Havok::RedGreen::isRedGreen(col1)
+# select * from mytable where Genezzo::Havok::Examples::isRedGreen(col1)
 # select * from mytable where isRedGreen(col1)
 
+# Example for UserExtend function: test if a string matches 
+# the regexp "red or green"
 sub isRedGreen
 {
     return undef
         unless scalar(@_);
 
     return ($_[0] =~ m/^(red|green)$/i);
+}
+
+sub Howdy
+{
+    my %args = @_;
+
+    if (exists($args{self}))
+    {
+        my $self = $args{self};
+        if (defined($self) && exists($self->{GZERR}))
+        {
+            my $err_cb = $self->{GZERR};
+            &$err_cb(self => $self, severity => 'info',
+                     msg => "Howdy!!");
+        }
+    }
+    
+    return 1;
 }
 
 END { }       # module clean-up code here (global destructor)
@@ -40,7 +60,7 @@ __END__
 
 =head1 NAME
 
-Genezzo::Havok::RedGreen - test if argument is red or green
+Genezzo::Havok::Examples - some example havok functions
 
 =head1 SYNOPSIS
 
@@ -54,7 +74,7 @@ Havok test module
 
 =over 4
 
-=item  isRedGreen
+=item  isRedGreen - test if argument is red or green
 
 =back
 
@@ -77,7 +97,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 
 L<perl(1)>.
 
-Copyright (c) 2004 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2005 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -96,6 +116,6 @@ Copyright (c) 2004 Jeffrey I Cohen.  All rights reserved.
 Address bug reports and comments to: jcohen@genezzo.com
 
 For more information, please visit the Genezzo homepage 
-at http://www.genezzo.com
+at L<http://www.genezzo.com>
 
 =cut

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Block/RCS/Std.pm,v 6.3 2004/12/14 07:45:14 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Block/RCS/Std.pm,v 6.4 2005/01/23 09:57:37 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -20,7 +20,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 6.3 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 6.4 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
     @EXPORT      = qw(&GetStdHdr &SetStdHdr &ClearStdBlock &SetHdr);
@@ -51,8 +51,8 @@ our $DEFBLOCKSIZE = $Genezzo::Util::DEFBLOCKSIZE;   # 4K blocksize
 
 # calculate space for type, fileno/blockno, 
 # LSN/SCN/sequence number 
-my $fileblockTmpl = "N N";
-my $fbtLen = length(pack($fileblockTmpl, 1, 1));
+our $fileblockTmpl = "N N";
+our $fbtLen = length(pack($fileblockTmpl, 1, 1));
 
 our $xtraHdr = "x$fbtLen";  # can only be a spacer like x32
 

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 6.17 2005/01/01 07:04:34 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 6.21 2005/01/23 09:59:40 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -20,7 +20,7 @@ use Genezzo::Dict;
 use Genezzo::Util;
 #use SQL::Statement;
 use Term::ReadLine;
-use Text::ParseWords qw(shellwords);
+use Text::ParseWords qw(shellwords quotewords parse_line);
 use warnings::register;
 
 # Items to export into callers namespace by default. Note: do not export
@@ -48,11 +48,11 @@ BEGIN {
 	
 }
 
-our $VERSION   = '0.32';
+our $VERSION   = '0.33';
 our $RELSTATUS = 'Alpha'; # release status
 # grab the code check-in date and convert to YYYYMMDD
 our $RELDATE   = 
-    do { my @r = (q$Date: 2005/01/01 07:04:34 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
+    do { my @r = (q$Date: 2005/01/23 09:59:40 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
 
 our $errstr; # DBI errstr
 
@@ -261,8 +261,10 @@ sub _init
         $dictargs{GZERR} = $args{GZERR};
     }
 
+    $self->{dbh_ctx} = {}; # database handle context
+
     $self->{dictobj} = Genezzo::Dict->new(gnz_home => $self->{gnz_home}, 
-                                       init_db => $init_db, %dictargs);
+                                          init_db => $init_db, %dictargs);
     return 0
         unless (defined($self->{dictobj}));
 
@@ -504,6 +506,8 @@ sub Kgnz_AddFile
              );
         my %nargs;
 
+        $nargs{dbh_ctx} = $self->{dbh_ctx};
+
         for my $argval (@_)
         {
             if ($argval =~ m/^help$/i)
@@ -572,7 +576,7 @@ EOF_Msg
                 unless ($gothelp);
 
             my %earg = (self => $self, msg => $msg,
-                                severity => 'warn');
+                        severity => 'warn');
             
             &$GZERR(%earg)
                 if (defined($GZERR));
@@ -660,11 +664,12 @@ sub Kgnz_CIdx
             return 0;
         }
         my $dictobj = $self->{dictobj};
-        return ($dictobj->DictIndexCreate (tname => $tablename,
+        return ($dictobj->DictIndexCreate (tname      => $tablename,
                                            index_name => $indexname,
-                                           cols => \@params,
+                                           cols       => \@params,
                                            tablespace => "SYSTEM",
-                                           itype => "nonunique"
+                                           itype      => "nonunique",
+                                           dbh_ctx    => $self->{dbh_ctx}
                                            ));
 
     }
@@ -901,10 +906,12 @@ sub Kgnz_Create
 
             # create hash ref
             
-            return ($dictobj->DictTableCreate (tname => $tablename,
-                                               tabdef => \%coldatatype,
-                                               tablespace => "SYSTEM",
-                                               object_type => $tabtype));
+            return ($dictobj->DictTableCreate (tname       => $tablename,
+                                               tabdef      => \%coldatatype,
+                                               tablespace  => "SYSTEM",
+                                               object_type => $tabtype,
+                                               dbh_ctx     => $self->{dbh_ctx}
+                                               ));
 
 
         }
@@ -927,7 +934,9 @@ sub Kgnz_Drop
             next # optional "table" keyword... [not SQL standard]
                 if ($tablename =~ m/^table$/i);
 
-            $stat = $dictobj->DictTableDrop (tname => $tablename);
+            $stat = $dictobj->DictTableDrop (tname   => $tablename,
+                                             dbh_ctx => $self->{dbh_ctx}
+                                             );
 
             last 
                 unless ($stat);
@@ -979,7 +988,20 @@ sub Kgnz_Commit
 
 #    greet @_ ; 
 
-    return ($dictobj->DictSave());
+    return ($dictobj->DictSave(dbh_ctx => $self->{dbh_ctx}));
+	
+}
+
+sub Kgnz_Rollback
+{
+    my $self = shift;
+    my $dictobj = $self->{dictobj};
+    my %args = (
+		@_);
+
+#    greet @_ ; 
+
+    return ($dictobj->DictRollback(dbh_ctx => $self->{dbh_ctx}));
 	
 }
 
@@ -1058,7 +1080,7 @@ sub Kgnz_Startup
 		@_);
 
     greet @_ ; 
-
+    $args{dbh_ctx} = $self->{dbh_ctx};
     return $dictobj->DictStartup(@_);
 }
 
@@ -1070,7 +1092,7 @@ sub Kgnz_Shutdown
 		@_);
 
     greet @_ ; 
-
+    $args{dbh_ctx} = $self->{dbh_ctx};
     return $dictobj->DictShutdown(@_);
 }
 
@@ -1131,8 +1153,9 @@ sub Kgnz_Delete
         foreach my $rid (@params)
         {
             unless 
-                ($dictobj->RowDelete (tname => $tablename, 
-                                      rid => $rid
+                ($dictobj->RowDelete (tname   => $tablename, 
+                                      rid     => $rid,
+                                      dbh_ctx => $self->{dbh_ctx}
                                       )
                  )
                 {
@@ -1219,8 +1242,9 @@ sub Kgnz_Insert2
             while (@rowarr = splice (@params, 0, $numitems))
             {
 
-                unless ($dictobj->RowInsert (tname => $tablename, 
-                                             rowval => \@rowarr
+                unless ($dictobj->RowInsert (tname   => $tablename, 
+                                             rowval  => \@rowarr,
+                                             dbh_ctx => $self->{dbh_ctx}
                                              )
                         )
                 {
@@ -1299,8 +1323,9 @@ sub Kgnz_Insert2
                 last L_mfor
                     unless scalar(@params);
             }
-            unless ($dictobj->RowInsert (tname => $tablename, 
-                                         rowval => \@rowarr
+            unless ($dictobj->RowInsert (tname   => $tablename, 
+                                         rowval  => \@rowarr,
+                                         dbh_ctx => $self->{dbh_ctx}
                                          )
                     )
             {
@@ -1370,9 +1395,10 @@ sub Kgnz_Update
         $msg = "";
         {
             unless 
-                ($dictobj->RowUpdate (tname => $tablename, 
-                                      rid => $rid,
-                                      rowval => \@rowarr
+                ($dictobj->RowUpdate (tname   => $tablename, 
+                                      rid     => $rid,
+                                      rowval  => \@rowarr,
+                                      dbh_ctx => $self->{dbh_ctx}
                                       )
                  )
                 {
@@ -1874,7 +1900,8 @@ sub SQLAlter
                     && ($alist->{type} eq 'constraint'))
                 {
                     my %nargs = (
-                                 tname => $tablename
+                                 tname   => $tablename,
+                                 dbh_ctx => $self->{dbh_ctx}
                                  );
 
                     my $cons_name;
@@ -2022,7 +2049,7 @@ sub SQLUpdate
         # XXX XXX: need to handle the case where newval is a column, not
         # an identifier
 
-        if ($newval =~ m/^NULL$/)
+        if ($newval =~ m/^NULL$/i)
         {
             # Convert unquoted NULL value to an undef
             $newval = undef;
@@ -2037,10 +2064,40 @@ sub SQLUpdate
             }
             else
             {
+                # NOTE: Special treat for single-quoted strings, 
+                # e.g.: 'foo'.  Allow/require backslash as a quote
+                # character, so must use '\\' to enter a single
+                # backslash and '\'' (backslash quote) to embed a
+                # single-quote in a single-quoted string.
+
+                # if have leading and trailing single quote
                 @getquotes = ($newval =~ m/^\'(.*)\'$/);
 
-                $newval = shift @getquotes
-                    if (scalar(@getquotes));
+                if (scalar(@getquotes))
+                {
+#                    greet @getquotes;
+
+                    # strip lead/trail quotes so parse_line can work
+                    # its magic
+                    $newval = $getquotes[0]; 
+
+                    # use parse line to process quoted characters 
+
+                    # XXX XXX: some weirdness using \n for delimiter
+                    # -- seems to work since shouldn't have embedded
+                    # newlines in these strings, so we only
+                    # split the line into a single token
+                    @getquotes = &parse_line('\n', 0, $newval);
+#                    greet @getquotes;
+
+                    # backslashes have been processed
+                    $newval = shift @getquotes;
+                    for my $tk (@getquotes)
+                    {
+                        $newval .= $tk
+                            if (defined($tk));
+                    }
+                }
             }
         }
 
@@ -2105,9 +2162,10 @@ sub SQLUpdate
         my $rid = shift @rowarr;
         
         unless 
-            ($dictobj->RowUpdate (tname => $tablename, 
-                                  rid => $rid,
-                                  rowval => \@rowarr
+            ($dictobj->RowUpdate (tname   => $tablename, 
+                                  rid     => $rid,
+                                  rowval  => \@rowarr,
+                                  dbh_ctx => $self->{dbh_ctx}
                                   )
              )
         {
@@ -2229,7 +2287,7 @@ sub SQLInsert
             for my $newval (@{$sql_cmd->{colvals}})
             {
 
-                if ($newval =~ m/^NULL$/)
+                if ($newval =~ m/^NULL$/i)
                 {
                     # Convert unquoted NULL value to an undef
                     $newval = undef;
@@ -2244,10 +2302,41 @@ sub SQLInsert
                     }
                     else
                     {
+                        # NOTE: Special treat for single-quoted strings, 
+                        # e.g.: 'foo'.  Allow/require backslash as a quote
+                        # character, so must use '\\' to enter a single
+                        # backslash and '\'' (backslash quote) to embed a
+                        # single-quote in a single-quoted string.
+                        
+                        # if have leading and trailing single quote
                         @getquotes = ($newval =~ m/^\'(.*)\'$/);
                         
-                        $newval = shift @getquotes
-                            if (scalar(@getquotes));
+                        if (scalar(@getquotes))
+                        {
+#                            greet @getquotes;
+
+                            # strip lead/trail quotes so parse_line can work
+                            # its magic
+                            $newval = $getquotes[0];
+
+                            # use parse line to process quoted characters 
+                            
+                            # XXX XXX: some weirdness using \n for delimiter
+                            # -- seems to work since shouldn't have embedded
+                            # newlines in these strings, so we only
+                            # split the line into a single token
+                            @getquotes = &parse_line('\n', 0, $newval);
+#                            greet @getquotes;
+
+                            # backslashes have been processed
+                            $newval = shift @getquotes;
+                            for my $tk (@getquotes)
+                            {
+                                $newval .= $tk
+                                    if (defined($tk));
+                            }
+
+                        }
                     }
                 }
                 push @outi, $newval;
@@ -2840,7 +2929,8 @@ sub SelectExecute
     return @outi
         unless (defined($tablename));
 
-    my $hashi = $dictobj->DictTableGetTable (tname => $tablename) ;
+    my $hashi = $dictobj->DictTableGetTable (tname   => $tablename,
+                                             dbh_ctx => $self->{dbh_ctx}) ;
 
     return @outi
         unless (defined($hashi));
@@ -3053,7 +3143,8 @@ qw(
 
    rem    Kgnz_Rem
 
-   commit Kgnz_Commit
+   commit    Kgnz_Commit
+   rollback Kgnz_Rollback
 
    desc     Kgnz_Describe
    describe Kgnz_Describe
@@ -3229,6 +3320,8 @@ quit : quit the line-mode app
 reload : Reload all genezzo modules
 
 rem : Remark [comment]
+
+rollback : discard uncommitted changes
 
 s : select from a table.  
     Syntax - s <table-name> *
@@ -3465,8 +3558,9 @@ sub prepare # DBI
     return undef
         unless (scalar(@param));
 
-    my $sth = Genezzo::GStatement->new(gnz_h => $self, 
-                                       GZERR => $self->{GZERR},
+    my $sth = Genezzo::GStatement->new(gnz_h     => $self, 
+                                       dbh_ctx   => $self->{dbh_ctx},
+                                       GZERR     => $self->{GZERR},
                                        statement => \@param);
     return $sth;
 }
@@ -3556,7 +3650,9 @@ sub automountcheck
     my $self = shift;
     my $dictobj = $self->{dictobj};
 
-    my $hashi = $dictobj->DictTableGetTable (tname => '_pref1') ;
+    my $hashi = $dictobj->DictTableGetTable (tname   => '_pref1',
+                                             dbh_ctx => $self->{dbh_ctx}
+                                             ) ;
 
     while ( my ($kk, $vv) = each ( %{$hashi}))
     { 

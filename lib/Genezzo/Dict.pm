@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 6.17 2004/12/26 01:02:43 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 6.19 2005/01/23 09:58:48 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -19,7 +19,7 @@ use Genezzo::Havok;
 
 BEGIN {
     our $VERSION;
-    $VERSION = do { my @r = (q$Revision: 6.17 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 6.19 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -640,6 +640,13 @@ sub DictStartup
     return 0
         unless Genezzo::Havok::HavokInit(dict => $self, flag => 0);
 
+    # use sys_hook to define a dictionary startup hook
+    if (defined(&dicthook1))  
+    {
+        return 0
+            unless (dicthook1(self => $self));
+    }
+
     return 1;
 } # end DictStartup
 
@@ -1019,7 +1026,7 @@ sub DictSave
         
         my $ts1 = $vv->{tsref};
         
-        $ts1->TSSave();
+        $ts1->TSSave(@_);
 
         my $msg = "saved tablespace $kk\n";
         my %earg = (self => $self, msg => $msg, 
@@ -1032,6 +1039,59 @@ sub DictSave
     return 1;
     
 } # end dictsave
+
+sub DictRollback
+{
+    my $self = shift;
+    
+    unless ($self->{started})
+    {
+        greet "dict not started";
+        return 0;
+    }
+
+    my $sys_ts = undef;
+    
+    while (my ($kk, $vv) = each (%{$self->{tablespaces}}))
+    {
+        whisper "tablespace: $kk\n";
+
+        next unless (exists($vv->{tsref}));
+        
+        my $ts1 = $vv->{tsref};
+
+        $sys_ts = $ts1
+            if ($kk =~/^SYSTEM$/); # need to reload system tablespace
+        
+        $ts1->TSRollback(@_);
+        greet $kk;
+#        greet $self->_reloadTS($kk);
+
+        $vv->{table_cache} = {}; # XXX XXX: blow out the table cache
+                                 # to force reload
+
+        my $msg = "rollback tablespace $kk\n";
+        my %earg = (self => $self, msg => $msg, 
+                    severity => 'info');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
+    }
+
+    if (defined($sys_ts))
+    {
+
+        # XXX XXX: somewhat abusive - rollback to SYSTEM requires a
+        # reload of the entire dictionary
+        $self->{started} = 0;
+        $self->{use_constraints} = 0; # Note: need to shutoff constraints 
+                                      # before startup
+        return $self->DictStartup();
+    }
+
+    return 1;
+    
+} # end dictrollback
 
 sub doDictPreLoad 
 {
@@ -1394,9 +1454,10 @@ sub _get_table
     # in the normal case the table is stored to disk, but may use
     # in-memory tables during preload.
     my %optional = (
-                    TableHashType => "DISK", # store table on disk
+                    TableHashType => "DISK",   # store table on disk
                     object_type   => "TABLE",
-                    tablespace    => "SYSTEM" # make easier for system tabs
+                    tablespace    => "SYSTEM", # make easier for system tabs
+                    dbh_ctx       => {}
                     );
     my %args = (
                 %optional,
@@ -1483,7 +1544,9 @@ sub _get_table
         my $ts1 = $tshref->{$tsname}->{tsref};
         my %thargs = (tname       => $tablename,
                       htype       => $args{TableHashType},
-                      object_type => $args{object_type});
+                      object_type => $args{object_type},
+                      dbh_ctx     => $args{dbh_ctx}
+                      );
 
         if (defined($args{object_id}))
         {
@@ -2423,7 +2486,8 @@ sub DictTableCreate
 
     my %optional = (
                     object_type => "TABLE",
-                    make_name   => 0 # make a new name if necessary
+                    make_name   => 0, # make a new name if necessary
+                    dbh_ctx     => {}
                     );
 
 
@@ -2993,7 +3057,11 @@ sub DictTableGetTable
 {
     my $self = shift;
 
+    my %optional = (
+                    dbh_ctx => {}
+                    );
     my %args = (
+                %optional,
 		@_);
 #		tname
 
@@ -3001,6 +3069,7 @@ sub DictTableGetTable
         unless (Validate(\%args, \%req_tname));
 
     my $tablename = $args{tname} ;
+    my $dbh_ctx   = $args{dbh_ctx};
 
     return undef
 	unless (&$tabexists(dhash => $self,
@@ -3014,6 +3083,7 @@ sub DictTableGetTable
                                     tablespace  => $tsname,
                                     object_type => $objtype,
                                     object_id   => $obj_id,
+                                    dbh_ctx     => $dbh_ctx
                                     );
     return ($tstable);
 }
@@ -3079,7 +3149,12 @@ sub RowInsert # was realRowPush
                     rowval       => "no rowval!"
                     );
 
+    my %optional = (
+                    dbh_ctx   => {}
+                    );
+
     my %args = (
+                %optional,
 		@_);
 #		tname, rowval
 
@@ -3102,7 +3177,8 @@ sub RowInsert # was realRowPush
 #    return 0
 #	unless ($self->DictTableExists (tname => $tablename));
 
-    my $tstable = $self->DictTableGetTable (tname => $tablename);
+    my $tstable = $self->DictTableGetTable (tname   => $tablename,
+                                            dbh_ctx => $args{dbh_ctx});
 
     return 0
         unless (defined($tstable));
@@ -3129,7 +3205,12 @@ sub RowUpdate
                     rowval       => "no rowval!"
                     );
 
+    my %optional = (
+                    dbh_ctx   => {}
+                    );
+
     my %args = (
+                %optional,
 		@_);
 #		tname, rid, rowval
 
@@ -3154,7 +3235,9 @@ sub RowUpdate
 
     my $rid = $args{rid};
 
-    my $tstable = $self->DictTableGetTable (tname => $tablename);
+    my $tstable = $self->DictTableGetTable (tname   => $tablename,
+                                            dbh_ctx => $args{dbh_ctx}
+                                            );
 
     return 0
         unless (defined($tstable));
@@ -3184,7 +3267,12 @@ sub RowDelete
                     rid       => "no rid!"
                     );
 
+    my %optional = (
+                    dbh_ctx   => {}
+                    );
+
     my %args = (
+                %optional,
 		@_);
 #		tname, rid
 
@@ -3209,7 +3297,9 @@ sub RowDelete
 
     my $rid = $args{rid};
 
-    my $tstable = $self->DictTableGetTable (tname => $tablename);
+    my $tstable = $self->DictTableGetTable (tname   => $tablename,
+                                            dbh_ctx => $args{dbh_ctx}
+                                            );
 
     return 0
         unless (defined($tstable));
@@ -3236,7 +3326,8 @@ sub DictIndexCreate
                     );
 
     my %optional = (
-                    itype => "nonunique" ,
+                    dbh_ctx   => {},
+                    itype     => "nonunique" ,
                     make_name => 0 # make a new name if necessary
                     );
 
@@ -3368,7 +3459,9 @@ sub DictIndexCreate
         $posn++;
     }
 
-    my $hashi2  = $self->DictTableGetTable (tname => $tablename) ;
+    my $hashi2  = $self->DictTableGetTable (tname   => $tablename,
+                                            dbh_ctx => $args{dbh_ctx}
+                                            );
     my $tv2 = tied(%{$hashi2});
     
     my $cfn = $self->_make_constraint_check_fn($tid);
@@ -3627,7 +3720,8 @@ sub _index_define
     my %optional = (
                     itype     => "UNIQUE",
                     do_create => 1,
-                    make_name => 0 # make a new name if necessary
+                    make_name => 0, # make a new name if necessary
+                    dbh_ctx   => {}
                     );
 
     my %args = (
@@ -3712,7 +3806,8 @@ sub _index_define
                  tabdef      => \%coldatatype,
                  tablespace  => $tspace,
                  object_type => "INDEX",
-                 make_name   => $args{make_name}
+                 make_name   => $args{make_name},
+                 dbh_ctx     => $args{dbh_ctx}
                  );
 
     # XXX XXX XXX : use_keycount pkey_type

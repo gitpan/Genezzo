@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Havok.pm,v 1.9 2004/12/30 07:12:59 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Havok.pm,v 1.10 2005/01/23 10:00:16 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -18,7 +18,7 @@ use Carp;
 our $VERSION;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 1.9 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.10 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -61,9 +61,9 @@ sub MakeSQL
 #i havok 1 Genezzo::Havok SYSTEM TODAY 0 HAVOK_VERSION
 #i havok 2 Genezzo::Havok::UserExtend SYSTEM TODAY 0 0
 #
-#REM 
-#REM select * from tab1 where Genezzo::Havok::RedGreen::isRedGreen(col1)
-#i user_extend 1 require Genezzo::Havok::RedGreen isRedGreen SYSTEM TODAY 0
+#REM HAVOK_EXAMPLE
+#REM select * from tab1 where Genezzo::Havok::Examples::isRedGreen(col1)
+#i user_extend 1 require Genezzo::Havok::Examples isRedGreen SYSTEM TODAY 0
 #i user_extend 2 require Text::Soundex soundex SYSTEM TODAY 0
 #
 #
@@ -153,7 +153,7 @@ sub HavokInit
         {
             my %earg = (#self => $self,
                         severity => 'warn',
-                        msg => "no such package - $modname");
+                        msg => "no such package - $modname - for row $hid");
 
             &$GZERR(%earg)
                 if (defined($GZERR));

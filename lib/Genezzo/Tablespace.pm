@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Tablespace.pm,v 6.5 2005/01/01 08:25:58 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Tablespace.pm,v 6.7 2005/01/23 10:03:02 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -27,7 +27,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 6.5 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 6.7 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
 #    @EXPORT      = qw(&func1 &func2 &func4 &func5);
@@ -95,7 +95,8 @@ our $GZERR = sub {
 
 # list of compatible database formats
 my %compatible_format = (
-                         0.32 => [0.31]
+                         0.32 => [0.31],
+                         0.33 => [0.31, 0.32]
                          );
 
 # make all your functions, whether exported or not;
@@ -230,7 +231,8 @@ sub TableHash ()
     my $ts = $self->{the_ts};
 
     my %required = (
-                    tname  => "no table name !"
+                    tname    => "no table name !",
+                    dbh_ctx  => "no dbh context !"
                     );
 
     my %optional = (
@@ -398,12 +400,31 @@ sub TSSave ()
 
     if ($bc)
     {
-        $bc->Flush();
+        $bc->Flush(@_);
         delete $ts->{bc}; # remove bc from ts hash before dumping ts to disk
     }
 
     $ts->{bc} = $bc;
 } # end tssave
+
+sub TSRollback ()
+{
+    my $self = shift;
+
+#    whoami;
+
+    my $ts = $self->{the_ts};
+
+    my $bc = $ts->{bc};
+
+    if ($bc)
+    {
+        $bc->Rollback(@_);
+        delete $ts->{bc}; # remove bc from ts hash before dumping ts to disk
+    }
+
+    $ts->{bc} = $bc;
+} # end tsrollback
 
 sub TSLoad ()
 {
@@ -903,9 +924,10 @@ sub TSExtendFile ()
     my $packstr  = "\0" x $blocksize ; # fill with nulls
 
     # XXX XXX: compute a basic 32 bit checksum
-    my $cksum    = unpack("%32C*", $packstr) % 65535;
+    my $packlen  = $Genezzo::Block::Std::LenFtrTemplate;
+    my $ckTempl  = '%32C' . ($blocksize - $packlen); # skip the footer
+    my $cksum    = unpack($ckTempl, $packstr) % 65535;
     my $basicftr = pack($Genezzo::Block::Std::FtrTemplate, 0, 0, $cksum);
-    my $packlen  = length($basicftr);
 
     substr($packstr, $blocksize-$packlen, $packlen) = $basicftr;
 
@@ -1496,6 +1518,8 @@ possible multiple active bc's, with different
 characteristics/semantics, e.g. a bc for temp space with different
 blocksize, lacking txn recovery?  Need to guarantee that all clients
 of a tso use the same bc for consistency/locking/txn support
+
+=item  use compatibility matrix to drive automatic upgrade capability
 
 =back
 

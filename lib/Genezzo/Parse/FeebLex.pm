@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Parse/RCS/FeebLex.pm,v 6.2 2004/10/04 07:58:38 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Parse/RCS/FeebLex.pm,v 6.3 2005/01/23 10:05:00 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -11,7 +11,7 @@ use strict;
 use warnings;
 use Carp;
 use Genezzo::Util;
-use Text::ParseWords; # qw(shellwords);
+use Text::ParseWords; # qw(shellwords parse_line);
 #use Term::ANSIColor qw(colored);
 
 our (%tokentype, %reloptype, @relopary);

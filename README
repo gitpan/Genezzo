@@ -376,11 +376,25 @@ NEW FEATURES - backward compatiblity
   database format.  Need to extend this capability to get automatic upgrade
   between different database revisions.
 
+NEW FEATURES - database export, rollback, quoted strings,  
+               dynamic system extensions
+  
+  Version 0.33 introduces genexpl.pl, a very, very basic data export 
+  utility.  A "rollback" command is now available, which will discard 
+  all in-memory changes and replace them with the previous committed
+  results.  Note that the buffer cache will automatically flush data
+  to disk when it is full, so rollback will not be able to restore
+  data in this case.  Single-quoted strings in SQL expressions now
+  support backslash quoting, so 'foo\\bar\'s' is interpreted as
+  foo\bar's.  Finally, a new Havok module called SysHook supports 
+  extensions to basic Genezzo database functions.  
+
+
 INCOMPATIBLE CHANGES
 
   Version 0.31 dictionary and block format is incompatible with
   previous releases.  No upgrade path is supported.
-  Version 0.32 is compatible with version 0.31.
+  Version 0.33 and 0.32 are compatible with version 0.31.
 
 SEE ALSO
 

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BCFile.pm,v 6.3 2004/12/14 07:51:38 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BCFile.pm,v 6.5 2005/01/23 09:58:01 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -171,15 +171,19 @@ sub _filereadblock
     $fh->sysseek (($hdrsize+($bnum * $blocksize)), 0 )
         or die "bad seek - file $fname : $fnum, block $bnum : $! \n";
 
+    # HOOK: PRE SYSREAD BLOCK
+
     $fh->sysread ($$refbuf, $blocksize)
         == $blocksize
             or die "bad read - file $fname : $fnum, block $bnum : $! \n";
 
+    # HOOK: POST SYSREAD BLOCK
+
     if (1)
     {
         # XXX XXX: compute a basic 32 bit checksum
-        my $basicftr = pack($Genezzo::Block::Std::FtrTemplate, 0, 0, 0);
-        my $packlen  = length($basicftr);
+#        my $basicftr = pack($Genezzo::Block::Std::FtrTemplate, 0, 0, 0);
+        my $packlen  = $Genezzo::Block::Std::LenFtrTemplate;
 
         my $skippy = $blocksize-$packlen; # skip to end of buffer
         # get the checksum
@@ -188,10 +192,11 @@ sub _filereadblock
 
         # zero out the checksum because it wasn't part of the original
         # calculation
-        substr($$refbuf, $blocksize-$packlen, $packlen) = $basicftr;
+#        substr($$refbuf, $blocksize-$packlen, $packlen) = $basicftr;
 
         # calculate checksum and test if matches stored value
-        my $cksum = unpack("%32C*", $$refbuf) % 65535;
+        my $ckTempl  = '%32C' . ($blocksize - $packlen); # skip the footer
+        my $cksum = unpack($ckTempl, $$refbuf) % 65535;
         my $ck1 = pop @outarr;
         unless ($cksum == $ck1)
         {
@@ -203,6 +208,8 @@ sub _filereadblock
         }
 
     }
+
+    # HOOK: post filereadblock
     
     return (1);
              
@@ -217,11 +224,13 @@ sub _filewriteblock
     $fh->sysseek (($hdrsize+($bnum * $blocksize)), 0 )
         or die "bad seek - file $fname : $fnum, block $bnum : $! \n";
 
+    # HOOK: init filewriteblock
+
     # XXX: build a basic header with the file number, block number,
     # etc 
     # XXX XXX fileblockTmpl
-    my $basichdr = pack("N N", $fnum, $bnum); 
-    my $packlen  = length($basichdr);
+    my $basichdr = pack($Genezzo::Block::Std::fileblockTmpl, $fnum, $bnum); 
+    my $packlen  = $Genezzo::Block::Std::fbtLen;
 
     substr($$refbuf, 0, $packlen) = $basichdr;
 
@@ -229,22 +238,27 @@ sub _filewriteblock
     {
         # XXX XXX: compute a basic 32 bit checksum 
         # -- see perldoc unpack
-        my $basicftr = pack($Genezzo::Block::Std::FtrTemplate, 0, 0, 0);
-        $packlen     = length($basicftr);
+#        my $basicftr = pack($Genezzo::Block::Std::FtrTemplate, 0, 0, 0);
+        $packlen     = $Genezzo::Block::Std::LenFtrTemplate;
 
         # zero out the checksum because the old checksum isn't part of
         # the new checksum
-        substr($$refbuf, $blocksize-$packlen, $packlen) = $basicftr;
+#        substr($$refbuf, $blocksize-$packlen, $packlen) = $basicftr;
 
-        my $cksum = unpack("%32C*", $$refbuf) % 65535;
-        $basicftr = pack($Genezzo::Block::Std::FtrTemplate, 0, 0, $cksum);
+        my $ckTempl  = '%32C' . ($blocksize - $packlen); # skip the footer
+        my $cksum = unpack($ckTempl, $$refbuf) % 65535;
+        my $basicftr = pack($Genezzo::Block::Std::FtrTemplate, 0, 0, $cksum);
         # add the checksum to the end of the block
         substr($$refbuf, $blocksize-$packlen, $packlen) = $basicftr;
     }
 
+    # HOOK: PRE SYSWRITE BLOCK
+
     $fh->syswrite ($$refbuf,  $blocksize)
         == $blocksize
     or die "bad write - file $fname : $fnum, block $bnum : $! \n";
+
+    # HOOK: POST SYSWRITE BLOCK
 
     return (1);
 }
@@ -421,7 +435,8 @@ sub WriteBlock
 
 } # end WriteBlock
 
-sub Flush {
+sub Flush 
+{
     my $self   = shift;
 
     whoami;
@@ -430,6 +445,8 @@ sub Flush {
     my $fn_arr  = $self->{ __PACKAGE__ . ":FN_ARRAY" };
 
     my %sync_list;
+
+    # HOOK: PRE FLUSH BCFILE
 
     while (my ($kk, $vv) = each (%{$hitlist}))
     {
@@ -472,6 +489,53 @@ sub Flush {
         whisper "failed to sync $fname"
             unless ($fh->sync); # should be "0 but true"
     }
+
+    # HOOK: POST FLUSH BCFILE
+
+    return 1;
+#    greet $hitlist;
+    
+} # end flush
+
+sub Rollback 
+{
+    my $self   = shift;
+
+    whoami;
+
+    my $hitlist = $self->{ __PACKAGE__ . ":HITLIST"  };    
+    my $fn_arr  = $self->{ __PACKAGE__ . ":FN_ARRAY" };
+
+    # HOOK: PRE ROLLBACK BCFILE
+
+    while (my ($kk, $vv) = each (%{$hitlist}))
+    {
+        next if ($kk !~ /^FILE/);
+
+        my ($fnum, $bnum) = ($kk =~ m/FILE:(\d.*):(\d.*)/);
+
+        my $bceref =  $self->{bc}->ReadBlock(blocknum => $vv);
+        my $bce = $$bceref;
+
+        if ($bce->_dirty())
+        {
+            my $fname  = $fn_arr->[$fnum-1]->{name};
+            my $fh     = $fn_arr->[$fnum-1]->{fh};
+            my $fhdrsz = $fn_arr->[$fnum-1]->{hdrsize};
+
+            whisper "replace dirty block : $fname - $fnum : $bnum";
+
+            $bce->_dirty(0);
+
+            return (0)
+                unless (
+                        $self->_filereadblock($fname, $fnum, $fh, $bnum, 
+                                              $bce->{bigbuf}, $fhdrsz)
+                        );
+        }
+    }
+
+    # HOOK: POST ROLLBACK BCFILE
 
     return 1;
 #    greet $hitlist;
@@ -554,7 +618,7 @@ END { }       # module clean-up code here (global destructor)
  basis of a more complicated multi-process buffer cache
  with locking.  The buffer cache contains a number of Buffer Cache
  Elements (BCEs), a special wrapper class for simple byte buffers
- (blocks).  See Genezzo::BufCa::BufCa.
+ (blocks).  See L<Genezzo::BufCa::BufCa>.
 
  Note that this module does not perform space management or allocation 
  within the files -- it only reads and writes the blocks.  The caller
@@ -593,6 +657,10 @@ END { }       # module clean-up code here (global destructor)
 =item Flush
 
  Write all dirty blocks to disk.
+
+=item Rollback
+
+ Discard all dirty blocks and replace with blocks from disk..
 
 =back
 
