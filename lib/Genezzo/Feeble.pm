@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Feeble.pm,v 6.5 2004/09/11 06:59:12 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Feeble.pm,v 6.6 2005/01/01 07:04:01 claude Exp claude $
 #
-# copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 package Genezzo::Feeble;
@@ -14,6 +14,45 @@ use Genezzo::Util;
 use Term::ReadLine;
 use Text::ParseWords; # qw(shellwords);
 use Genezzo::Parse::FeebLex;
+
+our $GZERR = sub {
+    my %args = (@_);
+
+    return 
+        unless (exists($args{msg}));
+
+    if (exists($args{self}))
+    {
+        my $self = $args{self};
+        if (defined($self) && exists($self->{GZERR}))
+        {
+            my $err_cb = $self->{GZERR};
+            return &$err_cb(%args);
+        }
+    }
+
+    my $warn = 0;
+    if (exists($args{severity}))
+    {
+        my $sev = uc($args{severity});
+        $sev = 'WARNING'
+            if ($sev =~ m/warn/i);
+
+        # don't print 'INFO' prefix
+        if ($args{severity} !~ m/info/i)
+        {
+            printf ("%s: ", $sev);
+            $warn = 1;
+        }
+
+    }
+    # XXX XXX XXX
+    print __PACKAGE__, ": ",  $args{msg};
+#    print $args{msg};
+#    carp $args{msg}
+#      if (warnings::enabled() && $warn);
+    
+};
 
 sub _init
 {
@@ -30,9 +69,20 @@ sub new
     my $class = ref($invocant) || $invocant ; 
     my $self = { };
 
-    return undef
-        unless (_init($self, @_));
+    my %args = (@_);
 
+    if ((exists($args{GZERR}))
+        && (defined($args{GZERR}))
+        && (length($args{GZERR})))
+    {
+        # NOTE: don't supply our GZERR here - will get
+        # recursive failure...
+        $self->{GZERR} = $args{GZERR};
+    }
+
+    return undef
+        unless (_init($self, %args));
+                
     return bless $self, $class;
 
 } # end new
@@ -131,10 +181,16 @@ sub Parseall
     }
     if ($badparse)
     {
-        print "\n",$pretty,"\n";
-        print ' ' x $badparse, "^\n";
-        print ' ' x $badparse, "|\n";
-        print '-' x $badparse, "+\n";
+        my $msg = "\n" . $pretty . "\n";
+        $msg .= (' ' x $badparse) . "^\n";
+        $msg .= (' ' x $badparse) . "|\n";
+        $msg .= ('-' x $badparse) . "+\n";
+
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'error');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
 
         greet $sql_cmd;
     }
@@ -1369,7 +1425,12 @@ sub sql_create
         $pretty = $self->{feeb}->{pretty};
         $badparse = $self->{feeb}->{badparse};
         
-        carp $msg;
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'error');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
     }
 
     return (\%create_clause, $pretty, $badparse);
@@ -1491,7 +1552,12 @@ sub sql_alter
         $pretty = $self->{feeb}->{pretty};
         $badparse = $self->{feeb}->{badparse};
         
-        carp $msg;
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'error');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
     }
 
     return (\%alter_clause, $pretty, $badparse);
@@ -2008,7 +2074,11 @@ sub sql_update
             $badparse = $self->{feeb}->{badparse} ?
                 $self->{feeb}->{badparse} : length($pretty);
         
-            carp $msg;
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'error');
+        
+            &$GZERR(%earg)
+                if (defined($GZERR));
 
             return (\%upd_clause, $pretty, $badparse);
         }
@@ -2148,7 +2218,11 @@ sub sql_delete
             $badparse = $self->{feeb}->{badparse} ?
                 $self->{feeb}->{badparse} : length($pretty);
         
-            carp $msg;
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'error');
+        
+            &$GZERR(%earg)
+                if (defined($GZERR));
 
             return (\%del_clause, $pretty, $badparse);
         }
@@ -2482,7 +2556,11 @@ sub sql_insert
             $badparse = $self->{feeb}->{badparse} ?
                 $self->{feeb}->{badparse} : length($pretty);
             
-            carp $msg;
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'error');
+        
+            &$GZERR(%earg)
+                if (defined($GZERR));
 
             return (\%ins_clause, $pretty, $badparse);
         }
@@ -2535,7 +2613,11 @@ sub sql_insert
             $badparse = $self->{feeb}->{badparse} ?
                 $self->{feeb}->{badparse} : length($pretty);
             
-        carp $msg;
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'error');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
     }
     return (\%ins_clause, $pretty, $badparse);
 
@@ -2578,7 +2660,12 @@ sub sql_select
         $pretty = $self->{feeb}->{pretty};
         $badparse = $self->{feeb}->{badparse};
         
-        carp $msg;
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'error');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return (\%selclause, $pretty, $badparse);
     }
     
@@ -2612,7 +2699,13 @@ sub sql_select
             }
         }
         
-        carp "missing FROM clause or invalid FROM location";
+        my $msg = "missing FROM clause or invalid FROM location";
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'error');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         $pretty = $self->{feeb}->{pretty};
         $badparse = (($badparse) ? 
                      $self->{feeb}->{badparse} :
@@ -2681,7 +2774,12 @@ sub sql_select
         $pretty = $self->{feeb}->{pretty};
         $badparse = $self->{feeb}->{badparse};
         
-        carp $msg;
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'error');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return (\%selclause, $pretty, $badparse);
     }
     
@@ -2702,7 +2800,12 @@ sub sql_select
         $pretty = $self->{feeb}->{pretty};
         $badparse = $self->{feeb}->{badparse};
         
-        carp $msg;
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'error');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return (\%selclause, $pretty, $badparse);
     }
     
@@ -2734,7 +2837,12 @@ sub sql_select
                 $pretty = $self->{feeb}->{pretty};
                 $badparse = $self->{feeb}->{badparse};
                 
-                carp $msg;
+                my %earg = (self => $self, msg => $msg,
+                            severity => 'error');
+        
+                &$GZERR(%earg)
+                    if (defined($GZERR));
+
                 return (\%selclause, $pretty, $badparse);
             }
             
@@ -3128,7 +3236,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 
 L<perl(1)>.
 
-Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2003, 2004, 2005 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -3145,5 +3253,8 @@ Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 Address bug reports and comments to: jcohen@genezzo.com
+
+For more information, please visit the Genezzo homepage 
+at L<http://www.genezzo.com>
 
 =cut

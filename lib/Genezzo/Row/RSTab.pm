@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSTab.pm,v 6.11 2004/12/30 08:15:36 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSTab.pm,v 6.12 2005/01/01 07:53:11 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -1500,10 +1500,7 @@ __END__
 
 =head1 NAME
 
-Genezzo::Row::RSTab.pm - Row Source TABle tied hash class.  A
-hierarchical pushhash (see L<Genezzo::PushHash::hph>) class that stores
-perl arrays as rows in a table, writing them into a block (byte
-buffer).
+Genezzo::Row::RSTab.pm - Row Source TABle tied hash class. 
 
 =head1 SYNOPSIS
 
@@ -1538,8 +1535,9 @@ buffer).
 
 =head1 DESCRIPTION
 
-RSTab is table class that packs complex objects into byte buffers via
-B<Genezzo::Block::RDBlock>.
+RSTab is a hierarchical pushhash (see L<Genezzo::PushHash::hph>) class
+that stores perl arrays as rows in a table, writing them into a block
+(byte buffer) via B<Genezzo::Row::RSFile> and B<Genezzo::Block::RDBlock>.
 
 =head1 ARGUMENTS
 
@@ -1613,7 +1611,8 @@ ACM SIGMOD 1992, Online Aggregation (with J. Hellerstein and H. Wang),
 ACM SIGMOD 1997 Ripple Joins for Online Aggregation (with
 J. Hellerstein) ACM SIGMOD 1999).  It could use support for confidence
 intervals, so drop me a line if you understand Central Limit Theorem,
-Hoeffding and Chebyshev inequalites.
+Hoeffding and Chebyshev inequalites.  Knowledge of change-points and
+time-series is also a plus.
 
 =head1 FUNCTIONS
 

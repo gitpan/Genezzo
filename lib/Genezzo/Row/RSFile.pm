@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSFile.pm,v 6.3 2004/10/04 07:59:38 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSFile.pm,v 6.4 2005/01/01 07:52:43 claude Exp claude $
 #
-# copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 use strict;
@@ -174,7 +174,7 @@ sub _currchunkno     # override the hph method
 sub _get_current_chunk # override the hph method
 {
 #    whoami;
-    local $Genezzo::Util::QUIETWHISPER = 1; # XXX: quiet the whispering
+#    local $Genezzo::Util::QUIETWHISPER = 1; # XXX: quiet the whispering
 
     my $self = shift;
 #    greet $self->{tablename};
@@ -672,15 +672,76 @@ __END__
 
 =head1 NAME
 
-Genezzo::Row::RSFile - Row Source File
+Genezzo::Row::RSFile - Row Source File tied hash class.
 
 =head1 SYNOPSIS
 
+ use Genezzo::Row::RSFile;
+
 =head1 DESCRIPTION
+
+RSFile is a hierarchical pushhash (see L<Genezzo::PushHash::hph>)
+class that stores scalar data in a block (byte buffer) via
+L<Genezzo::Block::RDBlock>.
 
 =head1 ARGUMENTS
 
+=over 4
+
+=item tablename
+(Required) - the name of the table
+
+=item tso
+(Required) - tablespace object from L<Genezzo::Tablespace>
+
+=item bufcache
+(Required) - buffer cache object from L<Genezzo::BufCa::BCFile>
+
+
+=back
+
+
+=head1 CONCEPTS
+
+RSFile can persistently store scalar data in a single file.  It
+doesn't know anything about rows -- that's all in
+L<Genezzo::Row::RSTab>.  
+
+RSFile has some extensions to directly manipulate the underlying
+blocks.  These extensions are useful for building specialized index
+mechanisms (see L<Genezzo::Index>) like B-trees, or for supporting
+scalars that span multiple blocks.
+
+=head2 Basic PushHash
+
+You can use RSFile as a persistent hash of scalars if you like.
+RSFile can only support strings that fit with a single database block.
+Use L<Genezzo::Row::RSTab> if you need to split data over multiple
+blocks.
+
+=head2 HPHRowBlk - Row and Block operations
+
+HPHRowBlk is a special pushhash subclass with certain direct block
+manipulation methods.  One very useful function is HSuck, which
+provides support for rows that span multiple blocks.  While the
+standard HPush fails if a row exceeds the space in a single block, the
+HSuck api lets the underlying blocks consume the rows in pieces --
+each block "sucks up" as much of the row as it can.  However, RSFile
+does not provide the HSuck api.  Instead, it provides some utility
+functions so RSTab can get direct access to the low-level block
+routines.  
+
+=head2 Counting, Estimation, Approximation
+
+RSFile has some support for count estimation, inspired by some of Peter
+Haas' work (Sequential Sampling Procedures for Query Size Estimation,
+ACM SIGMOD 1992, Online Aggregation (with J. Hellerstein and H. Wang),
+ACM SIGMOD 1997 Ripple Joins for Online Aggregation (with
+J. Hellerstein) ACM SIGMOD 1999).  
+
 =head1 FUNCTIONS
+
+RSFile support all standard hph hierarchical pushhash operations.
 
 =head2 EXPORT
 
@@ -702,7 +763,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 
 L<perl(1)>.
 
-Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2003, 2004, 2005 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -719,5 +780,8 @@ Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 Address bug reports and comments to: jcohen@genezzo.com
+
+For more information, please visit the Genezzo homepage 
+at L<http://www.genezzo.com>
 
 =cut

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Tablespace.pm,v 6.4 2004/12/26 01:02:18 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Tablespace.pm,v 6.5 2005/01/01 08:25:58 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -27,7 +27,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 6.4 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 6.5 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
 #    @EXPORT      = qw(&func1 &func2 &func4 &func5);
@@ -92,6 +92,11 @@ our $GZERR = sub {
 # the functions below that use them.
 
 # file-private lexicals go here
+
+# list of compatible database formats
+my %compatible_format = (
+                         0.32 => [0.31]
+                         );
 
 # make all your functions, whether exported or not;
 
@@ -469,11 +474,44 @@ sub TSLoad ()
             unless (exists($h1->{V}) # V for Version
                     && ($h1->{V} eq $Genezzo::GenDBI::VERSION))
             {
+                my $is_compatible = 0;
                 my $oldversion = $h1->{V} || "(unknown)";
-                my $deadmess =
-                    "File $defdbfile version $oldversion not compatible ";
-                $deadmess .= "with Genezzo version $Genezzo::GenDBI::VERSION";
-                die $deadmess;
+
+                # check the compatible format list and see if can use
+                # datafile from an older version
+                if (exists($compatible_format{$Genezzo::GenDBI::VERSION}))
+                {
+                    my $vlist = $compatible_format{$Genezzo::GenDBI::VERSION};
+
+                    for my $vv (@{$vlist})
+                    {
+                        if ($vv eq $oldversion)
+                        {
+                            # found a match
+                            $is_compatible = 1;
+                            last;
+                        }
+                    }
+                }
+
+                # either die with incompatibility, or print info msg
+
+                my $msg =
+                    "File $defdbfile version $oldversion is ";
+                $msg .=  "not "
+                    unless ($is_compatible);
+                $msg .= "compatible with Genezzo version "
+                    . $Genezzo::GenDBI::VERSION;
+
+                die $msg
+                    unless ($is_compatible);
+
+                # old version is compatible
+                my %earg = (self => $self, msg => $msg,
+                            severity => 'info');
+               
+                &$GZERR(%earg)
+                    if (defined($GZERR));
             }
 
             # XXX XXX XXX XXX : reset the blocksize using the

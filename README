@@ -369,10 +369,18 @@ NEW FEATURES - Improved error reporting, handling
   error handlers.  More documentation exists in GenDBI.pm.  The DBI
   standard err and errstr aren't supported yet.
 
+NEW FEATURES - backward compatiblity
+  
+  Version 0.32 supports a compatibility matrix - it can support version 0.31
+  databases.  Genezzo can now maintain a list of which versions use the same
+  database format.  Need to extend this capability to get automatic upgrade
+  between different database revisions.
+
 INCOMPATIBLE CHANGES
 
   Version 0.31 dictionary and block format is incompatible with
   previous releases.  No upgrade path is supported.
+  Version 0.32 is compatible with version 0.31.
 
 SEE ALSO
 

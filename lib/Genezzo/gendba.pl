@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/gendba.pl,v 6.5 2004/12/26 04:30:58 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/gendba.pl,v 6.6 2005/01/01 07:05:25 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -252,6 +252,8 @@ our $GZERR = sub {
 
     }
     print $args{msg};
+    # add a newline if necessary
+    print "\n" unless $args{msg}=~/\n$/;
 #    carp $args{msg}
 #      if (warnings::enabled() && $warn);
     

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 6.16 2004/12/30 08:36:15 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 6.17 2005/01/01 07:04:34 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -48,11 +48,11 @@ BEGIN {
 	
 }
 
-our $VERSION   = '0.31';
+our $VERSION   = '0.32';
 our $RELSTATUS = 'Alpha'; # release status
 # grab the code check-in date and convert to YYYYMMDD
 our $RELDATE   = 
-    do { my @r = (q$Date: 2004/12/30 08:36:15 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
+    do { my @r = (q$Date: 2005/01/01 07:04:34 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
 
 our $errstr; # DBI errstr
 
@@ -109,7 +109,8 @@ our $dbi_gzerr = sub {
     }
     # XXX XXX XXX
     print __PACKAGE__, ": ",  $args{msg};
-#    print $args{msg};
+    # add a newline if necessary
+    print "\n" unless $args{msg}=~/\n$/;
 #    carp $args{msg}
 #      if (warnings::enabled() && $warn);
     
@@ -175,7 +176,12 @@ sub _init
     }
 #    print "$self->{gnz_home}\n";
 
-    $self->{feeble}  = Genezzo::Feeble->new(); # build a feeble parser
+    my %nargs;
+    if (exists($args{GZERR})) # pass the error reporting routine
+    {
+        $nargs{GZERR} = $args{GZERR};
+    }
+    $self->{feeble}  = Genezzo::Feeble->new(%nargs); # build a feeble parser
     return 0
         unless (defined($self->{feeble}));
 
@@ -266,8 +272,8 @@ sub _init
 sub _clearerror
 {
     my $self = shift;
-    $self->{errstr} = "";
-    $self->{err}    = 0;
+    $self->{errstr} = undef;
+    $self->{err}    = undef;
 }
 
 # DBI-style connect
@@ -401,8 +407,6 @@ sub new
     my $self = { };
 
     my %args = (@_);
-    return undef
-        unless (_init($self,%args));
 
     if ((exists($args{GZERR}))
         && (defined($args{GZERR}))
@@ -425,6 +429,9 @@ sub new
 #                         severity => 'error',
                          msg      => @_); };
     }
+
+    return undef
+        unless (_init($self,%args));
 
     return bless $self, $class;
 
@@ -3974,8 +3981,8 @@ sub _init
 sub _clearerror
 {
     my $self = shift;
-    $self->{errstr} = "";
-    $self->{err}    = 0;
+    $self->{errstr} = undef;
+    $self->{err}    = undef;
 }
 
 sub new
