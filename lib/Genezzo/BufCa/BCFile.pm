@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/g3/lib/Genezzo/BufCa/RCS/BCFile.pm,v 6.1 2004/08/12 09:31:15 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BCFile.pm,v 6.2 2004/09/19 08:43:53 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -10,6 +10,8 @@ use warnings;
 
 package Genezzo::BufCa::BCFile;
 
+use IO::File;
+use IO::Handle;
 use Genezzo::BufCa::BufCa;
 use Genezzo::Util;
 use Carp;
@@ -136,8 +138,7 @@ sub FileReg
         $th{name} = $args{FileName};
 
         # XXX: open all handles for now
-        $th{fh} = ();
-        open ($th{fh}, "+<$th{name}")
+        $th{fh} = new IO::File "+<$th{name}"
             or die "Could not open $th{name} for writing : $! \n";
 
         @headerinfo = Genezzo::Util::FileGetHeaderInfo($th{fh}, $th{name});
@@ -167,10 +168,10 @@ sub _filereadblock
     
     my $blocksize = $self->{bc}->{blocksize};
 
-    sysseek ($fh, ($hdrsize+($bnum * $blocksize)), 0 )
+    $fh->sysseek (($hdrsize+($bnum * $blocksize)), 0 )
         or die "bad seek - file $fname : $fnum, block $bnum : $! \n";
 
-    sysread ($fh, $$refbuf, $blocksize)
+    $fh->sysread ($$refbuf, $blocksize)
         == $blocksize
             or die "bad read - file $fname : $fnum, block $bnum : $! \n";
 
@@ -213,7 +214,7 @@ sub _filewriteblock
 
     my $blocksize = $self->{bc}->{blocksize};
 
-    sysseek ($fh, ($hdrsize+($bnum * $blocksize)), 0 )
+    $fh->sysseek (($hdrsize+($bnum * $blocksize)), 0 )
         or die "bad seek - file $fname : $fnum, block $bnum : $! \n";
 
     # XXX: build a basic header with the file number, block number,
@@ -241,7 +242,7 @@ sub _filewriteblock
         substr($$refbuf, $blocksize-$packlen, $packlen) = $basicftr;
     }
 
-    syswrite ($fh, $$refbuf,  $blocksize)
+    $fh->syswrite ($$refbuf,  $blocksize)
         == $blocksize
     or die "bad write - file $fname : $fnum, block $bnum : $! \n";
 
@@ -428,6 +429,8 @@ sub Flush {
     my $hitlist = $self->{ __PACKAGE__ . ":HITLIST"  };    
     my $fn_arr  = $self->{ __PACKAGE__ . ":FN_ARRAY" };
 
+    my %sync_list;
+
     while (my ($kk, $vv) = each (%{$hitlist}))
     {
         next if ($kk !~ /^FILE/);
@@ -443,6 +446,8 @@ sub Flush {
             my $fh     = $fn_arr->[$fnum-1]->{fh};
             my $fhdrsz = $fn_arr->[$fnum-1]->{hdrsize};
 
+            $sync_list{$fnum} = 1;
+
             whisper "write dirty block : $fname - $fnum : $bnum";
 
             return (0)
@@ -452,6 +457,20 @@ sub Flush {
                         );
         }
         $bce->_dirty(0);
+    }
+
+    for my $fnum (keys (%sync_list))
+    {
+        # sync the file handles - normally, can bcfile can buffer
+        # writes, but in this case we want to assure they get written
+        # before commit
+        #
+        # Note: sync is an IO::Handle method inherited by IO::File
+        my $fname  = $fn_arr->[$fnum-1]->{name};
+        my $fh     = $fn_arr->[$fnum-1]->{fh};
+
+        whisper "failed to sync $fname"
+            unless ($fh->sync); # should be "0 but true"
     }
 
     return 1;

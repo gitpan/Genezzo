@@ -12,7 +12,9 @@ WriteMakefile(
         'Text::ParseWords' => '0.0',
         'Term::ReadLine'   => '0.0',
         'File::Path'       => '0.0',
-        'File::Spec'       => '0.0'
+        'File::Spec'       => '0.0',
+        'IO::File'         => '0.0',
+        'IO::Handle'       => '0.0'
 #        'POSIX'            => '0.0'
     }, # e.g., Module::Name => 1.1
 
