@@ -1,5 +1,11 @@
 Revision history for Perl extension Genezzo
 
+0.37 Fri Feb 25 00:55:10 2005
+        - Add Parse::RecDescent dependency -- prelude to
+          new SQL parser.  
+          Ship precompiled parser -- 3 meg (!) SQL.pm
+          compresses to about 100K.
+
 0.36  Mon Feb  7 22:28:28 2005
         - BufCa/bce: set fileread flag in buffercache element 
           when reading blocks in to counteract the spurious 

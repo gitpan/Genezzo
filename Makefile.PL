@@ -15,7 +15,8 @@ WriteMakefile(
         'File::Path'       => '0.0',
         'File::Spec'       => '0.0',
         'IO::File'         => '0.0',
-        'IO::Handle'       => '0.0'
+        'IO::Handle'       => '0.0',
+        'Parse::RecDescent' => '1.94'
 #        'POSIX'            => '0.0'
     }, # e.g., Module::Name => 1.1
 
@@ -42,3 +43,19 @@ sub metafile {
     return "$meta\t$extra\n\t$e2\n\t$e3\n";
 
 }
+
+# use postamble to build havok.sql, syshook.sql, SQL.pm
+sub postamble { <<'END_POSTAMBLE'; }
+#pm_to_blib: GENEZZO_SPECIAL
+GENEZZO_SPECIAL: GENEZZO_HAVOK GENEZZO_SYSHOOK GENEZZO_SQL
+GENEZZO_HAVOK: lib/Genezzo/Havok.pm
+	$(PERLRUNINST) -MGenezzo::Havok -e 'print Genezzo::Havok::MakeSQL();' > lib/Genezzo/havok.sql
+GENEZZO_SYSHOOK: lib/Genezzo/Havok/SysHook.pm
+	$(PERLRUNINST) -MGenezzo::Havok::SysHook -e 'print Genezzo::Havok::SysHook::MakeSQL();' > lib/Genezzo/syshook.sql
+  GENEZZO_SQL: lib/Genezzo/Parse/SQLGrammar.pl
+	($(PERLRUNINST) lib/Genezzo/Parse/SQLGrammar.pl ; mv SQL.pm lib/Genezzo/Parse)
+END_POSTAMBLE
+
+
+##   GENEZZO_SQL: lib/Genezzo/Parse/SQLGrammar.pl
+##	($(PERLRUN)  lib/Genezzo/Parse/SQLGrammar.pl; $(PERLRUN) -MExtUtils::Install -e 'pm_to_blib({SQL.pm => blib/Genezzo/Parse/SQL.pm})')

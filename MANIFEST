@@ -43,6 +43,8 @@ lib/Genezzo/Havok/Examples.pm
 lib/Genezzo/TSHash.pm
 lib/Genezzo/Feeble.pm
 lib/Genezzo/Parse/FeebLex.pm
+lib/Genezzo/Parse/SQLGrammar.pl
+lib/Genezzo/Parse/SQL.pm
 lib/Genezzo/GenDBI.pm
 lib/Genezzo/Util.pm
 lib/Genezzo/PushHash/PHArray.pm
