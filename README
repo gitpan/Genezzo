@@ -1,4 +1,4 @@
-Copyright (C) 2003, 2004 Jeffrey I Cohen.  All rights reserved, worldwide.
+Copyright (C) 2003,2004,2005 Jeffrey I Cohen.  All rights reserved, worldwide.
 
 NAME
 
@@ -361,7 +361,7 @@ NEW FEATURES - System/User Extensibility
 
 INCOMPATIBLE CHANGES
 
-  Version 0.29 dictionary and block format is incompatible with
+  Version 0.30 dictionary and block format is incompatible with
   previous releases.  No upgrade path is supported.
 
 SEE ALSO
@@ -373,7 +373,7 @@ AUTHOR
 
   Original author: Jeffrey I Cohen <jcohen@genezzo.com>
 
-  Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
+  Copyright (c) 2003, 2004, 2005 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Util.pm,v 6.5 2004/12/14 07:47:26 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Util.pm,v 6.6 2004/12/26 00:15:11 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -20,7 +20,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 6.5 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 6.6 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
     @EXPORT      = qw(&whisper &whoami &greet 
@@ -34,7 +34,8 @@ BEGIN {
 #    @EXPORT_OK   = qw($Var1 %Hashit &func3 &func5);
     @EXPORT_OK   = qw($QUIETWHISPER $WHISPERDEPTH $DEFBLOCKSIZE $USECARP 
                       $DEFDBSIZE $MINBLOCKSIZE $MAXBLOCKSIZE $MAXDBSIZE
-                      $UNPACK_TEMPL_ARR $UTILPRINT $WHISPERPREFIX);
+                      $UNPACK_TEMPL_ARR $WHISPER_PRINT $UTIL_EPRINT 
+                      $WHISPERPREFIX);
 
 }
 
@@ -132,7 +133,8 @@ our $MAXDBSIZE    = 2**31; # 2 Gig # XXX : 4 gig ok all platforms?
 
 our $USECARP = 1;
 
-our $UTILPRINT = sub { print @_ ; };
+our $WHISPER_PRINT   = sub { print @_ ; };
+our $UTIL_EPRINT = sub { print @_ ; };
 
 # then the others (which are still accessible as $Some::Module::stuff)
 #$stuff  = '';
@@ -200,7 +202,7 @@ sub _realwhisper
     # treat string as multiple lines, and prefix each with "whisper:" prefix
 #    $outmess =~ s/\^J/\n$wprefix/gm ;
 
-    &$UTILPRINT( $outmess );
+    &$WHISPER_PRINT( $outmess );
 }
 
 sub whoami  
@@ -276,7 +278,7 @@ sub Validate
             else
             {
                 my $m1 = "$package $filename $line: " . $vv;
-                &$UTILPRINT( $m1 );
+                &$UTIL_EPRINT( $m1 );
             }
             return 0;
         }
@@ -423,7 +425,7 @@ sub HumanNum
     else
     {
         my $m1 = "$package $filename $line: " . $emsg;
-        &$UTILPRINT( $m1 );
+        &$UTIL_EPRINT( $m1 );
     }
     return undef;
 }
@@ -532,7 +534,7 @@ sub NumVal
     else
     {
         my $m1 = "$package $filename $line: " . $emsg;
-        &$UTILPRINT( $m1 );
+        &$UTIL_EPRINT( $m1 );
     }
     return 0;
 }
@@ -711,7 +713,7 @@ sub checkKeyVal
     else
     {
         my $m1 = "$package $filename $line: " . $emsg;
-        &$UTILPRINT( $m1 );
+        &$UTIL_EPRINT( $m1 );
     }
     return undef;
 }

@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 6.11 2004/12/14 07:46:54 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 6.13 2004/12/26 00:10:33 claude Exp claude $
 #
-# copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 package Genezzo::GenDBI;
@@ -21,6 +21,7 @@ use Genezzo::Util;
 #use SQL::Statement;
 use Term::ReadLine;
 use Text::ParseWords qw(shellwords);
+use warnings::register;
 
 # Items to export into callers namespace by default. Note: do not export
 # names by default without a very good reason. Use EXPORT_OK instead.
@@ -47,17 +48,66 @@ BEGIN {
 	
 }
 
-our $VERSION   = '0.29';
+our $VERSION   = '0.30';
 our $RELSTATUS = 'Alpha'; # release status
 # grab the code check-in date and convert to YYYYMMDD
 our $RELDATE   = 
-    do { my @r = (q$Date: 2004/12/14 07:46:54 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
+    do { my @r = (q$Date: 2004/12/26 00:10:33 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
 
+# dbi gzerr doesn't call $self->gzerr to eliminate recursive hell
+our $dbi_gzerr = sub {
+    my %args = (@_);
+
+    return 
+        unless (exists($args{msg}));
+
+    my $warn = 0;
+    if (exists($args{severity}))
+    {
+        my $sev = uc($args{severity});
+        $sev = 'WARNING'
+            if ($sev =~ m/warn/i);
+
+        # don't print 'INFO' prefix
+        if ($args{severity} !~ m/info/i)
+        {
+            printf ("%s: ", $sev);
+            $warn = 1;
+        }
+
+    }
+    # XXX XXX XXX
+    print __PACKAGE__, ": ",  $args{msg};
+#    print $args{msg};
+#    carp $args{msg}
+#      if (warnings::enabled() && $warn);
+    
+};
+
+our $GZERR = sub {
+    my %args = (@_);
+
+    # use the error routine supplied to GenDBI class if it exists,
+    # else use package error handler (dbi_gzerr)
+    if (exists($args{self}))
+    {
+        my $self = $args{self};
+        if (defined($self) && exists($self->{GZERR}))
+        {
+            my $err_cb = $self->{GZERR};
+            return &$err_cb(%args);
+        }
+    }
+    return &$dbi_gzerr(%args);
+};
+
+# NOTE: turn off "whisper" debug information.  
+# Use "def _QUIETWHISPER=0" to re-enable if necessary.
 $Genezzo::Util::QUIETWHISPER  = 1; # XXX XXX XXX XXX
-#$Genezzo::Util::USECARP       = 0;
+$Genezzo::Util::USECARP       = 0;
 #$Genezzo::Util::WHISPERPREFIX = "baz: ";
 #$Genezzo::Util::WHISPERPREFIX = undef;
-#$Genezzo::Util::UTILPRINT     = sub { print "baz2: ", @_ ; };
+#$Genezzo::Util::WHISPER_PRINT = sub { print "baz2: ", @_ ; };
 
 # Preloaded methods go here.
 
@@ -85,12 +135,12 @@ sub _init
         && (defined($args{gnz_home}))
         && (length($args{gnz_home})))
     {
-#        print "(",$args{gnz_home},")";
         $self->{gnz_home} = $args{gnz_home};
     }
     else
     {
-        $self->{gnz_home} = $ENV{GNZ_HOME} || ($ENV{HOME} . '/gnz_home');
+        $self->{gnz_home} = $ENV{GNZ_HOME} || 
+            File::Spec->catdir($ENV{HOME} , 'gnz_home');
     }
 #    print "$self->{gnz_home}\n";
 
@@ -120,7 +170,11 @@ sub _init
              force_init_db =>
              "set =1 to overwrite (and destroy) an existing db",
              dbsize =>
-             "size of the default datafile, e.g. dbsize=1g"
+             "size of the default datafile, e.g. dbsize=1g",
+
+             # hidden definitions (use leading underscore)
+             _QUIETWHISPER => 
+             "quiet whisper state"
              );
         my %defs2 = %{$args{defs}};
 
@@ -129,33 +183,51 @@ sub _init
             if (exists($defs2{$key}))
             {
                 $dictargs{$key} = $defs2{$key};
+
+                if ($key =~ m/QUIETWHISPER/)
+                {
+                    whisper "quietwhisper is  $Genezzo::Util::QUIETWHISPER";
+                    $Genezzo::Util::QUIETWHISPER = $defs2{$key};
+                    whisper "set quietwhisper to $Genezzo::Util::QUIETWHISPER";
+                }
                 delete $defs2{$key};
             }
         }
         
         if (scalar(keys(%defs2)))
         {
-            print "unknown definitions for database initialization:\n";
+            my $msg = "unknown definitions for database initialization:\n";
             while (my ($kk, $vv) = each (%defs2))
             {
-                print "\t", $kk, "=", $vv, "\n";
+                $msg .=  "\t" .  $kk .  "=" . $vv ."\n";
             }
-            print "\nlegal values are:\n";
+            $msg .= "\nlegal values are:\n";
             while ( my ($kk, $vv) = each (%legitdefs))
             {
-                print "  $kk - $vv\n";
+                $msg .= "  $kk - $vv\n"
+                    if ($kk !~ /^\_/); # hide defs with leading underscores
             }          
-            print "\n";  
+            $msg .= "\n";  
+
+            my %earg = ( msg => $msg, severity => 'fatal');
+
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             return 0;
         }
 
+    }
+
+    if (exists($args{GZERR})) # pass the error reporting routine
+    {
+        $dictargs{GZERR} = $args{GZERR};
     }
 
     $self->{dictobj} = Genezzo::Dict->new(gnz_home => $self->{gnz_home}, 
                                        init_db => $init_db, %dictargs);
     return 0
         unless (defined($self->{dictobj}));
-
 
     return 1;
 }
@@ -168,13 +240,35 @@ sub connect # DBI
 
     my ($gnz_home, $user, $passwd) = @_;
 
-    my %args = (exe => $0,
+    my %optional = (GZERR => $dbi_gzerr);
+
+    my %args = (%optional,
+                exe => $0,
                 gnz_home => $gnz_home,
                 user => $user,
                 password => $passwd);
 
     return undef
         unless (_init($self,%args));
+
+#    if ((exists($args{GZERR}))
+#        && (defined($args{GZERR}))
+#        && (length($args{GZERR})))
+    {
+        my $err_cb     = $self->{GZERR};
+        # capture all standard error messages
+        $Genezzo::Util::UTIL_EPRINT = 
+            sub {
+                &$err_cb(self     => $self,
+                         severity => 'error',
+                         msg      => @_); };
+        
+        $Genezzo::Util::WHISPER_PRINT = 
+            sub {
+                &$err_cb(self     => $self,
+#                         severity => 'error',
+                         msg      => @_); };
+    }
 
     return bless $self, $class;
 
@@ -190,6 +284,28 @@ sub new
     return undef
         unless (_init($self,%args));
 
+    if ((exists($args{GZERR}))
+        && (defined($args{GZERR}))
+        && (length($args{GZERR})))
+    {
+        # NOTE: don't supply our GZERR here - will get
+        # recursive failure...
+        $self->{GZERR} = $args{GZERR};
+        my $err_cb     = $self->{GZERR};
+        # capture all standard error messages
+        $Genezzo::Util::UTIL_EPRINT = 
+            sub {
+                &$err_cb(self     => $self,
+                         severity => 'error',
+                         msg      => @_); };
+        
+        $Genezzo::Util::WHISPER_PRINT = 
+            sub {
+                &$err_cb(self     => $self,
+#                         severity => 'error',
+                         msg      => @_); };
+    }
+
     return bless $self, $class;
 
 } # end new
@@ -203,7 +319,11 @@ sub Kgnz_Rem
 sub Kgnz_Quit
 {
     my $self = shift;
-    print "quitting...\n";
+    my %earg = (self => $self, msg => "quitting...\n", severity => 'info');
+
+    &$GZERR(%earg)
+        if (defined($GZERR));
+
     exit ;
 
     return 1;
@@ -216,7 +336,11 @@ sub Kgnz_Reload
 
     if (exists($self->{caller}))
     {
-        print $self->{caller} , "\n";
+        my $msg  = $self->{caller} . "\n";
+        my %earg = (self => $self, msg => $msg, severity => 'info');
+
+        &$GZERR(%earg)
+            if (defined($GZERR));
         
         # need to add arg list here ... 
         exec $self->{caller}  ;
@@ -257,11 +381,22 @@ sub Kgnz_AddFile
         {
             if ($argval =~ m/^help$/i)
             {
-                print "\nAddFile Help - addfile takes a list of name=value arguments\n";
-                print "with no spaces around the equal sign, and no commas between arguments\n";
-                print "e.g: addfile filename=test.dbf filesize=22M\n\n";
-                print "If no arguments are specified addfile will create a new datafile\n";
-                print "double the size of the previous one.\n";
+                my $bigMsg;
+                ($bigMsg = <<EOF_Msg) =~ s/^\#//gm;
+#
+# AddFile Help - addfile takes a list of name=value arguments
+# with no spaces around the equal sign, and no commas between arguments
+# e.g: addfile filename=test.dbf filesize=22M
+#
+# If no arguments are specified addfile will create a new datafile
+# double the size of the previous one.
+#
+EOF_Msg
+                my %earg = (self => $self, msg => $bigMsg, severity => 'warn');
+
+                &$GZERR(%earg)
+                    if (defined($GZERR));
+                
                 $gothelp  = 1;
                 $goodargs = 0;
                 last;
@@ -278,25 +413,43 @@ sub Kgnz_AddFile
                 }
                 else
                 {
-                    print "invalid argument: $argval\n";
+                    my $msg = "invalid argument: $argval\n";
+                    my %earg = (self => $self, msg => $msg, 
+                                severity => 'warn');
+                    
+                    &$GZERR(%earg)
+                        if (defined($GZERR));
+
                     $goodargs = 0;
                 }
             }
             else
             {
-                print "invalid argument: $argval\n";
+                my $msg = "invalid argument: $argval\n";
+                my %earg = (self => $self, msg => $msg,
+                            severity => 'warn');
+                    
+                &$GZERR(%earg)
+                    if (defined($GZERR));
                 $goodargs = 0;
             }
         } # end for
         unless ($goodargs)
         {
-            print "valid args are:\n";
+            my $msg = "valid args are:\n";
             while (my ($kk, $vv) = each (%legitdefs))
             {
-                print $kk, ":\t",$vv,"\n";
+                $msg .= $kk . ":\t" . $vv ."\n";
             }
-            print "type: \"addfile help\" for more information\n"
+            $msg .= "type: \"addfile help\" for more information\n"
                 unless ($gothelp);
+
+            my %earg = (self => $self, msg => $msg,
+                                severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             return 0;
         }
 
@@ -332,11 +485,16 @@ sub Kgnz_Describe
 
             $outi[$colidx] = "$kk : $dtype\n";
         }
+        my $bigMsg = "";
         for my $ii (@outi)
         {
-            print $ii
+            $bigMsg .= $ii
                 if (defined($ii));
         }
+        my %earg = (self => $self, msg => $bigMsg, severity => 'info');
+
+        &$GZERR(%earg)
+            if (defined($GZERR));
 
         return 1;
 
@@ -355,13 +513,23 @@ sub Kgnz_CIdx
 	my $indexname = shift @_ ;
 	my $tablename = shift @_ ;
 
-        print "Create Index : $indexname on $tablename \n";
+        my $msg = "Create Index : $indexname on $tablename \n";
+
+        my %earg = (self => $self, msg => $msg, severity => 'info');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
 
 	my @params = @_ ;
 
         unless (scalar(@params))
         {
-            print "invalid column list for table $tablename\n";
+            $msg = "invalid column list for table $tablename\n";
+            %earg = (self => $self, msg => $msg, severity => 'warn');
+        
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             return 0;
         }
         my $dictobj = $self->{dictobj};
@@ -385,13 +553,16 @@ sub Kgnz_CT
 
 	my $tablename = shift @_ ;
 
-        print "Create Table : $tablename \n";
-
 	my @params = @_ ;
 
         unless (scalar(@params))
         {
-            print "invalid column list for table $tablename\n";
+            my $msg = "invalid column list for table $tablename\n";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
             return 0;
         }
 
@@ -401,20 +572,33 @@ sub Kgnz_CT
 
         my $tabtype = "TABLE";
 
+        my $msg = "Create Table : $tablename \n";
+
         # XXX XXX: quick hack for index-organized table support
         if ($params[0] =~ m/^index/i)
         {
-            print "with unique index option\n";
+            $msg .= "with unique index option\n";
             $tabtype = "IDXTAB";
             shift @params
         }
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'info');
+                    
+        &$GZERR(%earg)
+            if (defined($GZERR));
 
       L_coldataloop:
         foreach my $token (@params)
         {
             unless ($token =~ m/=/)
             {
-                print "invalid column specifier ($token) for table $tablename\n";
+                $msg = "invalid column specifier ($token) for table $tablename\n";
+                %earg = (self => $self, msg => $msg,
+                         severity => 'warn');
+                
+                &$GZERR(%earg)
+                    if (defined($GZERR));
+
                 return 0;
             }
 
@@ -470,17 +654,31 @@ sub Kgnz_Create
     {
 	my $createkeyword = $args{op2};
 
+        my ($msg,%earg);
+
 	unless (exists($createdispatch{lc($createkeyword)}))
 	{
-	    print "could not parse: " ;
+	    $msg = "could not parse: \n" ;
             my $b = \%args;
-	    print Data::Dumper->Dump([$b], [qw(*b )]); 
+	    $msg .= Data::Dumper->Dump([$b], [qw(*b )]); 
+            %earg = (self => $self, msg => $msg,
+                     severity => 'warn');
+                    
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
 	    last   L_ParseCreate; 
 	}
 
         unless (exists($args{createtabargs}))
         {
-            print "no table name \n" ;
+            $msg = "no table name \n" ;
+            %earg = (self => $self, msg => $msg,
+                     severity => 'warn');
+                    
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             last L_ParseCreate;
         }
 
@@ -488,7 +686,13 @@ sub Kgnz_Create
 
         unless (exists($tabargs->{tabname}))
         {
-            print "no table name \n" ;
+            $msg = "no table name \n" ;
+            %earg = (self => $self, msg => $msg,
+                     severity => 'warn');
+                    
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             last L_ParseCreate;
         }
 
@@ -518,7 +722,16 @@ sub Kgnz_Create
 
             my $colidx = 1;
 
-            print "tablename : $tablename\n" if $bVerbose ;
+            if ($bVerbose )
+            {
+
+                $msg = "tablename : $tablename\n" ;
+                %earg = (self => $self, msg => $msg,
+                         severity => 'info');
+                    
+                &$GZERR(%earg)
+                    if (defined($GZERR));
+            }
 
           L_coldataloop:
             foreach my $token (@{ $tabdefn->{coldefarr} })
@@ -528,8 +741,14 @@ sub Kgnz_Create
 
                 unless (exists($legaldtypes{lc($dtype)}))
                 {
-                    print "illegal datatype: $dtype \n" ;
-                    print "$tablename : ", Dumper($token), "\n";
+                    $msg = "illegal datatype: $dtype \n" ;
+                    $msg .= "$tablename : " . Dumper($token) . "\n";
+                    %earg = (self => $self, msg => $msg,
+                             severity => 'warn');
+                    
+                    &$GZERR(%earg)
+                        if (defined($GZERR));
+
                     last   L_ParseCreate; 
                 }
                 if ($bVerbose)
@@ -538,7 +757,12 @@ sub Kgnz_Create
                     $extra = '(primary key)' # XXX XXX
                         if (($tabtype eq "IDXTAB") && (1 == $colidx));
 
-                    print "\tcolumn $colname : $dtype $extra\n" 
+                    $msg = "\tcolumn $colname : $dtype $extra\n" ;
+                    %earg = (self => $self, msg => $msg,
+                             severity => 'info');
+                    
+                    &$GZERR(%earg)
+                        if (defined($GZERR));
                 }
 
                 $coldatatype{$colname} = [$colidx, $dtype];
@@ -634,16 +858,25 @@ sub Kgnz_Commit
 
 sub PrintVersionString
 {
-    print "\n\nGenezzo Version $VERSION - $RELSTATUS $RELDATE\n";
-    print "Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.";
-    print "\nType \"SHOW\" to obtain license information.";
-    print "\n\n";
+    my $self = shift;
+    my $msg = "\n\nGenezzo Version $VERSION - $RELSTATUS $RELDATE  (www.genezzo.com)\n";
+    $msg .= "Copyright (c) 2003, 2004, 2005 Jeffrey I Cohen.  All rights reserved.\n";
+    $msg .= "\nType \"SHOW\" to obtain license information.\n\n";
+    my %earg = (self => $self, msg => $msg,
+             severity => 'info');
+                    
+    &$GZERR(%earg)
+        if (defined($GZERR));
+
 }
 
 sub Kgnz_Show
 {
     my $self = shift;
     my $dictobj = $self->{dictobj};
+
+    my $msg = "";
+    my $severity = 'info';
 
     my %legitdefs = 
         (version => "Genezzo version information",
@@ -656,11 +889,11 @@ sub Kgnz_Show
     {
         if ($argval =~ m/license/i)
         {
-            PrintLicense();
+            $self->PrintLicense();
         }
         elsif ($argval =~ m/version/i)
         {
-            PrintVersionString();
+            $self->PrintVersionString();
         }
         elsif ($argval =~ m/help/i)
         {
@@ -669,17 +902,22 @@ sub Kgnz_Show
         else
         {
             $showhelp = 1;
-            print "invalid SHOW argument ($argval)\n";
+            $msg = "invalid SHOW argument ($argval)\n";
+            $severity = 'warn';
         }
     }
     if ($showhelp)
     {
-        print "\nlegal values are:\n";
+        $msg .= "\nlegal values are:\n";
         while ( my ($kk, $vv) = each (%legitdefs))
         {
-            print "  show $kk - $vv\n";
+            $msg .= "  show $kk - $vv\n";
         }          
-        print "\n";  
+        my %earg = (self => $self, msg => $msg,
+                    severity => $severity);
+                    
+        &$GZERR(%earg)
+            if (defined($GZERR));
     }
 
     return 1;
@@ -755,10 +993,14 @@ sub Kgnz_Delete
 	my @params = @_ ;
 #        greet @params;
 
+        my ($msg, %earg);
+        my $severity = 'info';
+
 	last unless $dictobj->DictTableExists(tname => $tablename);
 
         my $rowcount = 0;
 
+        $msg = "";
         foreach my $rid (@params)
         {
             unless 
@@ -767,14 +1009,22 @@ sub Kgnz_Delete
                                       )
                  )
                 {
-                    print "failed to delete row $rid : \n";
+                    $msg = "failed to delete row $rid : \n";
+                    $severity = 'warn';
+
                     last;
                 }
             
             $rowcount++;
         }
         my $rowthing = ((1 == $rowcount) ? "row" : "rows");
-        print "deleted $rowcount $rowthing from table $tablename.\n";
+        $msg .= "deleted $rowcount $rowthing from table $tablename.\n";
+        %earg = (self => $self, msg => $msg,
+                 severity => $severity);
+                    
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return $rowcount;
     }
 
@@ -811,6 +1061,9 @@ sub Kgnz_Insert2
         my $collist   = shift @_ ;
 	my @params = @_ ;
 
+        my ($msg, %earg);
+        my $severity = 'info';
+
 	last unless $dictobj->DictTableExists(tname => $tablename);
 
         my $rowcount = 0;
@@ -823,10 +1076,17 @@ sub Kgnz_Insert2
 
         if (scalar(@{$collist}) > $numitems)
         {
-            carp "too many columns";
+            $msg = "too many columns";
+            %earg = (self => $self, msg => $msg,
+                     severity => 'warn');
+                    
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             return undef;
         }
 
+        $msg = "";
         unless (scalar(@{$collist}))
         {
             while (@rowarr = splice (@params, 0, $numitems))
@@ -838,7 +1098,9 @@ sub Kgnz_Insert2
                         )
                 {
                     my $rr = $rowcount + 1;
-                    carp "Failed to insert row $rr in table $tablename";
+                    $msg = "Failed to insert row $rr in table $tablename\n";
+                    $severity = 'warn';
+                    
                     last;
                 }
             
@@ -846,7 +1108,13 @@ sub Kgnz_Insert2
                 @rowarr = ();
             }
             my $rowthing = ((1 == $rowcount) ? "row" : "rows");
-            print "inserted $rowcount $rowthing into table $tablename.\n";
+            $msg .= "inserted $rowcount $rowthing into table $tablename.\n";
+            %earg = (self => $self, msg => $msg,
+                     severity => $severity);
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             return $rowcount
         } # end unless
 
@@ -864,24 +1132,37 @@ sub Kgnz_Insert2
                 if ($colname =~ m/(?i)^(rid|rownum)$/)
                 {
                     $colname = uc $colname;
-                    carp "cannot update ($colname) pseudo column";
+                    $msg = "cannot update ($colname) pseudo column";
                 }
                 else
                 {
-                    carp "no such column ($colname) in $tablename";
+                    $msg = "no such column ($colname) in $tablename";
                 }
+                %earg = (self => $self, msg => $msg,
+                         severity => 'warn');
+                    
+                &$GZERR(%earg)
+                    if (defined($GZERR));
+
                 return undef;
             }
 
             if (exists($colh{$colnum}))
             {
-                carp "column ($colname) specified more than once";
+               $msg = "column ($colname) specified more than once";
+               %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+                    
+               &$GZERR(%earg)
+                   if (defined($GZERR));
+
                 return undef;
             }
             $colh{$colnum} = 1;
             push @match, ($colnum - 1);
         } # end for all columns
 
+        $msg = "";
         while (scalar(@params))
         {
           L_mfor:
@@ -897,8 +1178,13 @@ sub Kgnz_Insert2
                     )
             {
                 my $rr = $rowcount + 1;
-                carp "Failed to insert row $rr in table $tablename";
-                return $rowcount;
+                $msg = "Failed to insert row $rr in table $tablename\n";
+                $severity = 'warn';
+                    
+                &$GZERR(%earg)
+                    if (defined($GZERR));
+
+                last;
             }
             
             $rowcount++;
@@ -912,7 +1198,13 @@ sub Kgnz_Insert2
 
         } # end while param
         my $rowthing = ((1 == $rowcount) ? "row" : "rows");
-        print "inserted $rowcount $rowthing into table $tablename.\n";
+        $msg = "inserted $rowcount $rowthing into table $tablename.\n";
+        %earg = (self => $self, msg => $msg,
+                 severity => $severity);
+                    
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return $rowcount;
 
     }
@@ -934,6 +1226,9 @@ sub Kgnz_Update
         my $rid = shift @_ ;
 	my @params = @_ ;
 
+        my ($msg, %earg);
+        my $severity = 'info';
+
 	last unless $dictobj->DictTableExists(tname => $tablename);
 
 	# take the scalar of keys for number of items in hash
@@ -945,6 +1240,7 @@ sub Kgnz_Update
         # Note: ignore extra columns -- don't loop like an insert
         my @rowarr = splice (@params, 0, $numitems);
 
+        $msg = "";
         {
             unless 
                 ($dictobj->RowUpdate (tname => $tablename, 
@@ -953,7 +1249,8 @@ sub Kgnz_Update
                                       )
                  )
                 {
-                    print "failed to update row $rid : \n";
+                    $msg = "failed to update row $rid : \n";
+                    $severity = 'warn';
                     goto L_up1; # last
                 }
             
@@ -963,7 +1260,13 @@ sub Kgnz_Update
 
         }
         my $rowthing = ((1 == $rowcount) ? "row" : "rows");
-        print "updated $rowcount $rowthing in table $tablename.\n";
+        $msg = "updated $rowcount $rowthing in table $tablename.\n";
+        %earg = (self => $self, msg => $msg,
+                 severity => $severity);
+                    
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return $rowcount;
     }
 
@@ -1090,6 +1393,8 @@ sub SQLWhere
     my @AndTokens;        # be suitable for index lookups, but ORs
     my $OrBars = '\|\|';  # can be a problem.  Test for "And Purity".
 
+    my ($msg, %earg);
+
     for my $ii (0..($maxw - 1))
     {
         if ($doskip >= 0)
@@ -1125,7 +1430,7 @@ sub SQLWhere
                         # of if no previous value to pop from filtary
                         if (!defined($v2) || !scalar(@filtary))
                         {
-                            print "could not parse IS NULL\n";
+                            $msg = "could not parse IS NULL\n";
                             $badparse = 1;
                             last L_isnull;
                         }
@@ -1154,7 +1459,7 @@ sub SQLWhere
                             }
                             else
                             {
-                                print "could not parse IS NULL\n";
+                                $msg = "could not parse IS NULL\n";
                                 $badparse = 1;
                                 last L_isnull;
                             }
@@ -1265,17 +1570,34 @@ sub SQLWhere
 
     my $status;
 
-    unless ($badparse)
+    if ($badparse)
+    {
+        %earg = (self => $self, msg => $msg,
+                 severity => 'warn');
+                    
+        &$GZERR(%earg)
+            if (defined($GZERR));
+    }
+    else
     {
         $status = eval " $filterstring ";
     }
 
     unless (defined($status))
     {
-        warn $@ if $@;
-        print "bad filter:\n";
-        print $filterstring, "\n";
-        print "\nWHERE clause:\tWHERE ", $where_text, "\n";
+        $msg = "";
+#        warn $@ if $@;
+        $msg .= $@ 
+            if $@;
+        $msg .= "\nbad filter:\n";
+        $msg .= $filterstring . "\n";
+        $msg .= "\nWHERE clause:\tWHERE " . $where_text . "\n";
+        %earg = (self => $self, msg => $msg,
+                 severity => 'warn');
+                    
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return undef;
     }
 #    greet $filter; 
@@ -1396,6 +1718,7 @@ sub SQLAlter
 #    greet $sql_cmd;
 
     my $tablename;
+    my ($msg, %earg);
 
     if (exists($sql_cmd->{operation}))
     {
@@ -1460,7 +1783,13 @@ sub SQLAlter
 
                            unless (defined($filter))
                            {
-                               whisper "invalid where clause";
+                               $msg = "invalid where clause";
+                               %earg = (self => $self, msg => $msg,
+                                        severity => 'warn');
+                    
+                               &$GZERR(%earg)
+                                   if (defined($GZERR));
+
                                return 0;
                            }
 #                         greet $filter;
@@ -1473,27 +1802,40 @@ sub SQLAlter
                        }
                        else
                        {
-                           whisper "unknown constraint";
-                           greet %nargs;
+                           $msg = "unknown constraint\n";
+                           $msg .= Dumper( %nargs);
+                           %earg = (self => $self, msg => $msg,
+                                    severity => 'warn');
+                    
+                           &$GZERR(%earg)
+                               if (defined($GZERR));
+
                            return 0;
                        }
 
                        my ($stat, $new_consname, $new_iname) = 
                            $dictobj->DictTableAddConstraint(%nargs);
 
-                       my $outstr;
+                       my $severity;
                        if ($stat)
                        {
                            $cons_name = $new_consname
                                unless (defined($cons_name));
-                           $outstr = "Added constraint $cons_name" .
-                               " to table $tablename";
+                           $msg = "Added constraint $cons_name" .
+                               " to table $tablename\n";
+                           $severity = 'info';
                        }
                        else
                        {
-                           $outstr = "Failed to add constraint";
+                           $msg = "Failed to add constraint\n";
+                           $severity = 'warn';
                        }
-                       print $outstr, "\n";
+                       %earg = (self => $self, msg => $msg,
+                                severity => $severity);
+                       
+                       &$GZERR(%earg)
+                           if (defined($GZERR));
+
                        return $stat;
                    } # end if exists constraint
                 }
@@ -1518,6 +1860,9 @@ sub SQLUpdate
 
 #    greet $sql_cmd;
 
+    my ($msg, %earg);
+    my $severity = 'info';
+
     my $tablename = $sql_cmd->{tablename};
 
     return 0
@@ -1537,25 +1882,39 @@ sub SQLUpdate
 
         if (defined($colary[$colnum]))
         {
-            print "duplicate update column ($colname), table ($tablename)\n";
+            $msg = "duplicate update column ($colname), table ($tablename)\n";
+            %earg = (self => $self, msg => $msg,
+                     severity => 'warn');
+                    
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             return 0;
         }
 
         # XXX XXX: need to handle the case where newval is a column, not
         # an identifier
 
-        # strip double and single quotes
-        my @getquotes = ($newval =~ m/^\"(.*)\"$/);
-        if (scalar(@getquotes))
+        if ($newval =~ m/^NULL$/)
         {
-            $newval = shift @getquotes;
+            # Convert unquoted NULL value to an undef
+            $newval = undef;
         }
         else
         {
-            @getquotes = ($newval =~ m/^\'(.*)\'$/);
+            # strip double and single quotes
+            my @getquotes = ($newval =~ m/^\"(.*)\"$/);
+            if (scalar(@getquotes))
+            {
+                $newval = shift @getquotes;
+            }
+            else
+            {
+                @getquotes = ($newval =~ m/^\'(.*)\'$/);
 
-            $newval = shift @getquotes
-                if (scalar(@getquotes));
+                $newval = shift @getquotes
+                    if (scalar(@getquotes));
+            }
         }
 
         # save newvalue for this column
@@ -1592,6 +1951,7 @@ sub SQLUpdate
 
     # select out all the rows first (consistent read)
 
+    $msg = "";
     while (1)
     {
         ($key, $rownum, @vals) =
@@ -1624,7 +1984,8 @@ sub SQLUpdate
                                   )
              )
         {
-            print "failed to update row $rid : \n";
+            $msg = "failed to update row $rid : \n";
+            $severity = 'warn';
             last;
         }
             
@@ -1632,10 +1993,15 @@ sub SQLUpdate
 
     } # end for
     my $rowthing = ((1 == $rowcount) ? "row" : "rows");
-    print "updated $rowcount $rowthing in table $tablename.\n";
-    return $rowcount;
+    $msg = "updated $rowcount $rowthing in table $tablename.\n";
+    %earg = (self => $self, msg => $msg,
+             severity => $severity);
+                    
+    &$GZERR(%earg)
+        if (defined($GZERR));
 
-    return undef;
+    return $rowcount; 
+
 } # end sqlupdate
 
 sub SQLInsert
@@ -1688,11 +2054,18 @@ sub SQLInsert
 #        greet @ggg;
         # compare insert column list to select list
         # XXX XXX : need to fix here too
+        # XXX XXX : is too few cols legal?  pad remainder with nulls?
         my $comp = ($colcnt <=> scalar(@{$ggg[2]}));
         unless (0 == $comp) # should be zero if match
         {
-            print "Cannot insert: too ", ($comp == -1) ? "many" : "few", 
+            my $msg = "Cannot insert: too " . (($comp == -1) ? "many": "few") .
             " columns in SELECT list\n";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+                    
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             return undef;
         }
 
@@ -1728,18 +2101,27 @@ sub SQLInsert
         {
             for my $newval (@{$sql_cmd->{colvals}})
             {
-                # strip double and single quotes
-                my @getquotes = ($newval =~ m/^\"(.*)\"$/);
-                if (scalar(@getquotes))
+
+                if ($newval =~ m/^NULL$/)
                 {
-                    $newval = shift @getquotes;
+                    # Convert unquoted NULL value to an undef
+                    $newval = undef;
                 }
                 else
                 {
-                    @getquotes = ($newval =~ m/^\'(.*)\'$/);
-                    
-                    $newval = shift @getquotes
-                        if (scalar(@getquotes));
+                    # strip double and single quotes
+                    my @getquotes = ($newval =~ m/^\"(.*)\"$/);
+                    if (scalar(@getquotes))
+                    {
+                        $newval = shift @getquotes;
+                    }
+                    else
+                    {
+                        @getquotes = ($newval =~ m/^\'(.*)\'$/);
+                        
+                        $newval = shift @getquotes
+                            if (scalar(@getquotes));
+                    }
                 }
                 push @outi, $newval;
             } # end for
@@ -1835,7 +2217,13 @@ sub SQLDelete
 
     unless (scalar(@{$ftch_aryref}))
     {
-        print "deleted 0 rows from table $tablename.\n";
+        my $msg = "deleted 0 rows from table $tablename.\n";
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'warn');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return 0;
     }
 
@@ -1917,13 +2305,18 @@ sub HCountPrint
 
         my $tv = tied(%{$hashi});
 
-        print $tv->HCount(), "\n";
+        print $tv->HCount(), "\n\n";
 
         $rownum++;
 
-        print "\n", ($rownum ? $rownum : "no") ;
-        print ((1 == $rownum) ? " row " : " rows ");
-        print  "selected.\n";
+        my $msg = ($rownum ? $rownum : "no") ;
+        $msg .= ((1 == $rownum) ? " row " : " rows ") .
+            "selected.\n";
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'info');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
         
         $stat = $rownum;            
     }
@@ -2098,11 +2491,16 @@ sub ECountPrint
                 unless (defined($kk));
 
         } # end while
+        print "\n";
 
-
-        print "\n", ($rownum ? $rownum : "no") ;
-        print ((1 == $rownum) ? " row " : " rows ");
-        print  "selected.\n";
+        my $msg = ($rownum ? $rownum : "no") ;
+        $msg .= ((1 == $rownum) ? " row " : " rows ") .
+            "selected.\n";
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'info');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
         
         $stat = $rownum;            
     } # end l_sel
@@ -2482,9 +2880,15 @@ sub SelectPrint
 
             print "\n";
 	}
-        print "\n", ($rownum ? $rownum : "no") ;
-        print ((1 == $rownum) ? " row " : " rows ");
-        print  "selected.\n";
+        print "\n";
+        my $msg = ($rownum ? $rownum : "no") ;
+        $msg .= ((1 == $rownum) ? " row " : " rows ") .
+            "selected.\n";
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'info');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
         
         $stat = $rownum;            
     }
@@ -2583,7 +2987,13 @@ sub histfetch
         return $histlist->[$hidx];
     }
 
-    print "!",$getcnt, ": event not found\n";
+    my $msg = "!" . $getcnt . ": event not found\n";
+    my %earg = (self => $self, msg => $msg,
+                severity => 'warn');
+        
+    &$GZERR(%earg)
+        if (defined($GZERR));
+
     return undef;
 }
 
@@ -2592,19 +3002,34 @@ sub Kgnz_History
     my $self = shift;
     my $harg = shift @_;
     my $histlist = $self->{histlist};
+
+    my ($msg, %earg);
+
     if (defined($harg) && ($harg =~ m/clear/i))
     {
-        print "Cleared history...\n";
+        $msg = "Cleared history...\n";
+        %earg = (self => $self, msg => $msg,
+                 severity => 'info');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         $self->{histlist} = [];
         return 1;
     }
 
+    $msg = "\n";
     foreach my $aval (@{$histlist})
     {
         my ($hcnt, $val) = @{$aval};
         
-        print $hcnt, " ", $val, "\n";
+        $msg .= $hcnt . " " . $val . "\n";
     }
+        %earg = (self => $self, msg => $msg,
+                 severity => 'info');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
 
 }
 
@@ -2687,9 +3112,14 @@ update : SQL Update
 
 EOF_HELP
 
-print $bigHelp, "\n";
+    my $msg = $bigHelp;
+    my %earg = (self => $self, msg => $msg,
+                severity => 'info');
+        
+    &$GZERR(%earg)
+        if (defined($GZERR));
+
     return 1;
-	
 }
 
 sub Kgnz_Prepare
@@ -2704,6 +3134,9 @@ sub Kgnz_Prepare
 
     return undef
         unless (@pwords);
+
+    my ($msg, %earg);
+    my $severity = 'info';
     
     my $operation;
 
@@ -2783,6 +3216,7 @@ sub Kgnz_Prepare
 
 	my @pfiles = split(/(@)/, $operation) ;
 
+        $msg = "";
 	{
 	    last if (@pfiles < 2 );
 
@@ -2794,13 +3228,18 @@ sub Kgnz_Prepare
 
 		unless (-e $inifile)
 		{
-		    print "file $inifile does not exist \n";
-		    next L_inifile;
+		    $msg .= "file $inifile does not exist \n";
+                    $severity = 'warn';
+		    last L_inifile;
 		}
 
                 my $fh; # lexical scope filehandle for nesting includes
-		open ($fh, "< $inifile" ) 
-		    or die "Could not open $inifile for reading : $! \n";
+		unless (open ($fh, "< $inifile" ) )
+                {
+		    $msg .="Could not open $inifile for reading : $! \n";
+                    $severity = 'warn';
+		    last  L_inifile;                    
+                }
 
 		while (<$fh>) {
 		    print "$inifile> $_ \n";
@@ -2810,15 +3249,32 @@ sub Kgnz_Prepare
 
 		} # end big while
 		close ($fh);
-	    }   
+	    } # end foreach
+
+            if ($severity !~ m/info/i)
+            {
+                %earg = (self => $self, msg => $msg,
+                         severity => $severity);
+        
+                &$GZERR(%earg)
+                    if (defined($GZERR));
+            }
+
 	    return undef;
 	}
     }
 
     unless (exists($parsedispatch{lc($operation)}))
     {
-	print "could not parse: " ;
-	print Dumper ($operation), Dumper (@pwords) , "\n" ;
+	$msg = "could not parse: " .
+            Dumper ($operation) . Dumper (@pwords) . "\n" ;
+
+        %earg = (self => $self, msg => $msg,
+                 severity => 'warn');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
 	return undef;
     }
 
@@ -2931,8 +3387,14 @@ sub Kgnz_BigStatement
         unless (   (exists ($args{op1})) 
                 && (exists ($opdispatch{lc($args{op1})})))
         {
-            print "Could not find valid operation in: \n";
-            print "$bigstatement \n";
+            my $msg = "Could not find valid operation in: \n" . 
+                "$bigstatement \n";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             return 0;
         }
         my $dispatch = $opdispatch{lc($args{op1})};
@@ -2958,10 +3420,19 @@ sub automountcheck
         if ($rarr[0] =~ m/automount/)
         {
             my $amval = $rarr[1] ;
-            print "automount = $amval\n";
+            my $msg = "automount = $amval\n";
             if ($rarr[1] =~ m/TRUE/)
             {
-                print "automounting...\n";
+                $msg .= "automounting...\n";
+            }
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'info');
+        
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
+            if ($rarr[1] =~ m/TRUE/)
+            {
                 return $self->Kgnz_Startup();
             }
             last;
@@ -2981,7 +3452,7 @@ sub Interactive
 
     $self->automountcheck();
 
-    PrintVersionString();
+    $self->PrintVersionString();
 
     my $term = new Term::ReadLine 'gendba';
 
@@ -3007,6 +3478,7 @@ sub Interactive
 
 sub PrintLicense
 {
+    my $self = shift;
     my $bigGPL;
     ($bigGPL = <<EOF_GPL) =~ s/^\#//gm;
 #
@@ -3293,9 +3765,13 @@ sub PrintLicense
 #
 EOF_GPL
 
-    print "\nThe Genezzo program may be redistributed under terms of\n";
-    print "the GNU General Public License.\n";
-    print $bigGPL;
+    my $msg = "\nThe Genezzo program may be redistributed under terms of\n" .
+    "the GNU General Public License.\n" . $bigGPL;
+    my %earg = (self => $self, msg => $msg,
+                severity => 'info');
+        
+    &$GZERR(%earg)
+        if (defined($GZERR));
 
 } # end printlicense
 
@@ -3607,7 +4083,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 L<perl(1)>, C<gendba.pl -man>,
 C<perldoc DBI>, L<http://dbi.perl.org/>
 
-Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2003, 2004, 2005 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -3626,6 +4102,6 @@ Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
 Address bug reports and comments to: jcohen@genezzo.com
 
 For more information, please visit the Genezzo homepage 
-at http://www.genezzo.com
+at L<http://www.genezzo.com>
 
 =cut

@@ -69,6 +69,7 @@ rmtree($gnz_home, 1, 1);
 {
     use Genezzo::Util;
 
+    print "dbi connect:\n";
     my $dbh = Genezzo::GenDBI->connect($gnz_home, "NOUSER", "NOPASSWORD");
 
     unless (defined($dbh))

@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/gendba.pl,v 6.3 2004/08/19 21:41:22 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/gendba.pl,v 6.4 2004/12/26 01:09:17 claude Exp claude $
 #
-# copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 #use strict;
@@ -207,7 +207,7 @@ GNZ_HOME is undefined, the default location is $HOME/gnz_home.
 
 =head1 AUTHORS
 
-Copyright 2003, 2004 Jeffrey I Cohen.  All rights reserved.  
+Copyright (c) 2003, 2004, 2005 Jeffrey I Cohen.  All rights reserved.  
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -225,7 +225,38 @@ Copyright 2003, 2004 Jeffrey I Cohen.  All rights reserved.
 
 Address bug reports and comments to: jcohen@genezzo.com
 
+For more information, please visit the Genezzo homepage 
+at L<http://www.genezzo.com>
+
 =cut
+
+our $GZERR = sub {
+    my %args = (@_);
+
+    return 
+        unless (exists($args{msg}));
+
+    my $warn = 0;
+    if (exists($args{severity}))
+    {
+        my $sev = uc($args{severity});
+        $sev = 'WARNING'
+            if ($sev =~ m/warn/i);
+
+        # don't print 'INFO' prefix
+        if ($args{severity} !~ m/info/i)
+        {
+            printf ("%s: ", $sev);
+            $warn = 1;
+        }
+
+    }
+    print $args{msg};
+#    carp $args{msg}
+#      if (warnings::enabled() && $warn);
+    
+};
+
 
     my $glob_init;
     my $glob_gnz_home;
@@ -267,9 +298,10 @@ BEGIN {
 }
 
 my $fb = Genezzo::GenDBI->new(exe => $0, 
-                         gnz_home => $glob_gnz_home, 
-                         dbinit => $glob_init,
-                         defs   => $glob_defs
+                              gnz_home => $glob_gnz_home, 
+                              dbinit => $glob_init,
+                              defs   => $glob_defs,
+                              GZERR  => $GZERR
                          );
 
 unless (defined($fb))

@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 6.15 2004/12/14 07:48:01 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 6.17 2004/12/26 01:02:43 claude Exp claude $
 #
-# copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 package Genezzo::Dict;  # assumes Some/Module.pm
@@ -19,11 +19,49 @@ use Genezzo::Havok;
 
 BEGIN {
     our $VERSION;
-    $VERSION = do { my @r = (q$Revision: 6.15 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 6.17 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
 # non-exported package globals go here
+our $GZERR = sub {
+    my %args = (@_);
+
+    return 
+        unless (exists($args{msg}));
+
+    if (exists($args{self}))
+    {
+        my $self = $args{self};
+        if (defined($self) && exists($self->{GZERR}))
+        {
+            my $err_cb = $self->{GZERR};
+            return &$err_cb(%args);
+        }
+    }
+
+    my $warn = 0;
+    if (exists($args{severity}))
+    {
+        my $sev = uc($args{severity});
+        $sev = 'WARNING'
+            if ($sev =~ m/warn/i);
+
+        # don't print 'INFO' prefix
+        if ($args{severity} !~ m/info/i)
+        {
+            printf ("%s: ", $sev);
+            $warn = 1;
+        }
+
+    }
+    # XXX XXX XXX
+    print __PACKAGE__, ": ",  $args{msg};
+#    print $args{msg};
+#    carp $args{msg}
+#      if (warnings::enabled() && $warn);
+    
+};
 
 # initialize package globals, first exported ones
 
@@ -151,6 +189,8 @@ sub _init
     return 0
         unless (Validate(\%args, \%required));
 
+    my ($msg, %earg);
+
     $self->{gnz_home}    = $args{gnz_home};
     $self->{dbfile}      = $args{name} . ".dbf";
 
@@ -196,9 +236,13 @@ sub _init
 
         if (-e $fhts)    
         {
-            print "FORCE: remove existing gnz_home\n\n";
+            $msg = "\nFORCE: remove existing gnz_home\n\n";
+            %earg = (self => $self, msg => $msg, severity => 'warn');
+
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             rmtree($fhts, 1, 1); # XXX XXX : what should permissions be?
-            print "\n";
         }
     }
 
@@ -207,11 +251,21 @@ sub _init
     {
         unless ($args{init_db} > 0)
         {
-            print "no gnz_home at $self->{gnz_home}\n\n";
+            $msg = "no gnz_home at $self->{gnz_home}\n\n";
+            %earg = (self => $self, msg => $msg, severity => 'fatal');
+
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             return 0;
         }
 
-        print "Create new gnz_home at $self->{gnz_home}\n";
+        $msg = "Create new gnz_home at $self->{gnz_home}\n";
+        %earg = (self => $self, msg => $msg, severity => 'info');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         my $fh   = $self->{gnz_home};
 #        system "mkdir $fh";
 #        system "mkdir $fhts";
@@ -317,8 +371,32 @@ sub new
 
     my $newdict =  bless $self, $class;
 
+    my %args = (@_);
+
+    if ((exists($args{GZERR}))
+        && (defined($args{GZERR}))
+        && (length($args{GZERR})))
+    {
+        # NOTE: don't supply our GZERR here - will get
+        # recursive failure...
+        $self->{GZERR} = $args{GZERR};
+        my $err_cb     = $self->{GZERR};
+        # capture all standard error messages
+        $Genezzo::Util::UTIL_EPRINT = 
+            sub {
+                &$err_cb(self     => $self,
+                         severity => 'error',
+                         msg      => @_); };
+        
+        $Genezzo::Util::WHISPER_PRINT = 
+            sub {
+                &$err_cb(self     => $self,
+#                         severity => 'error',
+                         msg      => @_); };
+    }
+
     return undef
-        unless ($self->_init(@_));
+        unless ($self->_init(%args));
 
     return $newdict;
 
@@ -337,6 +415,10 @@ sub DictDump
     my $self = shift;
 
     my @params = @_;
+
+    # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX
+    # NOTE: dumper still prints - does not use gzerr!!
+    # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX
 
     if ((0 == scalar (@params)) || ($params[0] =~ m/ALL/i))
     {
@@ -549,6 +631,12 @@ sub DictStartup
 
         $self->{use_constraints} = 1; # Note: used in get_table
     }
+
+    $Genezzo::Havok::GZERR = 
+        sub {
+            my $err_cb = $self->{GZERR};
+            return &$err_cb(@_);
+        };
     return 0
         unless Genezzo::Havok::HavokInit(dict => $self, flag => 0);
 
@@ -630,7 +718,7 @@ sub _DictDefineCoreTabs
                           genezzo_version  => $Genezzo::GenDBI::VERSION
                           );
 
-        print "create _pref1...\n";
+        whisper "create _pref1...\n";
         my $tablename = "_pref1";
 
         my $ptable = $self->_get_table(tname => $tablename,
@@ -652,14 +740,22 @@ sub _DictDefineCoreTabs
         { 
             $rowarr->[$getcol->{prefkey}]   = $kk;
             $rowarr->[$getcol->{prefvalue}] = $vv;
-            return 0
-                unless (defined($realtie->HPush($rowarr)));
+            unless (defined($realtie->HPush($rowarr)))
+            {
+                my $msg = "Failed to create table $tablename";
+                my %earg = (self => $self, msg => $msg, severity => 'fatal');
+                
+                &$GZERR(%earg)
+                    if (defined($GZERR));
+
+                return 0;
+            }
         }
     }
 
     # create _tspace
     {
-        print "create _tspace...\n";
+        whisper "create _tspace...\n";
         my $tablename = "_tspace";
 
         # XXX XXX XXX: get the tablespace blocksize!!
@@ -678,13 +774,22 @@ sub _DictDefineCoreTabs
                       ];
         
         my $realtie = tied(%{$tstable});
-        return 0
-            unless (defined($realtie->HPush($rowarr))); 
+        unless (defined($realtie->HPush($rowarr)))
+        {
+            my $msg = "Failed to create table $tablename";
+            my %earg = (self => $self, msg => $msg, severity => 'fatal');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+            
+            return 0;
+        }
+
     }
     
     # create _tsfiles
     {
-        print "create _tsfiles...\n";
+        whisper "create _tsfiles...\n";
         my $tablename = "_tsfiles";
         
         # XXX XXX XXX: get the tablespace blocksize!!
@@ -714,13 +819,21 @@ sub _DictDefineCoreTabs
 
         my $realtie = tied(%{$tstable});
 
-        return 0
-            unless (defined($realtie->HPush($rowarr)));
+        unless (defined($realtie->HPush($rowarr)))
+        {
+            my $msg = "Failed to create table $tablename";
+            my %earg = (self => $self, msg => $msg, severity => 'fatal');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+            
+            return 0;
+        }
     }
     
     # create _tab1
     {
-        print "create _tab1...\n";
+        whisper "create _tab1...\n";
         my $tablename = "_tab1";
         
         my $tstable = $self->_get_table(tname => $tablename,
@@ -757,15 +870,23 @@ sub _DictDefineCoreTabs
             $rowarr->[$getcol->{numcols}] = $colcnt;
             $rowarr->[$getcol->{numvar}]  = $colcnt;
 
-            return 0
-                unless (defined($realtie->HPush($rowarr)));
+            unless (defined($realtie->HPush($rowarr)))
+            {
+                my $msg = "Failed to create table $tablename";
+                my %earg = (self => $self, msg => $msg, severity => 'fatal');
+                
+                &$GZERR(%earg)
+                    if (defined($GZERR));
+                
+                return 0;
+            }
         }
 
     }
 
     # create _col1
     {
-        print "create _col1...\n";
+        whisper "create _col1...\n";
         my $tablename = "_col1";
         
         my $tstable = $self->_get_table(tname => $tablename,
@@ -793,8 +914,18 @@ sub _DictDefineCoreTabs
                               $coltype,
                               "Y", "N", "0", "30"
                               ];
-                return 0
-                    unless (defined($realtie->HPush($rowarr)));
+                unless (defined($realtie->HPush($rowarr)))
+                {
+                    my $msg = "Failed to create table $tablename";
+                    my %earg = (self => $self, msg => $msg, 
+                                severity => 'fatal');
+                    
+                    &$GZERR(%earg)
+                        if (defined($GZERR));
+                    
+                    return 0;
+                }
+
                 $colidx++;
             }
         }
@@ -816,7 +947,13 @@ sub _DictDBInit
     # XXX: Add FORCE for recreate...
     if (-e $deffile_full)
     {
-        print "file $deffile already exists\n";
+        my $msg = "file $deffile already exists\n";
+        my %earg = (self => $self, msg => $msg, 
+                    severity => 'warn');
+                    
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return 0;
     }
 
@@ -839,11 +976,12 @@ sub _DictDBInit
     }
 
     my $ts1 = Genezzo::Tablespace->new(name      => $tsname,
-                                    tsid      => 1,
-                                    gnz_home  => $self->{gnz_home},
-                                    blocksize => $self->{blocksize},
-                                    bc_size   => $self->{prefs}->{bc_size},
-                                    dict      => $self);
+                                       tsid      => 1,
+                                       gnz_home  => $self->{gnz_home},
+                                       blocksize => $self->{blocksize},
+                                       bc_size   => $self->{prefs}->{bc_size},
+                                       GZERR     => $self->{GZERR},
+                                       dict      => $self);
     $tshref->{$tsname} = {
         tsref => $ts1,
     };
@@ -876,14 +1014,19 @@ sub DictSave
     
     while (my ($kk, $vv) = each (%{$self->{tablespaces}}))
     {
-        print "tablespace: $kk\n";
+        whisper "tablespace: $kk\n";
         next unless (exists($vv->{tsref}));
         
         my $ts1 = $vv->{tsref};
         
         $ts1->TSSave();
-        whisper "saved tablespace $kk\n";
+
+        my $msg = "saved tablespace $kk\n";
+        my %earg = (self => $self, msg => $msg, 
+                    severity => 'info');
         
+        &$GZERR(%earg)
+            if (defined($GZERR));
     }
     
     return 1;
@@ -894,7 +1037,7 @@ sub doDictPreLoad
 {
     my $self = shift;
     
-    print "load prefs...\n";
+    whisper "load prefs...\n";
     
     my $tsname = "SYSTEM";
     my $deffile = $self->{dbfile};
@@ -947,8 +1090,16 @@ sub doDictPreLoad
             my $ts1 = $tshref->{$tsname}->{tsref};
 #            greet $prefval;
             my $bufsz = $ts1->{the_ts}->{bc}->Resize($prefval);
-            whisper "reset buffer cache to $bufsz from $prefval"
-                if ($prefval ne $bufsz);
+            if ($prefval ne $bufsz)
+            {
+                my $msg = "reset buffer cache to $bufsz from $prefval";
+                my %earg = (self => $self, msg => $msg, 
+                            severity => 'info');
+        
+                &$GZERR(%earg)
+                    if (defined($GZERR));
+            }
+
             
 #            last; # XXX XXX : need to reset pref1 hash to start at beginning
         }
@@ -1013,7 +1164,7 @@ sub _loadDictMemStructs
 {
     my $self = shift;
 
-    print "loading dictionary memory structs...\n";
+    whisper "loading dictionary memory structs...\n";
 
     # clean up first
     delete $self->{dict_tables};
@@ -1204,7 +1355,12 @@ my $tabexists = sub {
         {
             my $outstr = $args{str_exists} ;
             $outstr =~ s/THETABLENAME/$tablename/;
-            print $outstr ; 
+
+            my %earg = (self => $self, msg => $outstr, 
+                        severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
         }
         return 1 ;
     }
@@ -1213,7 +1369,12 @@ my $tabexists = sub {
     {
         my $outstr = $args{str_notexists} ;
         $outstr =~ s/THETABLENAME/$tablename/;
-        print $outstr ; 
+
+        my %earg = (self => $self, msg => $outstr, 
+                    severity => 'warn');
+            
+        &$GZERR(%earg)
+            if (defined($GZERR));
     }
     return 0 ;
 
@@ -1271,6 +1432,7 @@ sub _get_table
                            tsid      => $tsid,
                            gnz_home  => $self->{gnz_home},
                            blocksize => $self->{blocksize},
+                           GZERR     => $self->{GZERR},
                            dict      => $self);
 
         if (exists($self->{prefs})
@@ -1500,7 +1662,12 @@ sub DictTableAllTab
         unless ($t_rid)
         {
             # NOTE: need to cleanup dict data structs on failure
-            whisper "could not add table $tablename to _tab1";
+            my $msg = "could not add table $tablename to _tab1\n";
+            my %earg = (self => $self, msg => $msg, 
+                        severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
 
             $self->DictTableAllTab(operation => "delete", 
                                    tname => $tablename);
@@ -1539,7 +1706,13 @@ sub DictTableAllTab
                 # NOTE: need to cleanup alltab insert and previous
                 # _col1 inserts
 
-                whisper "could not add column $tablename . $colname to _col1";
+                my $msg = 
+                    "could not add column $tablename . $colname to _col1\n";
+                my %earg = (self => $self, msg => $msg, 
+                            severity => 'warn');
+            
+                &$GZERR(%earg)
+                    if (defined($GZERR));
 
                 $self->DictTableAllTab(operation => "delete", 
                                        tname => $tablename);
@@ -1696,7 +1869,13 @@ sub DictTableAllTab
 
         unless ($rrid)
         {
-            whisper "could not add file $fileno for table $tablename to allfileused";
+            my $msg =  "could not add file $fileno" .
+                " for table $tablename to allfileused\n";
+            my %earg = (self => $self, msg => $msg, 
+                        severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
 
             return 0 ;
         }
@@ -1766,7 +1945,12 @@ sub DictAddFile
 
     unless ($self->{started})
     {
-        greet "dict not started";
+        my %earg = (self => $self, msg => "dict not started\n",
+                    severity => 'warn');
+            
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return 0;
     }
     my %optional = (
@@ -1841,7 +2025,13 @@ sub DictAddFile
 
     unless (exists($tshref->{$tsname}))
     {
-        print "no such tablespace $tsname\n\n";
+        my $msg = "no such tablespace $tsname\n\n";
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'warn');
+            
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return 0;
     }
 
@@ -1890,7 +2080,12 @@ sub _DictTSAddFile
 
     unless ($self->{started})
     {
-        greet "dict not started";
+        my %earg = (self => $self, msg => "dict not started\n",
+                    severity => 'warn');
+            
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return 0;
     }
 
@@ -1921,7 +2116,13 @@ sub _DictTSAddFile
 
     unless (defined($tablespace_id))
     {
-        whisper "invalid tablespace name $args{tsname}";
+        my $msg = "invalid tablespace name $args{tsname}";
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'warn');
+            
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return 0;
     }
 
@@ -1960,7 +2161,13 @@ sub _DictTSAddFile
 
     unless ($rrid)
     {
-        whisper "could not add file $filename for tablespace $tsname to _tsfiles";
+        my $msg = "could not add file $filename"
+            . " for tablespace $tsname to _tsfiles";
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'warn');
+            
+        &$GZERR(%earg)
+            if (defined($GZERR));
         
         return 0 ;
     }
@@ -1990,7 +2197,12 @@ sub DictTableUseFile
     }
     unless ($self->{started})
     {
-        greet "dict not started";
+        my %earg = (self => $self, msg => "dict not started\n",
+                    severity => 'warn');
+            
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return 0;
     }
 
@@ -2057,7 +2269,12 @@ sub DictFileInfo
 
     unless ($self->{started})
     {
-        greet "dict not started";
+        my %earg = (self => $self, msg => "dict not started\n",
+                    severity => 'warn');
+            
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return 0;
     }
     my %required = (
@@ -2118,7 +2335,12 @@ sub DictGrowTablespace
 
     unless ($self->{started})
     {
-        greet "dict not started";
+        my %earg = (self => $self, msg => "dict not started\n",
+                    severity => 'warn');
+            
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return 0;
     }
     my %required = (
@@ -2143,7 +2365,13 @@ sub DictGrowTablespace
     unless (   exists($self->{ts_tsid_idx})
             && exists($self->{ts_tsid_idx}->{$tsid}))
     {
-        whisper "invalid tablespace name $tsname, id $tsid";
+        my $msg = "invalid tablespace name $tsname, id $tsid";
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'warn');
+            
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return 0;
     }
 
@@ -2211,7 +2439,12 @@ sub DictTableCreate
 
     unless ($self->{started} || $self->{preload} )
     {
-        greet "dict not started";
+        my %earg = (self => $self, msg => "dict not started\n",
+                    severity => 'warn');
+            
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return 0;
     }
 
@@ -2272,14 +2505,24 @@ sub DictTableCreate
     unless ($self->DictTableAllTab(operation => "insert", %args))
     {
         # XXX: cleanup
-        print "failed to create $o_type $tablename \n";
+        my $msg = "failed to create $o_type $tablename \n";
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'warn');
+            
+        &$GZERR(%earg)
+            if (defined($GZERR));
 
         delete $self->{dict_tables}->{$tablename} ;
 
         return 0;
     }
 
-    print "$o_type $tablename created \n" ;
+    my $msg = "$o_type $tablename created \n" ;
+    my %earg = (self => $self, msg => $msg,
+                severity => 'info');
+            
+    &$GZERR(%earg)
+        if (defined($GZERR));
 
     my @stat = (1, $tablename);
     return @stat ;
@@ -2300,7 +2543,12 @@ sub DictTableDrop
 
     unless ($self->{started})
     {
-        greet "dict not started";
+        my %earg = (self => $self, msg => "dict not started\n",
+                    severity => 'warn');
+            
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return 0;
     }
 
@@ -2341,7 +2589,13 @@ sub _table_drop
                                        tname => $tablename))
         {
             # XXX: cleanup
-            print "failed to drop $o_type $tablename \n";
+            my $msg = "failed to drop $o_type $tablename \n";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             return 0;
         }
 
@@ -2362,7 +2616,12 @@ sub _table_drop
         # fix the tablespaces to remove the tied table hash...
         delete $self->{tablespaces}->{$tsname}->{table_cache}->{$tablename};
 
-        print "dropped $o_type $tablename \n" ;
+        my $msg = "dropped $o_type $tablename \n" ;
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'info');
+            
+        &$GZERR(%earg)
+            if (defined($GZERR));
     }
 
     return 1 ;
@@ -2389,7 +2648,13 @@ sub DictTableGetCols
 
     unless (ref($tablehash{tabdef}) eq 'HASH')
     {
-	print "expected hash ref for tabdef! \n";
+        my $msg = "expected hash ref for tabdef! \n";
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'warn');
+            
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
 	return 0;
     }
 
@@ -2417,7 +2682,12 @@ sub DictTableAddConstraint
 
     unless ($self->{started})
     {
-        greet "dict not started";
+        my %earg = (self => $self, msg => "dict not started\n",
+                    severity => 'warn');
+            
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return 0;
     }
 
@@ -2439,7 +2709,13 @@ sub DictTableAddConstraint
     {
         unless (exists($args{where_clause}))
         {
-            whisper "no CHECK text";
+            my $msg = "no CHECK text";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             return 0;
         }
 
@@ -2472,6 +2748,13 @@ sub DictTableAddConstraint
         unless ($self->RowInsert(tname => "cons1", rowval => \@rowarr))
         {
             # XXX XXX : cleanup!
+            my $msg = "failed to add constraint $cons_name to table cons1\n";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             return 0;
         }
     }
@@ -2508,7 +2791,13 @@ sub DictTableAddConstraint
     }
     else
     {
-        greet "unknown constraint type: $args{cons_type}";
+        my $msg = "unknown constraint type: $args{cons_type}";
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'warn');
+            
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return 0;
     }
 
@@ -2560,7 +2849,12 @@ sub DictTableDropConstraint
 
     unless ($self->{started})
     {
-        greet "dict not started";
+        my %earg = (self => $self, msg => "dict not started\n",
+                    severity => 'warn');
+            
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return 0;
     }
 
@@ -2575,7 +2869,13 @@ sub DictTableDropConstraint
         unless ((exists ($self->{dict_tables})) &&
                 exists ($self->{dict_tables}->{$tablename} ))
         {
-            print "no such table $tablename\n";
+            my $msg = "no such table $tablename\n";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             return 0;
         }
 
@@ -2621,7 +2921,13 @@ sub DictTableDropConstraint
     }
     else
     {
-        print "no constraint name specified\n";
+        my $msg = "no constraint name specified\n";
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'warn');
+            
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return 0;
     }
         
@@ -2748,8 +3054,15 @@ sub DictTableColExists
 
     unless (exists ($thsh->{tabdef}->{$colname}))
     {
-        print "no such column \'$colname\' in table \'$tablename\' \n"
-            unless ($args{silent_notexists});
+        unless ($args{silent_notexists}) 
+        {
+            my $msg = "no such column \'$colname\' in table \'$tablename\' \n";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+        }
         return 0;
     }
     my @farr;
@@ -2775,7 +3088,12 @@ sub RowInsert # was realRowPush
 
     unless ($self->{started})
     {
-        greet "dict not started";
+        my %earg = (self => $self, msg => "dict not started\n",
+                    severity => 'warn');
+            
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return 0;
     }
 
@@ -2820,7 +3138,12 @@ sub RowUpdate
 
     unless ($self->{started})
     {
-        greet "dict not started";
+        my %earg = (self => $self, msg => "dict not started\n",
+                    severity => 'warn');
+            
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return 0;
     }
 
@@ -2870,7 +3193,12 @@ sub RowDelete
 
     unless ($self->{started})
     {
-        greet "dict not started";
+        my %earg = (self => $self, msg => "dict not started\n",
+                    severity => 'warn');
+            
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return 0;
     }
 
@@ -3016,12 +3344,25 @@ sub DictIndexCreate
                                  rowval => \@rowarr))
         {
             # XXX XXX: cleanup
+            my $msg = "failed to add constraint $consid to table cons1_cols\n";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             return 0;
         }
         unless ($self->RowInsert(tname => "ind1_cols", 
                                  rowval => \@icrow))
         {
-            whisper "failed to insert col $colidx for index $iid";
+            my $msg = "failed to insert col $colidx for index $iid";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             return 0;
         }
         $posn++;
@@ -3112,7 +3453,13 @@ sub DictIndexDrop
     }
     else
     {
-        print "no index name!\n";
+        my $msg = "no index name!\n";
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'warn');
+            
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return 0;
     }
 
@@ -3220,7 +3567,12 @@ sub _index_create
 
     unless ($self->{started} || $self->{preload} )
     {
-        greet "dict not started";
+        my %earg = (self => $self, msg => "dict not started\n",
+                    severity => 'warn');
+            
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return 0;
     }
 
@@ -3243,7 +3595,13 @@ sub _index_create
         unless ($self->_index_load($tablename, $unique, 
                                    $i_name, $tspace, @index_col_info))
         {
-            whisper "index load failed - could not create index";
+            my $msg = "index load failed - could not create index";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             $self->DictTableDrop(tname => $i_name);
             return 0;
         }
@@ -3284,7 +3642,12 @@ sub _index_define
 
     unless ($self->{started} || $self->{preload} )
     {
-        greet "dict not started";
+        my %earg = (self => $self, msg => "dict not started\n",
+                    severity => 'warn');
+            
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return 0;
     }
 
@@ -3300,7 +3663,14 @@ sub _index_define
         
     unless (defined($allcols))
     {
-        print "failed to create index $i_name - no such table $tablename \n";
+        my $msg = "failed to create index $i_name" .
+            " - no such table $tablename \n";
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'warn');
+            
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return 0;
     }
 
@@ -3315,8 +3685,14 @@ sub _index_define
     {
         unless (exists($allcols->{$colname}))
         {
-            print "failed to create index $i_name - ";
-            print "no such column $colname in table $tablename \n";
+            my $msg =  "failed to create index $i_name - " .
+                "no such column $colname in table $tablename \n";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             return 0;
         }
         my $colinfo = $allcols->{$colname};
@@ -3355,7 +3731,13 @@ sub _index_define
         unless ($stat)
         {
             # XXX: cleanup
-            print "failed to create index $i_name on table $tablename \n";
+            my $msg = "failed to create index $i_name on table $tablename \n";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             return 0;
         }
     }
@@ -3440,16 +3822,28 @@ sub _index_load
             
         unless ( $bt->insert(\@rowarr, $kk))
         {
-            whisper "failed to insert row into index!";
-            print "inserted $rowcount entries \n";
+            my $msg =  "failed to insert row into index!\n" .
+                "inserted $rowcount entries \n";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             return 0;
             last;
         }
         $rowcount++;
     }
 
-    print "index $i_name on table $tablename created \n" ;
-    print "inserted $rowcount entries \n";
+    my $msg = "index $i_name on table $tablename created \n" .
+        "inserted $rowcount entries \n";
+    my %earg = (self => $self, msg => $msg,
+                severity => 'info');
+    
+    &$GZERR(%earg)
+        if (defined($GZERR));
+
     return 1 ;
 }
 
@@ -3488,7 +3882,13 @@ sub dictp2_define_cons
 
         unless (exists($self->{dict_tables}->{$tname}))
         {
-            whisper "no such table $tname for primary key constraint!";
+            my $msg = "no such table $tname for primary key constraint!";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             next L_primary_key_constraint;
         }
 
@@ -3518,7 +3918,14 @@ sub dictp2_define_cons
                                          tablespace  => "SYSTEM",
                                          define_only => 1))
             {
-                whisper "failed to create primary key index!";
+                my $msg = "failed to create primary key index " .
+                    "$i_name on table $tname\n";
+                my %earg = (self => $self, msg => $msg,
+                            severity => 'warn');
+            
+                &$GZERR(%earg)
+                    if (defined($GZERR));
+
                 next L_primary_key_constraint;
             }
             my $ihsh  = $self->{dict_tables}->{$i_name};
@@ -3533,12 +3940,24 @@ sub dictp2_define_cons
         }
         unless ($self->RowInsert(tname => "cons1", rowval => \@rowarr))
         {
-            whisper "failed to insert constraint $consid";
+            my $msg = "failed to insert constraint $consid";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             return 0;
         }
         unless ($self->RowInsert(tname => "ind1", rowval => \@irow))
         {
-            whisper "failed to insert index $irow[0]";
+            my $msg = "failed to insert index $irow[0]";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             return 0;
         }
 
@@ -3549,7 +3968,13 @@ sub dictp2_define_cons
             # error if no such col
             unless (exists($thsh->{tabdef}->{$colname}))
             {
-                whisper "no such column $colname in $tname!!";
+                my $msg = "no such column $colname in $tname!!";
+                my %earg = (self => $self, msg => $msg,
+                            severity => 'warn');
+            
+                &$GZERR(%earg)
+                    if (defined($GZERR));
+
                 next L_constraint_col;
             }
             my $refarr = 
@@ -3561,13 +3986,26 @@ sub dictp2_define_cons
             unless ($self->RowInsert(tname => "cons1_cols", 
                                      rowval => \@rowarr))
             {
-                whisper "failed to insert col $colidx for constraint $consid";
+                my $msg = 
+                    "failed to insert col $colidx for constraint $consid";
+                my %earg = (self => $self, msg => $msg,
+                            severity => 'warn');
+                
+                &$GZERR(%earg)
+                    if (defined($GZERR));
+
                 return 0;
             }
             unless ($self->RowInsert(tname => "ind1_cols", 
                                      rowval => \@icrow))
             {
-                whisper "failed to insert col $colidx for index $iid";
+                my $msg = "failed to insert col $colidx for index $iid";
+                my %earg = (self => $self, msg => $msg,
+                            severity => 'warn');
+            
+                &$GZERR(%earg)
+                    if (defined($GZERR));
+
                 return 0;
             }
             $posn++;
@@ -3585,7 +4023,13 @@ sub dictp2_define_cons
 
         unless (exists($self->{dict_tables}->{$tname}))
         {
-            whisper "no such table $tname for primary key constraint!";
+            my $msg = "no such table $tname for primary key constraint!";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             next;
         }
 
@@ -3598,7 +4042,14 @@ sub dictp2_define_cons
                                          tablespace => "SYSTEM",
                                          load_only  => 1))
             {
-                whisper "failed to create primary key index!";
+                my $msg = "failed to create primary key index " .
+                "$i_name on table $tname\n";
+                my %earg = (self => $self, msg => $msg,
+                            severity => 'warn');
+            
+                &$GZERR(%earg)
+                    if (defined($GZERR));
+
                 next;
             }
         }
@@ -3655,12 +4106,24 @@ sub _make_constraint_check_fn
         }
         else
         {
-            whisper "unknown type $cons_type";
+            my $msg = "unknown type $cons_type";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
         }
 
         unless (defined($cons_func))
         {
-            whisper "could not create constraint $cons_name for table tid $tid";
+            my $msg = "could not create constraint $cons_name" .
+                 " for table tid $tid\n";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             next;
         }
 
@@ -3904,13 +4367,27 @@ sub _make_cons_pk_check
 
         unless (defined($keyval))
         {
-            whisper "bad value!\n";
+            my $msg = "bad value!\n";
+
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             return 1;
         }
 
         if (scalar(@{$keyval}) < scalar(@pkey_cols))
         {
-            print "missing key cols\n";
+            my $msg = "missing key cols\n";
+
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             return 1;
         } 
 
@@ -3935,14 +4412,29 @@ sub _make_cons_pk_check
            }
            if ($allnull)
            {
-               print "null key violated PRIMARY KEY constraint $cons_name\n";
+               my $msg = 
+                   "null key violated PRIMARY KEY constraint $cons_name\n";
+               
+               my %earg = (self => $self, msg => $msg,
+                           severity => 'warn');
+               
+               &$GZERR(%earg)
+                   if (defined($GZERR));
+
                return 1;
            }
        }
             
         unless ( $bt->insert(\@rowarr, $place))
         {
-            print "violated constraint $cons_name\n";
+            my $msg = "violated constraint $cons_name\n";
+               
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             return 1;
         }
         return 0;
@@ -3955,13 +4447,25 @@ sub _make_cons_pk_check
 
         unless (defined($keyval))
         {
-            whisper "bad value!\n";
+            my $msg = "bad value!\n";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+               
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             return undef;
         }
 
         if (scalar(@{$keyval}) < scalar(@pkey_cols))
         {
-            print "missing key cols\n";
+            my $msg = "missing key cols\n";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+               
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             return undef;
         } 
 
@@ -3991,13 +4495,25 @@ sub _make_cons_pk_check
 
         unless (defined($keyval))
         {
-            whisper "bad value!\n";
+            my $msg = "bad value!\n";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+               
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             return 0; # not an error for update - let fail on insert
         }
 
         if (scalar(@{$keyval}) < scalar(@pkey_cols))
         {
-            print "missing key cols\n";
+            my $msg = "missing key cols\n";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+               
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             return 0; # not an error for update - let fail on insert
         } 
 
@@ -4124,10 +4640,20 @@ sub _make_cons_ck_check
 
     unless (defined($status))
     {
-        warn $@ if $@;
-        print "bad filter:\n";
-        print $check_filter, "\n";
-        print $check_text, "\n";
+        my $msg = "";
+#        warn $@ if $@;
+        $msg .= $@ 
+            if $@;
+
+        $msg .= "\nbad filter:\n" .
+            $check_filter . "\n" . $check_text . "\n";
+
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'warn');
+                    
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return undef;
     }
 
@@ -4142,7 +4668,13 @@ sub _make_cons_ck_check
 
         unless (defined($val))
         {
-            whisper "bad value!\n";
+            my $msg = "bad value!\n";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+               
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             return 1;
         }
 
@@ -4151,8 +4683,14 @@ sub _make_cons_ck_check
 
         unless (&$filter($tabdef, $place, $val))
         {
-            print "violated constraint $cons_name\n";
-            print "must satisfy $check_text\n";
+            my $msg = "violated constraint $cons_name\n" .
+                "must satisfy $check_text\n";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+               
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             return 1;
         }
         return 0;
@@ -4180,13 +4718,25 @@ sub _make_cons_ck_check
 
         unless (defined($newval))
         {
-            whisper "bad value!\n";
+            my $msg = "bad value!\n";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+               
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             return 0; # not an error for update - let fail on insert
         }
 
         unless (&$filter($tabdef, $place, $newval))
         {
-            print "violated constraint $cons_name\n";
+            my $msg = "violated constraint $cons_name\n";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+               
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             return 1;
         }
         return 0;
@@ -4379,7 +4929,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 
 perl(1).
 
-Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2003, 2004, 2005 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -4398,6 +4948,6 @@ Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
 Address bug reports and comments to: jcohen@genezzo.com
 
 For more information, please visit the Genezzo homepage 
-at http://www.genezzo.com
+at L<http://www.genezzo.com>
 
 =cut

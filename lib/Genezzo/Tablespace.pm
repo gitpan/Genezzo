@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Tablespace.pm,v 6.2 2004/12/14 07:47:46 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Tablespace.pm,v 6.4 2004/12/26 01:02:18 claude Exp claude $
 #
-# copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 package Genezzo::Tablespace;  # assumes Some/Module.pm
@@ -18,6 +18,7 @@ use Genezzo::Row::RSTab;
 use Genezzo::BufCa::BCFile;
 use Genezzo::Dict;
 use File::Spec;
+use warnings::register;
 
 BEGIN {
     use Exporter   ();
@@ -26,7 +27,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 6.2 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 6.4 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
 #    @EXPORT      = qw(&func1 &func2 &func4 &func5);
@@ -43,6 +44,45 @@ BEGIN {
 our @EXPORT_OK;
 
 # non-exported package globals go here
+
+our $GZERR = sub {
+    my %args = (@_);
+
+    return 
+        unless (exists($args{msg}));
+
+    if (exists($args{self}))
+    {
+        my $self = $args{self};
+        if (defined($self) && exists($self->{GZERR}))
+        {
+            my $err_cb = $self->{GZERR};
+            return &$err_cb(%args);
+        }
+    }
+
+    my $warn = 0;
+    if (exists($args{severity}))
+    {
+        my $sev = uc($args{severity});
+        $sev = 'WARNING'
+            if ($sev =~ m/warn/i);
+
+        # don't print 'INFO' prefix
+        if ($args{severity} !~ m/info/i)
+        {
+            printf ("%s: ", $sev);
+            $warn = 1;
+        }
+
+    }
+    # XXX XXX XXX
+    print __PACKAGE__, ": ",  $args{msg};
+#    print $args{msg};
+#    carp $args{msg}
+#      if (warnings::enabled() && $warn);
+    
+};
 
 # initialize package globals, first exported ones
 
@@ -110,6 +150,15 @@ sub new
       File::Spec->catfile(
                           $ts_prefix,
                           $args{dbfile} . '.dbf');
+
+    if ((exists($args{GZERR}))
+        && (defined($args{GZERR}))
+        && (length($args{GZERR})))
+    {
+        # NOTE: don't supply our GZERR here - will get
+        # recursive failure...
+        $self->{GZERR} = $args{GZERR};
+    }
     
     return bless $self, $class;
 
@@ -142,7 +191,9 @@ sub make_fac2 {
 
     if (exists($args{hashref}))
     {    
-        print "cannot supply hashref to factory method - deleting !\n";
+        carp "cannot supply hashref to factory method - deleting !\n"
+            if warnings::enabled();
+
         delete $args{hashref};
     }
 
@@ -153,8 +204,7 @@ sub make_fac2 {
     my $newfunc = 
         sub {
 
-            local $Genezzo::Util::QUIETWHISPER = 1; # XXX: quiet the whispering
-            whoami @_;
+#            whoami @_;
             my %args2 = (
                         @_);
 
@@ -234,6 +284,7 @@ sub TableHash ()
         my %nargs = (
                      tablename => $tname,
                      tso       => $self,
+                     GZERR     => $self->{GZERR},
                      bufcache  => $ts->{bc}
                      );
 
@@ -256,7 +307,13 @@ sub TableHash ()
 
             unless (defined($args{pkey_type}))
             {
-                whisper "missing pkey argument";
+                my $msg = "missing pkey argument\n";
+                my %earg = (self => $self, msg => $msg,
+                            severity => 'warn');
+               
+                &$GZERR(%earg)
+                    if (defined($GZERR));
+
                 return undef;
             }
 
@@ -273,7 +330,13 @@ sub TableHash ()
 
             unless (defined($args{pkey_type}))
             {
-                whisper "missing pkey argument";
+                my $msg = "missing pkey argument\n";
+                my %earg = (self => $self, msg => $msg,
+                            severity => 'warn');
+               
+                &$GZERR(%earg)
+                    if (defined($GZERR));
+
                 return undef;
             }
 
@@ -301,7 +364,14 @@ sub TableHash ()
         else
         {
             my $tt = $args{object_type};
-            print "invalid object type $tt\n";
+
+            my $msg = "invalid object type $tt\n";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+               
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             return undef;
         }
 
@@ -852,12 +922,24 @@ sub TSAddFile ()
 
     if (-e $tsfile)
     {
-        carp "file $tsfile already exists";
+        my $msg = "file $tsfile already exists\n";
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'warn');
+               
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return 0;
     }
 
     {
-        print "creating $tsfile...$numblks blocks \n";
+        my $msg = "creating $tsfile...$numblks blocks \n";
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'info');
+               
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
 
         my $outifile;
         open ($outifile, "> $tsfile")
@@ -893,7 +975,13 @@ sub TSAddFile ()
         unless ($self->TSExtendFile ($outifile, $blocksize, $numblks, 
                                      $tsfile))
         {
-            carp "failed to allocate $numblks blocks for file $tsfile";
+            my $msg = "failed to allocate $numblks blocks for file $tsfile\n";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+               
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             close ($outifile);
             return 0;
         }
@@ -922,7 +1010,13 @@ sub TSAddFile ()
     my $fileidx = $dict->_DictTSAddFile(%nargs);
     unless ($fileidx)
     {
-        whisper "could not add file ",$args{filename};
+        my $msg = "could not add file " . $args{filename} . "\n";
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'warn');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return 0;
     }
 
@@ -1063,7 +1157,12 @@ sub TSTableUseFile ()
 
     unless (exists($self->{tabsp_tables}->{$tablename}))
     {
-        whisper "no href for $tablename  !!!";
+        my $msg = "no href for $tablename  !!!\n";
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'warn');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
             
         return 0;
     }
@@ -1197,11 +1296,17 @@ sub TSFileInfo ()
 
     unless (defined($fileidx))
     {
-        whisper "null file idx!";
+        my $msg = "null file idx!\n";
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'warn');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return undef;
     }
 
-    local $Genezzo::Util::QUIETWHISPER = 1; # XXX: quiet the whispering
+#    local $Genezzo::Util::QUIETWHISPER = 1; # XXX: quiet the whispering
 
     whisper "fileinfo: $fileidx";
 
@@ -1215,7 +1320,13 @@ sub TSFileInfo ()
     my $foo = $filearr->[$fileidx];
     unless (defined($foo))
     {
-        greet "invalid array ref for $fileidx";
+        my $msg = "invalid array ref for $fileidx\n";
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'warn');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return undef;
     }
     my @retarr = @{$foo};
@@ -1258,7 +1369,13 @@ sub TSDropTable ()
         {
             my $outstr = $args{str_exists} ;
             $outstr =~ s/THETABLENAME/$tablename/;
-            print $outstr, $self->name(), "\n" ; 
+
+            my $msg = $outstr .  $self->name() . "\n" ; 
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+        
+            &$GZERR(%earg)
+                if (defined($GZERR));
         }
     }
     else
@@ -1267,7 +1384,13 @@ sub TSDropTable ()
         {
             my $outstr = $args{str_notexists} ;
             $outstr =~ s/THETABLENAME/$tablename/;
-            print $outstr, $self->name(), "\n" ; 
+
+            my $msg = $outstr .  $self->name() . "\n" ; 
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+        
+            &$GZERR(%earg)
+                if (defined($GZERR));
         }
     }
 
@@ -1348,7 +1471,7 @@ L<Genezzo::PushHash::PushHash>,
 L<Genezzo::Dict>,
 L<perl(1)>.
 
-Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2003, 2004, 2005 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -1367,6 +1490,6 @@ Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
 Address bug reports and comments to: jcohen@genezzo.com
 
 For more information, please visit the Genezzo homepage 
-at http://www.genezzo.com
+at L<http://www.genezzo.com>
 
 =cut

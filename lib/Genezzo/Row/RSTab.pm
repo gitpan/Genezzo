@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSTab.pm,v 6.8 2004/12/14 07:53:32 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSTab.pm,v 6.9 2004/12/26 01:03:18 claude Exp claude $
 #
-# copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 package Genezzo::Row::RSTab;
@@ -18,7 +18,47 @@ use Genezzo::BufCa::BCFile;
 use Genezzo::SpaceMan::SMFile;
 use Genezzo::Row::RSFile;
 use warnings::register;
+
 our @ISA = qw(Genezzo::PushHash::HPHRowBlk);
+
+our $GZERR = sub {
+    my %args = (@_);
+
+    return 
+        unless (exists($args{msg}));
+
+    if (exists($args{self}))
+    {
+        my $self = $args{self};
+        if (defined($self) && exists($self->{GZERR}))
+        {
+            my $err_cb = $self->{GZERR};
+            return &$err_cb(%args);
+        }
+    }
+
+    my $warn = 0;
+    if (exists($args{severity}))
+    {
+        my $sev = uc($args{severity});
+        $sev = 'WARNING'
+            if ($sev =~ m/warn/i);
+
+        # don't print 'INFO' prefix
+        if ($args{severity} !~ m/info/i)
+        {
+            printf ("%s: ", $sev);
+            $warn = 1;
+        }
+
+    }
+    # XXX XXX XXX
+    print __PACKAGE__, ": ",  $args{msg};
+#    print $args{msg};
+#    carp $args{msg}
+#      if (warnings::enabled() && $warn);
+    
+};
 
 sub make_fac1 {
     my $tclass = shift;
@@ -128,6 +168,15 @@ sub TIEHASH
     return undef
         unless (_init($self,%args));
 
+    if ((exists($args{GZERR}))
+        && (defined($args{GZERR}))
+        && (length($args{GZERR})))
+    {
+        # NOTE: don't supply our GZERR here - will get
+        # recursive failure...
+        $self->{GZERR} = $args{GZERR};
+    }
+
     return bless $self, $class;
 
 } # end new
@@ -231,11 +280,18 @@ sub _make_new_chunk # override the hph method
 
 sub _splitrid # override the hph method
 {
+    my $self = $_[0]; # no shift
+
     # split into 2 parts - chunkno and sliceno
     unless ($_[1] =~ m/$Genezzo::PushHash::hph::RIDSEPRX/)
     {
-        carp "could not split key: $_[1] "
-            if warnings::enabled();
+        my $msg = "could not split key: $_[1] \n";
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'warn');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return undef; # no rid separator
     }
     my @splitval = split(/$Genezzo::PushHash::hph::RIDSEPRX/,($_[1]), 2);
@@ -300,10 +356,19 @@ sub check_insert
     my $val;
     # be very paranoid - filter might be invalid perl
     eval {$val = &$cci_check(@_) };
+
+    # XXX XXX: figure out name of defective constraint
     if ($@)
     {
         whisper "check constraint blew up: $@";
         greet  $cci_check;
+        my $msg = "bad check constraint: $@\n";
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'warn');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return 1; #### undef;
     }
 
@@ -791,6 +856,13 @@ sub STORE
                 if (&$ins1($oldvalue, $place))
                 {
                     greet "really screwed up, sorry!";
+                    my $msg = "Serious error during update!!\n";
+                    my %earg = (self => $self, msg => $msg,
+                                severity => 'warn');
+        
+                    &$GZERR(%earg)
+                        if (defined($GZERR));
+
                     return undef;
                 }
             }
@@ -838,6 +910,12 @@ sub STORE
                     if (&$ins1($oldvalue, $place))
                     {
                         whisper "oh gosh!";
+                        my $msg = "Really serious error during update!!\n";
+                        my %earg = (self => $self, msg => $msg,
+                                    severity => 'warn');
+                        
+                        &$GZERR(%earg)
+                            if (defined($GZERR));
                     }
                 }
             } # end for
@@ -1112,8 +1190,14 @@ sub _localFetchDelete
  #               greet @outarr;
                 my $tname = $self->{tablename};
                 whisper "table $tname: malformed row $place at $pieceplace";
-                carp    "table $tname: malformed row $place at $pieceplace"
-                    if warnings::enabled();
+
+                my $msg = "table $tname: malformed row $place at " .
+                    "$pieceplace\n";
+                my %earg = (self => $self, msg => $msg,
+                            severity => 'warn');
+        
+                &$GZERR(%earg)
+                    if (defined($GZERR));
             }
             return undef;
         }
@@ -1356,6 +1440,16 @@ sub SQLFetch
         {
             whisper "filter blew up: $@";
             greet   $fullfilter;
+
+            my $msg = "bad filter: $@\n" ;
+#            $msg .= Dumper($fullfilter)
+#               if (defined($fullfilter));
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             return undef;
         }
         return ($currkey, $outarr)
@@ -1567,7 +1661,7 @@ L<Genezzo::BufCa::BCFile>,
 L<Genezzo::BufCa::BufCaElt>,
 L<perl(1)>.
 
-Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2003, 2004, 2005 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -1586,6 +1680,6 @@ Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
 Address bug reports and comments to: jcohen@genezzo.com
 
 For more information, please visit the Genezzo homepage 
-at http://www.genezzo.com
+at L<http://www.genezzo.com>
 
 =cut

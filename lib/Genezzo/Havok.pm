@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Havok.pm,v 1.7 2004/12/14 07:48:01 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Havok.pm,v 1.8 2004/12/26 00:15:55 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -18,7 +18,7 @@ use Carp;
 our $VERSION;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 1.7 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.8 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -53,7 +53,7 @@ sub MakeSQL
 {
     my $bigSQL; 
     ($bigSQL = <<EOF_SQL) =~ s/^\#//gm;
-#REM Copyright (c) 2004 Jeffrey I Cohen.  All rights reserved.
+#REM Copyright (c) 2004, 2005 Jeffrey I Cohen.  All rights reserved.
 #REM
 #REM 
 #ct havok hid=n modname=c owner=c creationdate=c flag=c version=c
@@ -140,6 +140,7 @@ sub HavokInit
                     "!= $verzion in database table";
 
                 my %earg = (#self => $self,
+                            severity => 'warn',
                             msg => $msg);
 
                 &$GZERR(%earg)
@@ -151,6 +152,7 @@ sub HavokInit
         unless (eval "require $modname")
         {
             my %earg = (#self => $self,
+                        severity => 'warn',
                         msg => "no such package - $modname");
 
             &$GZERR(%earg)
@@ -174,6 +176,7 @@ sub HavokInit
             if ($@)
             {
                 my %earg = (#self => $self,
+                            severity => 'warn',
                             msg => 
                             "bad " . lc($phase) . " : $modname");
 
@@ -183,6 +186,7 @@ sub HavokInit
             unless ($stat[0])
             {
                 my %earg = (#self => $self,
+                            severity => 'warn',
                             msg => "bad return status : $func");
 
                 &$GZERR(%earg)
@@ -192,6 +196,7 @@ sub HavokInit
         else
         {
             my %earg = (#self => $self,
+                        severity => 'warn',
                         msg => "unknown phase - $phase");
 
             &$GZERR(%earg)
