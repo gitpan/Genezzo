@@ -1,5 +1,10 @@
 Revision history for Perl extension Genezzo
 
+0.31  Thu Dec 30 00:39:37 2004
+        - More error reporting (RSTab, SQLPrepare).
+        - add attribute parameters to GenDBI::connect like
+          PrintError, RaiseError, and GZERR.
+
 0.30  Sat Dec 25 17:20:34 2004
         - support (unquoted, uppercase) NULL in insert, update.
         - More work on error reporting (GenDBI, Dict, RSTab).

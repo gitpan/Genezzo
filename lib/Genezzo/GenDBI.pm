@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 6.13 2004/12/26 00:10:33 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 6.16 2004/12/30 08:36:15 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -38,7 +38,7 @@ BEGIN {
 
     @ISA         = qw(Exporter);
     %EXPORT_TAGS = ( 'all' => [ qw(
-                                   $VERSION $RELSTATUS $RELDATE
+                                   $VERSION $RELSTATUS $RELDATE errstr
                                    ) ] 
                      );
 
@@ -48,12 +48,43 @@ BEGIN {
 	
 }
 
-our $VERSION   = '0.30';
+our $VERSION   = '0.31';
 our $RELSTATUS = 'Alpha'; # release status
 # grab the code check-in date and convert to YYYYMMDD
 our $RELDATE   = 
-    do { my @r = (q$Date: 2004/12/26 00:10:33 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
+    do { my @r = (q$Date: 2004/12/30 08:36:15 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
 
+our $errstr; # DBI errstr
+
+#
+# GZERR: the GeneZzo ERRor message handler
+#
+# You can define or redefine an error message handler for Genezzo 
+# 
+# Arguments:
+#
+# msg (required): an actual message that you can print, carp about, or log.
+# severity (optional): mainly to distinguish between informational
+#   messages and actual errors.  The current set of severities are INFO,
+#   WARN, ERROR, and FATAL, though I'll probably add DEBUG or DBG to replace 
+#   the "whisper" messages.  
+# self (optional): for object-oriented packages, adding a GZERR attribute 
+#   to the $self is a bit cleaner way of propagating a common error routine
+#   to subsequent classes in your hierarchy.
+#
+# Specifications:
+# Your error handler should do something when it gets a message.  
+# For example, the gendba.pl error handler prints INFO messages like 
+# "5 rows selected" and it flags errors with a prefix like WARNING or ERROR.
+# If you use the dbi-style connect to obtain a database handle, the default
+# handler ignores INFO msgs, but prints all errors and warnings.
+#
+# gendba.pl supplies its own error handler when it calls GenDBI::new, 
+# and GenDBI::connect (the DBI-style interface) has its own error handler,
+# which can be overridden in the attribute hash
+#
+# The default error handler declared here is typically not used.
+#
 # dbi gzerr doesn't call $self->gzerr to eliminate recursive hell
 our $dbi_gzerr = sub {
     my %args = (@_);
@@ -232,29 +263,114 @@ sub _init
     return 1;
 }
 
+sub _clearerror
+{
+    my $self = shift;
+    $self->{errstr} = "";
+    $self->{err}    = 0;
+}
+
+# DBI-style connect
+#
+# Arguments:
+# 
+# gnz_home   (required): genezzo home directory
+# username   (required, but ignored): user name
+# password   (required, but ignored): password
+# attributes (optional): hash of attributes
+#
+# example:
+# my $dbh = Genezzo::GenDBI->connect($gnz_home, 
+#                                    "NOUSER", "NOPASSWORD",
+#                                    {GZERR => $GZERR,
+#                                     PrintError => 1});
+#
 sub connect # DBI
 {
     my $invocant = shift;
     my $class = ref($invocant) || $invocant ; 
     my $self = { };
 
-    my ($gnz_home, $user, $passwd) = @_;
+    my ($gnz_home, $user, $passwd, $attr) = @_;
 
-    my %optional = (GZERR => $dbi_gzerr);
+    my %optional; # some optional values for _init args...
+    
+    $self->{PrintError} = 1;
+    $self->{RaiseError} = 0;
 
-    my %args = (%optional,
+    if (defined($attr) && (ref($attr) eq 'HASH'))
+    {
+        # standard DBI-style PrintError, RaiseError
+        if (exists($attr->{PrintError}))
+        {
+            $self->{PrintError} = $attr->{PrintError};
+        }
+        if (exists($attr->{RaiseError}))
+        {
+            $self->{RaiseError} = $attr->{RaiseError};
+        }
+        # Non-standard GZERR argument to supply error message handler
+        if ((exists($attr->{GZERR}))
+                && (defined($attr->{GZERR})))
+        {
+            $optional{GZERR} = $attr->{GZERR};
+        }
+    }
+
+    my $i_gzerr  = sub {
+        my %args = (@_);
+
+        return 
+            unless (exists($args{msg}));
+        
+        my $warn = 0;
+        if (exists($args{severity}))
+        {
+            my $sev = uc($args{severity});
+            $sev = 'WARNING'
+                if ($sev =~ m/warn/i);
+            
+            # don't print 'INFO' prefix
+            if ($args{severity} !~ m/info/i)
+            {
+#                printf ("%s: ", $sev);
+#                $warn = 1;
+            }
+            else
+            {
+#                printf ("%s: ", $sev);
+#                print $args{msg}, "\n";
+                return;
+            }
+        };
+
+        my $l_errstr = $args{msg} . "\n";
+        $self->{errstr} = $l_errstr;
+
+        warn $l_errstr
+            if $self->{PrintError};
+        die $l_errstr
+            if $self->{RaiseError};
+
+    };
+
+    # if no GZERR was supplied, use the dbi-style handler declared above
+    # with the appropriate printError, raiseError settings.
+    $optional{GZERR} = $i_gzerr
+        unless ((exists($optional{GZERR}))
+                && (defined($optional{GZERR})));
+
+    my %nargs = (%optional,
                 exe => $0,
                 gnz_home => $gnz_home,
                 user => $user,
                 password => $passwd);
 
-    return undef
-        unless (_init($self,%args));
-
-#    if ((exists($args{GZERR}))
-#        && (defined($args{GZERR}))
-#        && (length($args{GZERR})))
+    if ((exists($nargs{GZERR}))
+        && (defined($nargs{GZERR}))
+        && (length($nargs{GZERR})))
     {
+        $self->{GZERR} = $nargs{GZERR};
         my $err_cb     = $self->{GZERR};
         # capture all standard error messages
         $Genezzo::Util::UTIL_EPRINT = 
@@ -269,6 +385,10 @@ sub connect # DBI
 #                         severity => 'error',
                          msg      => @_); };
     }
+
+    return undef
+        unless (_init($self,%nargs));
+
 
     return bless $self, $class;
 
@@ -2556,6 +2676,13 @@ sub SelectPrepare
         unless (defined($args{tablename}))
         {
             whisper "no tablename!";
+            my $msg = "no tablename";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+                    
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             return @outi;
         }
         $tablename = $args{tablename};
@@ -2573,6 +2700,14 @@ sub SelectPrepare
             unless (defined($filter))
             {
                 whisper "invalid where clause";
+
+                my $msg = "invalid where clause";
+                my %earg = (self => $self, msg => $msg,
+                            severity => 'warn');
+                    
+                &$GZERR(%earg)
+                    if (defined($GZERR));
+
                 return @outi;
             }
         }
@@ -3301,6 +3436,7 @@ sub Kgnz_Execute
 sub Parseall 
 {
     my ($self, $currline) = @_;
+    $self->_clearerror();
     my @param = $self->Kgnz_Prepare($currline);
     return undef
         unless (scalar(@param));
@@ -3317,12 +3453,14 @@ sub do # DBI
 sub prepare # DBI
 {
     my ($self, $currline) = @_;
+    $self->_clearerror();
     my @param = $self->Kgnz_Prepare($currline);
     return undef
         unless (scalar(@param));
 
-    my $sth = Genezzo::GStatement->new(gnz_h => $self, statement => \@param);
-
+    my $sth = Genezzo::GStatement->new(gnz_h => $self, 
+                                       GZERR => $self->{GZERR},
+                                       statement => \@param);
     return $sth;
 }
 
@@ -3785,8 +3923,12 @@ sub _init
     my $self = shift;
     my %args = (@_);
 
-    $self->{gnz_h} = $args{gnz_h}
-      if (exists($args{gnz_h}));
+    return 0
+        unless (exists($args{gnz_h}));
+
+    $self->{gnz_h}      = $args{gnz_h};
+    $self->{PrintError} = $self->{gnz_h}->{PrintError};
+    $self->{RaiseError} = $self->{gnz_h}->{RaiseError};
 
     if (exists($args{statement}))
     {
@@ -3804,6 +3946,10 @@ sub _init
                 push @{$self->{select}},
                     $self->{gnz_h}->SelectPrepare(basic =>
                                                   \@{$self->{param}});
+
+                # check if prepare failed
+                return 0
+                    unless scalar(@{$self->{select}});
             }
             elsif ($self->{param}->[0] =~ m/$match2/ )
             {
@@ -3811,6 +3957,10 @@ sub _init
                 $self->{select} = [];
                 push @{$self->{select}},
                     $self->{gnz_h}->SQLSelectPrepare(@{$self->{param}});
+
+                # check if prepare failed
+                return 0
+                    unless scalar(@{$self->{select}});
             }
         }
 
@@ -3821,6 +3971,13 @@ sub _init
     return 1;
 }
 
+sub _clearerror
+{
+    my $self = shift;
+    $self->{errstr} = "";
+    $self->{err}    = 0;
+}
+
 sub new
 {
  #   whoami;
@@ -3828,7 +3985,11 @@ sub new
     my $class = ref($invocant) || $invocant ; 
     my $self = { };
 
+
     my %args = (@_);
+
+    $self->{GZERR} = $args{GZERR};
+
     return undef
         unless (_init($self,%args));
 
@@ -3840,6 +4001,7 @@ sub execute
 {
 #    whoami;
     my $self = shift;
+    $self->_clearerror();
 
     unless (exists($self->{select}))
     {    
@@ -3894,12 +4056,15 @@ sub rows
 sub fetch
 {
     my $self = shift;
+    $self->_clearerror();
+
     return $self->fetchrow_arrayref();
 }
 
 sub _fetchrow_internal
 {
     my ($self, $fetchtype) = @_;
+    $self->_clearerror();
 
     if (!defined($fetchtype) ||
         ($fetchtype =~ m/^ARRAY$/))
@@ -3980,7 +4145,8 @@ sub _selectrow_internal
 sub fetchrow_array
 {
     my $self = shift;
-    
+    $self->_clearerror();
+
     return undef
         unless (
                 ($self->{state} eq "EXECUTE")

@@ -66,11 +66,43 @@ rmtree($gnz_home, 1, 1);
 
 }
 
+# the default "connect" error handler uses "warn" or "die".  Replace
+# it with one that prints messages, which makes the test output cleaner.
+our $GZERR = sub {
+    my %args = (@_);
+
+    return 
+        unless (exists($args{msg}));
+
+    my $warn = 0;
+    if (exists($args{severity}))
+    {
+        my $sev = uc($args{severity});
+        $sev = 'WARNING'
+            if ($sev =~ m/warn/i);
+
+        # don't print 'INFO' prefix
+        if ($args{severity} !~ m/info/i)
+        {
+            printf ("%s: ", $sev);
+            $warn = 1;
+        }
+
+    }
+    print $args{msg};
+#    carp $args{msg}
+#      if (warnings::enabled() && $warn);
+    
+};
+
+
 {
     use Genezzo::Util;
 
     print "dbi connect:\n";
-    my $dbh = Genezzo::GenDBI->connect($gnz_home, "NOUSER", "NOPASSWORD");
+    my $dbh = Genezzo::GenDBI->connect($gnz_home, 
+                                       "NOUSER", "NOPASSWORD",
+                                       {GZERR => $GZERR});
 
     unless (defined($dbh))
     {

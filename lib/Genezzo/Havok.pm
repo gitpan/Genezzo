@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Havok.pm,v 1.8 2004/12/26 00:15:55 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Havok.pm,v 1.9 2004/12/30 07:12:59 claude Exp claude $
 #
-# copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 package Genezzo::Havok;
@@ -18,7 +18,7 @@ use Carp;
 our $VERSION;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 1.8 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.9 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -177,7 +177,7 @@ sub HavokInit
             {
                 my %earg = (#self => $self,
                             severity => 'warn',
-                            msg => 
+                            msg => "$@\n" .
                             "bad " . lc($phase) . " : $modname");
 
                 &$GZERR(%earg)
@@ -233,11 +233,12 @@ Genezzo::Havok - Cry Havok! And Let Slip the Dogs of War!
 use Genezzo::Havok; # Wreak Havok
 
 create table havok (
-    hid number,
-    modname char,
-    owner char,
+    hid          number,
+    modname      char,
+    owner        char,
     creationdate char, 
-    flag char
+    flag         char,
+    version      char
 );
 
 =over 4
@@ -339,7 +340,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 
 L<perl(1)>.
 
-Copyright (c) 2004 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2004, 2005 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -358,6 +359,6 @@ Copyright (c) 2004 Jeffrey I Cohen.  All rights reserved.
 Address bug reports and comments to: jcohen@genezzo.com
 
 For more information, please visit the Genezzo homepage 
-at http://www.genezzo.com
+at L<http://www.genezzo.com>
 
 =cut

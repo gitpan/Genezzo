@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSTab.pm,v 6.9 2004/12/26 01:03:18 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSTab.pm,v 6.11 2004/12/30 08:15:36 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -1290,6 +1290,12 @@ sub SQLPrepare # get a DBI-style statement handle
     my %args = @_;
     $args{pushhash} = $self;
 
+    if ((exists($self->{GZERR}))
+        && (defined($self->{GZERR})))
+    {
+        $args{GZERR} = $self->{GZERR};
+    }
+
     my $sth = Genezzo::Row::SQL_RSTab->new(%args);
 
     return $sth;
@@ -1349,6 +1355,16 @@ sub new
     my $self = { };
 
     my %args = (@_);
+
+    if ((exists($args{GZERR}))
+        && (defined($args{GZERR}))
+        && (length($args{GZERR})))
+    {
+        # NOTE: don't supply our GZERR here - will get
+        # recursive failure...
+        $self->{GZERR} = $args{GZERR};
+    }
+
     return undef
         unless (_init($self,%args));
 

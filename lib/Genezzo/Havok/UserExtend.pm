@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/UserExtend.pm,v 1.7 2004/12/14 07:48:17 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/UserExtend.pm,v 1.8 2004/12/30 08:14:40 claude Exp claude $
 #
-# copyright (c) 2004 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2004, 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 package Genezzo::Havok::UserExtend;
@@ -124,7 +124,7 @@ sub HavokInit
                 if ($@)
                 {
                     my %earg = (#self => $self,
-                                msg => "bad function : $func");
+                                msg => "$@\nbad function : $func");
 
                     &$GZERR(%earg)
                         if (defined($GZERR));
@@ -154,7 +154,7 @@ sub HavokInit
             if ($@)
             {
                 my %earg = (#self => $self,
-                            msg => "bad function : $func");
+                            msg => "$@\nbad function : $func");
 
                 &$GZERR(%earg)
                     if (defined($GZERR));
@@ -292,7 +292,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 
 L<perl(1)>.
 
-Copyright (c) 2004 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2004, 2005 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -311,6 +311,6 @@ Copyright (c) 2004 Jeffrey I Cohen.  All rights reserved.
 Address bug reports and comments to: jcohen@genezzo.com
 
 For more information, please visit the Genezzo homepage 
-at http://www.genezzo.com
+at L<http://www.genezzo.com>
 
 =cut

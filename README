@@ -359,9 +359,19 @@ NEW FEATURES - System/User Extensibility
   imported, then the query can just call soundex(), versus using the 
   fully-qualified name Text::Soundex::soundex.
 
+NEW FEATURES - Improved error reporting, handling
+
+  Version 0.31 error reporting has been significantly reworked to be
+  more compatible with DBI.  In particular, Genezzo::GenDBI->connect now
+  takes an optional attribute hash with PrintError and RaiseError, so
+  it will print messages using warn() or die().  In addition, it also
+  supports a GZERR argument is used to replace the internal Genezzo
+  error handlers.  More documentation exists in GenDBI.pm.  The DBI
+  standard err and errstr aren't supported yet.
+
 INCOMPATIBLE CHANGES
 
-  Version 0.30 dictionary and block format is incompatible with
+  Version 0.31 dictionary and block format is incompatible with
   previous releases.  No upgrade path is supported.
 
 SEE ALSO
