@@ -396,7 +396,9 @@ INCOMPATIBLE CHANGES
 
   Version 0.31 dictionary and block format is incompatible with
   previous releases.  No upgrade path is supported.
-  Version 0.34, 0.33 and 0.32 are compatible with version 0.31.
+  Version 0.33 and 0.32 are compatible with version 0.31.
+  Version 0.34 and 0.35 are compatible.  Previously, version 0.34
+  was incorrectly listed as compatible with 0.33, etc.  
 
 SEE ALSO
 

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Tablespace.pm,v 6.10 2005/01/30 09:55:54 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Tablespace.pm,v 6.11 2005/02/02 06:42:29 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -27,7 +27,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 6.10 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 6.11 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
 #    @EXPORT      = qw(&func1 &func2 &func4 &func5);
@@ -97,7 +97,8 @@ our $GZERR = sub {
 my %compatible_format = (
                          0.32 => [0.31],
                          0.33 => [0.31, 0.32],
-                         0.34 => [0.31, 0.32, 0.33]
+                         0.34 => [0.35],
+                         0.35 => [0.34]
                          );
 
 # make all your functions, whether exported or not;

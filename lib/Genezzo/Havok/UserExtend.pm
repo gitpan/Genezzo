@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/UserExtend.pm,v 1.9 2005/01/23 10:00:50 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/UserExtend.pm,v 1.10 2005/02/02 06:43:24 claude Exp claude $
 #
 # copyright (c) 2004, 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -243,7 +243,7 @@ of functions to import to the default Genezzo namespace.  if xtype =
 
 =head2 Example:
 
-insert into user_extend (1, "require", "Genezzo::Havok::Examples",  
+insert into user_extend values (1, "require", "Genezzo::Havok::Examples",  
 "isRedGreen", "SYSTEM", "2004-09-21T12:12");
 
 The row causes UserExtend to "require Genezzo::Havok::Examples", and

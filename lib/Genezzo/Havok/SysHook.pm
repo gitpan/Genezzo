@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/SysHook.pm,v 1.4 2005/01/30 09:37:45 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/SysHook.pm,v 1.5 2005/02/02 06:43:24 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -21,7 +21,7 @@ our $Got_Hooks;       # set to 1 after all hooks get loaded
 our %SysHookOriginal; # save original value of all hooks for posterity
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 1.4 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.5 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     $Got_Hooks = 0;
 }
@@ -384,7 +384,7 @@ of functions to import to the default Genezzo namespace.  if xtype =
 
 =head2 Example:
 
-insert into sys_hook (1, "Genezzo::Dict", "dicthook1", "Howdy_Hook",
+insert into sys_hook values (1, "Genezzo::Dict", "dicthook1", "Howdy_Hook",
 "require", "Genezzo::Havok::Examples",  
 "Howdy", "SYSTEM", "2004-09-21T12:12");
 
@@ -408,7 +408,7 @@ The Howdy function can call &$Howdy_Hook() to activate the original
 
 Replacing system functions in an operational database has
 approximately the same level of risk exposure as running with the
-bulls at Pamploma with your pants around your ankles.  Which is to
+bulls at Pamplona with your pants around your ankles.  Which is to
 say, "somewhat foolhardy".  
 
 =head2 EXPORT

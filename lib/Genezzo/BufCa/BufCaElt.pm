@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BufCaElt.pm,v 6.2 2004/10/04 07:58:16 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BufCaElt.pm,v 6.3 2005/02/02 06:46:26 claude Exp claude $
 #
-# copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 use strict;
@@ -23,7 +23,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 6.2 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 6.3 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
 #    @EXPORT      = qw(&func1 &func2 &func4 &func5);
@@ -95,6 +95,8 @@ sub _init
     $buf = "\0" x $self->{blocksize};
     $self->{bigbuf} = \$buf;
 
+    $self->{info}   = {};
+
     $self->{pin}    = 0;
     $self->{dirty}  = 0;
 
@@ -126,6 +128,7 @@ sub _postinit
     # if the underlying tied buffer gets overwritten
     my $foo = sub { $self->_dirty(1); };
     $self->{tbuf}->_StoreCB($foo);
+    $self->{tbuf}->SetBCE($self);
 
 }
 
@@ -159,6 +162,11 @@ sub _dirty
 
 } 
 
+sub GetInfo
+{
+    my $self = shift;
+    return $self->{info};
+}
 
 END { }       # module clean-up code here (global destructor)
 
@@ -178,9 +186,33 @@ Genezzo::BufCa::BufCaElt - Buffer Cache Element
 
 =head1 DESCRIPTION
 
+A Buffer Cache Element contains an actual datablock plus some minimal
+state information: the blocksize, whether the block is in use, and
+whether the contents have been modified.  BufCaElt clients can use
+GetInfo() to store and retrieve a hash of arbitrary information for
+each block.
+
 =head1 ARGUMENTS
 
 =head1 FUNCTIONS
+
+=item  GetInfo - return a reference to the info hash.  BCFile uses
+       this hash to store the filenum/blocknum info associated with
+       the current BufCaElt.
+
+=item  _dirty - set/clear the "dirty" bit.  Used to indicate if buffer
+       has been modified.
+
+=item  _postinit - Pass a callback to the DirtyScalar tie so the "dirty" bit
+       gets set automatically whenever the buffer is modified.  Also,
+       pass a reference to $self so DirtyScalar can use GetInfo to find
+       the current filenum/blocknum and any other interesting information.
+
+=item  _pin - used to pin/unpin a block in the cache via the PinScalar tie.
+       Blocks that are actively referenced must remain "pinned" in the
+       buffer cache, but unreferenced blocks can be freed.  If they are
+       "dirty", the modified buffer must be written to disk, else the
+       BufCaElt can simply be re-used.
 
 =head2 EXPORT
 
@@ -188,9 +220,16 @@ Genezzo::BufCa::BufCaElt - Buffer Cache Element
 
 various
 
-=head1 #TODO
+=head1 TODO
 
 =over 4
+
+=item get fileno, blockno info
+
+=item deal with multiple pins on same block sanely.  We shouldn't be
+      maintaining a reference count scheme here.  Shouldn't pin be <= 1,
+      and the destroy cb should set it to zero when last reference is
+      garbage collected?
 
 =back
 
@@ -202,7 +241,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 
 L<perl(1)>.
 
-Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2003, 2004, 2005 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -219,5 +258,8 @@ Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 Address bug reports and comments to: jcohen@genezzo.com
+
+For more information, please visit the Genezzo homepage 
+at L<http://www.genezzo.com>
 
 =cut

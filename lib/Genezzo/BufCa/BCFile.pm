@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BCFile.pm,v 6.7 2005/01/30 09:35:38 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BCFile.pm,v 6.8 2005/02/02 06:46:26 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -378,6 +378,12 @@ sub ReadBlock
 
     # new block is not dirty
     $bce->_dirty(0);
+
+    # get the hash of bce information and update with filenum, blocknum
+    my $infoh = $bce->GetInfo();
+
+    $infoh->{filenum}  = $fnum;
+    $infoh->{blocknum} = $bnum;
 
 #    greet $hitlist;
     return $self->{bc}->ReadBlock(blocknum => $bcblocknum);

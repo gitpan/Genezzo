@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/gendba.pl,v 6.6 2005/01/01 07:05:25 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/gendba.pl,v 6.7 2005/02/02 06:42:50 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -56,8 +56,15 @@ Options:
 
 =item B<-define> key=value
     
-    If initializing a new database, define a configuration 
-    parameter.
+    Define a configuration parameter for database
+    creation and/or initialization.  Some important 
+    database creation parameters are blocksize and dbsize, 
+    which define the size of database blocks and
+    the size of the initial database file.  An important
+    initialization parameter is use_havok=0, which 
+    disables the havok extensibility subsystem on database
+    startup. Use "gendba.pl -define help=help" 
+    for more information.
 
 =back
 

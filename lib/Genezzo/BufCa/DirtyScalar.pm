@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/DirtyScalar.pm,v 6.2 2004/10/04 07:58:16 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/DirtyScalar.pm,v 6.3 2005/02/02 06:46:26 claude Exp claude $
 #
-# copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 use strict;
@@ -38,6 +38,9 @@ sub STORE {
     
     if (defined($_[0]->{storecb}))
     {
+#        greet $_[0]->{bce}->GetInfo()
+#            if (exists($_[0]->{bce}));
+
         $_[0]->{storecb}->();
     }
     ${$_[0]->{ref}} = $_[1];
@@ -57,6 +60,16 @@ sub _StoreCB
     return $self->{storecb};
 }
 
+# set the buffer cache element associated with this tie
+sub SetBCE
+{
+#    whoami;
+
+    my $self     = shift;
+    $self->{bce} = shift;
+
+}
+
 1;
 
 __END__
@@ -71,9 +84,19 @@ Genezzo::BufCa::DirtyScalar - Detect modifications to scalar
 
 =head1 DESCRIPTION
 
+BufCaElt uses DirtyScalar to detect when a data block is modified.
+
 =head1 ARGUMENTS
 
 =head1 FUNCTIONS
+
+=item  _StoreCB - a callback function that is activated on every STORE, 
+       i.e., whenever the scalar is updated.  BufCaElt uses this function
+       to set a "dirty" bit for the buffer.
+
+=item  SetBCE - set a reference back to the BufCaElt that owns this tie.
+       Some DirtyScalar hook routines need to query the BufCaElt info hash
+       via BufCaElt::GetInfo.
 
 =head2 EXPORT
 
@@ -95,7 +118,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 
 L<perl(1)>.
 
-Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2003, 2004, 2005 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -112,5 +135,8 @@ Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 Address bug reports and comments to: jcohen@genezzo.com
+
+For more information, please visit the Genezzo homepage 
+at L<http://www.genezzo.com>
 
 =cut

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Feeble.pm,v 6.7 2005/01/23 10:04:48 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Feeble.pm,v 6.8 2005/02/02 06:44:02 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -2579,11 +2579,7 @@ sub sql_insert
             if (defined($token));
     }
 
-    return (\%ins_clause, $pretty, $badparse)
-        unless (defined($token));
-
-    
-    if ($token->{val} =~ m/(?i)^select$/)
+    if (defined($token) && ($token->{val} =~ m/(?i)^select$/))
     {
         my $selclause;
         ($selclause, $pretty, $badparse) = 
@@ -2592,7 +2588,7 @@ sub sql_insert
     }
     else 
     {
-        unless ($token->{val} =~ m/(?i)^values$/)
+        unless ((defined($token)) && ($token->{val} =~ m/(?i)^values$/))
         {
             $msg2 = "no VALUES clause";
             $badparse = 1;
@@ -2610,6 +2606,9 @@ sub sql_insert
 
     if ($badparse)
     {
+        $msg = $msg2
+            if (defined($msg2));
+
         $pretty = $self->{feeb}->{pretty};
             $badparse = $self->{feeb}->{badparse} ?
                 $self->{feeb}->{badparse} : length($pretty);
@@ -2620,6 +2619,7 @@ sub sql_insert
         &$GZERR(%earg)
             if (defined($GZERR));
     }
+
     return (\%ins_clause, $pretty, $badparse);
 
 }

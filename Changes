@@ -1,5 +1,11 @@
 Revision history for Perl extension Genezzo
 
+0.35  Tue Feb  1 22:53:00 2005
+        - fix parser to give error for INSERT with no VALUES
+        - fix 0.34 compatibility - syshook table changed.
+        - pass additional info BCFile/BufCa on current 
+          filenum/blocknum.
+
 0.34  Sun Jan 30 01:51:21 2005
         - more SysHook support.
         - option to disable havok
