@@ -3,6 +3,8 @@ use ExtUtils::MakeMaker;
 # the contents of the Makefile that is written.
 WriteMakefile(
     'NAME'		=> 'Genezzo',
+    'ABSTRACT'          => 'extensible database system',
+    'AUTHOR'            => 'Jeffrey I Cohen (jcohen@cpan.org)',
     'VERSION_FROM'	=> 'lib/Genezzo/GenDBI.pm', # finds $VERSION
     'PREREQ_PM'		=> {
 

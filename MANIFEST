@@ -8,6 +8,7 @@ t/Block2.t
 t/Block3.t
 t/Block4.t
 t/BufCa1.t
+t/Cons1.t
 t/DBI1.t
 t/Gnzo1.t
 t/Gnzo2.t

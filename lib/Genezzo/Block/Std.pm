@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/g3/lib/Genezzo/Block/RCS/Std.pm,v 6.1 2004/08/12 09:31:15 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Block/RCS/Std.pm,v 6.2 2004/09/05 23:38:19 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -20,7 +20,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 6.1 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 6.2 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
     @EXPORT      = qw(&GetStdHdr &SetStdHdr &ClearStdBlock &SetHdr);
@@ -152,6 +152,8 @@ __END__
 
 =head1 NAME
 
+Genezzo::Block::Std - Standard Block 
+
 =head1 SYNOPSIS
 
 =head1 DESCRIPTION
@@ -160,15 +162,44 @@ __END__
 
 =head1 FUNCTIONS
 
+=over 4
+
+=item  GetStdHdr 
+
+=item  SetStdHdr 
+
+=item  ClearStdBlock 
+
+=item  SetHdr
+
+=back
+
 =head2 EXPORT
+
+=over 4
+
+=item  %BlockType 
+List of legal block types
+
+=item  $DEFBLOCKSIZE
+Default block size
+
+=item  $HdrTemplate 
+
+=item  $LenHdrTemplate
+
+=back
+
 
 =head1 LIMITATIONS
 
-various
+Only supports fixed block header and fixed size 
 
-=head1 #TODO
+=head1 TODO
 
 =over 4
+
+=item  Support for completely variable block headers
 
 =back
 

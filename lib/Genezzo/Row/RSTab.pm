@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSTab.pm,v 6.2 2004/08/24 21:59:53 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSTab.pm,v 6.6 2004/09/11 00:04:20 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -266,6 +266,9 @@ sub _joinrid # override the hph method
     return (join ($Genezzo::PushHash::hph::RIDSEP, @args));
 }
 
+# Constraint Methods
+
+# get/set the constraint list
 sub _constraint_check
 {
 #    whoami;
@@ -273,10 +276,48 @@ sub _constraint_check
 
 #    greet $self->{tablename};
 
-    $self->{constraint_check} = shift if @_ ;
+    $self->{constraint_list} = shift if @_ ;
 
-    return $self->{constraint_check};
+    return $self->{constraint_list};
 }
+
+# check constraint when inserting new row
+sub check_insert
+{
+    my $self = shift;
+
+    return 0
+        unless (exists($self->{constraint_list}));
+
+    my $cons_list = $self->{constraint_list};
+
+    return 0
+        unless (defined($cons_list) &&
+                exists($cons_list->{check_insert}));
+
+    my $cci_check = $cons_list->{check_insert};
+
+    return (&$cci_check(@_));
+} # end check insert
+
+# insert new values into index when inserting new row
+sub index_insert
+{
+    my $self = shift;
+
+    return 0
+        unless (exists($self->{constraint_list}));
+
+    my $cons_list = $self->{constraint_list};
+
+    return 0
+        unless (defined($cons_list) &&
+                exists($cons_list->{index_insert}));
+
+    my $cci = $cons_list->{index_insert};
+
+    return (&$cci(@_));
+} # end index insert
 
 sub HSuck
 {
@@ -405,6 +446,24 @@ sub HPush
     my $toobig  = 0;
     my $maxsize = 2 * $self->{small_row}; 
 
+    # XXX XXX: need a "mutating" constraint to support default values
+    # for null columns, numeric precision, column uppercasing, etc.
+
+    # CONSTRAINT - "check constraints" first
+
+    if ($self->check_insert($value))
+    {
+        # Note: $place is undefined, because we haven't pushed
+        # yet.  But might need it for check constraints that
+        # require the rid (very very improbable - should probably
+        # be illegal)
+
+        {
+            # Check constraint FAILED
+            return undef;
+        }
+    }
+
     my $packstr = PackRowCheck($value, $maxsize);
 
     if (defined($packstr))
@@ -420,32 +479,26 @@ sub HPush
     return undef
         unless (defined($place));
 
-    # CONSTRAINT - need to do after the push because need a rid for
-    # the index.  maybe restructure so don't have to push huge rows
-    # that would violate constraint.  bt->insert_maybe with localhpush
-    # callback to generate rid
+    # CONSTRAINT - index_inserts, like primary/unique key.  Need to do
+    # after the push because need a rid for the index.  maybe
+    # restructure so don't have to push huge rows that would violate
+    # constraint.  bt->insert_maybe with localhpush callback to
+    # generate rid
     #
-    # val TBD callback needs a place_ref so subsequent cons_checks can
+    # val TBD callback needs a place_ref so subsequent cons_lists can
     # get correct place, and so HPush can return place to caller
     #
-    # cons_check ($value, null, val_TBD_cb, place_ref)
+    # cons_list ($value, null, val_TBD_cb, place_ref)
 
-    my $cons_check = $self->{constraint_check};
-
-    if (defined($cons_check))
+    if ($self->index_insert($value, $place))
     {
-        if (exists($cons_check->{insert}))
         {
-            my $cci = $cons_check->{insert};
-            if (&$cci($value, $place))
-            {
-                whisper "undo insert!!";
-                # and don't specify the constraint check.  Why?
-                # Because if the insert failed with a duplicate key,
-                # then delete will remove it from the index.
-                $self->_localDELETE($place);
-                return undef;
-            }
+            whisper "undo insert!!";
+            # and don't specify the constraint check.  Why?
+            # Because if the insert failed with a duplicate key,
+            # then delete will remove it from the index.
+            $self->_localDELETE($place);
+            return undef;
         }
     }
 
@@ -604,70 +657,182 @@ sub STORE
     my ($self, $place, $value) = @_;
 
     # CONSTRAINT
-    my $cons_check = $self->{constraint_check};
-    my ($cci, $ccu, $ccd);
+    my $cons_list = $self->{constraint_list};
+    my ($cci_index, $ccu, $ccd);
+    my @cc_op_list; # delete/insert operations
 
-    if (defined($cons_check))
+    if (defined($cons_list))
     {
-        $ccu = $cons_check->{update};
-        $ccd = $cons_check->{delete};
-        $cci = $cons_check->{insert};
+        $ccu = $cons_list->{update};
+        $ccd = $cons_list->{delete};
+        $cci_index = $cons_list->{index_insert};
+    }
+
+    # CONSTRAINT - do "check constraints" before update
+    if ($self->check_insert($value, $place))
+    {
+        # Check constraint FAILED
+        return undef;
     }
 
     my $oldvalue;
 
     if ($place !~ m/^PUSH$/)
     {
+        if (defined($cci_index))
+        {
+            # clear out the insert callback -- ccu will generate an
+            # op_list of delete/inserts if necessary.
+            $cci_index = (); 
+        }
+
         if (defined($ccu))
         {
             $oldvalue = $self->FETCH($place);
 
-            if (&$ccu($value, $oldvalue, $place))
+            if (&$ccu($value, $oldvalue, $place, \@cc_op_list))
             {
                 whisper "updated key - delete from index";
+                greet @cc_op_list;
                 greet $place, $value, $oldvalue;
-                greet &$ccd($oldvalue, $place);
+#                greet &$ccd($oldvalue, $place);
             }
             else
             {
                 whisper "keys match - index not updated";
-                $cci = ();      # clear out the insert callback --
-                                # -- even if the local RSTab STORE fails 
-                                # we don't need to fix the index
-
-                $oldvalue = (); # keys match - don't keep old value }
+                $oldvalue  = (); # keys match - don't keep old value 
             } 
         }
     } # end !push
 
     # 2 cases: 
-    # either PUSHing a new key or 
-    # the old keys didn't match so we deleted them from the index
-    if (defined($cci)
-        && (&$cci($value, $place)))
+    # either PUSHing a new key *or* 
+    # the old keys didn't match so we deleted them from the index.
+    #
+    # NOTE that we do the "index_insert" before the update, because the
+    # rid exists already.  
+
+    my $maxj;
+
+    if (defined($cci_index))
     {
-        # insert failed
-        if (defined($oldvalue)) # had an old key
+        return undef
+            if (&$cci_index($value, $place));
+    }
+    elsif (scalar(@cc_op_list))
+    {
+        my $maxi = scalar(@cc_op_list);
+     
+        for my $i (0..($maxi - 1))
         {
-            whisper " attempt to restore old value";
-            &$cci($oldvalue, $place);
-            return undef;
+            my $opv = $cc_op_list[$i];
+
+            greet $opv;
+            my $cnam = $opv->[0];
+            my $del1 = $opv->[1];
+            my $ins1 = $opv->[2];
+
+            if (defined($del1) && defined($oldvalue))
+            {
+                greet &$del1($oldvalue, $place);
+            }
+
+            if (defined($ins1))
+            {
+                if (&$ins1($value, $place))
+                {
+                    # Index insert FAILED - revert indexes to old state
+                    $maxj = $i;
+                    if (defined($oldvalue)) # had an old key
+                    {
+                        whisper " attempt to restore old value";
+                        &$ins1($oldvalue, $place);
+                    }
+                    return undef 
+                        unless ($i); # we're done if only a single index
+                    last;
+                }
+
+            }
+
         }
     }
 
+    if (defined($maxj))
+    {
+        for my $j (0..($maxj - 1))
+        {
+            my $opv = $cc_op_list[$j];
+
+            greet $opv;
+            my $cnam = $opv->[0];
+            my $del1 = $opv->[1];
+            my $ins1 = $opv->[2];
+
+            if (defined($del1))
+            {
+                # delete the new value
+                greet &$del1($value, $place);
+            }
+
+            if (defined($ins1)  && defined($oldvalue))
+            {
+                # restore the old value if possible
+                if (&$ins1($oldvalue, $place))
+                {
+                    greet "really screwed up, sorry!";
+                    return undef;
+                }
+            }
+        } # end for
+        return undef;
+    } # end if maxj
+            
+
     my $stat = $self->_localStore($place, $value);
     
-    if (defined($cci)
-        && !defined($stat))
+    if (!defined($stat))
     {
-        whisper "delete new key from index";
-        &$ccd($value, $place);
-        if (defined($oldvalue))
+        if (defined($cci_index))
         {
-            whisper " attempt to restore old value";
-            &$cci($oldvalue, $place);
+            # localStore FAILED - revert indexes to old state
+
+            whisper "delete new key from index";
+            &$ccd($value, $place);
+            if (defined($oldvalue))
+            {
+                whisper " attempt to restore old value";
+                &$cci_index($oldvalue, $place);
+            }
         }
-    }
+        elsif (scalar(@cc_op_list))
+        {
+            my $maxi = scalar(@cc_op_list);
+     
+            for my $i (0..($maxi - 1))
+            {
+                my $opv = $cc_op_list[$i];
+
+                greet $opv;
+                my $cnam = $opv->[0];
+                my $del1 = $opv->[1];
+                my $ins1 = $opv->[2];
+
+                if (defined($del1))
+                {
+                    greet &$del1($value, $place);
+                }
+
+                if (defined($ins1) && defined($oldvalue))
+                {
+                    if (&$ins1($oldvalue, $place))
+                    {
+                        whisper "oh gosh!";
+                    }
+                }
+            } # end for
+        }
+    } # end if not defined stat
 
     return ($stat);
 }
@@ -860,8 +1025,9 @@ sub _localFetchDelete
                 && defined($fetcha[1]) # rowstat
                 && Genezzo::Block::RDBlock::_isheadrow($fetcha[1]));
     
-    my @rowpiece = UnPackRow($fetcha[0], 
-                             $Genezzo::Util::UNPACK_TEMPL_ARR); # first row piece 
+    my @rowpiece = 
+        UnPackRow($fetcha[0], 
+                  $Genezzo::Util::UNPACK_TEMPL_ARR); # first row piece 
     
     # Note: just return if row was not split.  Avoid the extra push in
     # the while loop
@@ -962,23 +1128,25 @@ sub DELETE
     my ($self, $place) = @_;
 
     # CONSTRAINT
-    my $cons_check = $self->{constraint_check};
+    my $cons_list = $self->{constraint_list};
 
-    return $self->_localDELETE($place, $cons_check);
+    return $self->_localDELETE($place, $cons_list);
 }
 sub _localDELETE
 {
 #    whoami;
-    my ($self, $place, $cons_check) = @_;
+    my ($self, $place, $cons_list) = @_;
 
     # CONSTRAINT
-    my ($cci, $ccu, $ccd);
 
-    if (defined($cons_check))
+    # XXX XXX XXX XXX: need to support foreign key constraint, also
+    # DELETE CASCADE
+
+    my $ccd;
+
+    if (defined($cons_list))
     {
-        $ccu = $cons_check->{update};
-        $ccd = $cons_check->{delete};
-        $cci = $cons_check->{insert};
+        $ccd = $cons_list->{delete};
     }
 
     my @estat = $self->_exists2($place); # HPHRowBlk method
@@ -1053,18 +1221,18 @@ sub _init
         my $ff = $args{filter}; 
 #        greet $ff;
 
-        my $cons_check = $self->{pushhash}->_constraint_check();
+        my $cons_list = $self->{pushhash}->_constraint_check();
 
-        if (defined($cons_check))
+        if (defined($cons_list))
         {
             my @both_keys = Genezzo::Util::GetIndexKeys($ff);
             
             if ((scalar(@both_keys) > 1) 
-                && (exists($cons_check->{SQLPrepare})))
+                && (exists($cons_list->{SQLPrepare})))
             {
 #                greet @both_keys; # keys in table colidx order
 
-                my $get_search = $cons_check->{SQLPrepare};
+                my $get_search = $cons_list->{SQLPrepare};
 
                 # prepare an index search if have startkey/stopkey
 
@@ -1352,6 +1520,10 @@ substring byte offset -- the inverse functionality of PackRow2/HSuck
 specified columns, versus all columns)
 
 =item _init: change to use TSTableAFU support versus href->{filesused}
+
+=item need support for constraints that "mutate" supplied values,
+      e.g. manipulate numeric precision or supply default values for 
+      columns.  Also need support for foreign keys in delete.
 
 =back
 

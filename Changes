@@ -1,5 +1,13 @@
 Revision history for Perl extension Genezzo
 
+0.23  Sat Sep 11 00:00:26 2004
+        - fix uniqueness for initial primary key constraint definition 
+          in Dict::_index_create
+        - support multiple constraints on same table
+        - Remove associated constraints and indexes when a table is 
+          dropped (maybe should require CASCADE option?)
+        - Cons1.t: basic constraint testing
+
 0.22  Fri Aug 27 15:11:13 2004
         - slightly better line-mode "help"
         - remove trailing semicolons with trailing blanks

@@ -123,20 +123,21 @@ EXAMPLES
   described by gendba.pl -man.  Briefly, the commands are ct (create
   table), dt (drop table), i (insert), u (update), d (delete), s
   (select).  The following example creates a table EMP with two
-  columns, NAME (as character) and ID (as number), inserts five rows,
+  columns, ENAME (as character) and ID (as number), inserts five rows,
   and counts them.
 
-    ct EMP NAME=c ID=n
+    ct EMP ENAME=c ID=n
     i EMP bob 1 orville 2 wilbur 3 harry 4 luke 5
     s EMP count
     s EMP ecount
     commit
 
-  Update and delete only work via rowid.  For example:
+  While the SQL update and delete commands support a WHERE clause, the
+  Feeble "u" and "d" commands only work via rowid.  For example:
 
     gendba 10> s EMP rid rownum *
-    rid     rownum  NAME    ID
-    ___     ______  ____    __
+    rid     rownum  ENAME   ID
+    ___     ______  _____   __
 
     1/33/1  1       bob     1
     1/33/2  2       orville 2
@@ -154,8 +155,8 @@ EXAMPLES
 
     gendba 13> !10
     s EMP rid rownum *
-    rid     rownum  NAME    ID
-    ___     ______  ____    __
+    rid     rownum  ENAME   ID
+    ___     ______  _____   __
 
     1/33/2  1       orville 2
     1/33/3  2       wilbur  3
@@ -264,7 +265,7 @@ NEW FEATURES - Primary Key Indexes
   uses an index.  In general, additional predicates may accompany the
   equality expression as long as they are ANDed:
 
-      Select * from EMP where ID = 5 and NAME =~ m/BOB/x
+      Select * from EMP where ID = 5 and ENAME =~ m/BOB/x
 
   However, the presence of ORs causes the plan to revert to a full
   table scan:
@@ -335,13 +336,16 @@ NEW FEATURES - ALTER TABLE ADD CONSTRAINT
     and
     ALTER TABLE ADD CONSTRAINT <name> PRIMARY KEY (<column-list>
 
-  Currently, it only supports a single constraint or single index per
-  table.  Sorry.  Need to extend to fully support NULL/NOT NULL, with
-  multiple constraints and indexes per table, plus ENABLE/DISABLE.
+  Version 0.22 only supports a single constraint or single index per
+  table, but version 0.23 supports multiple constraints and indexes
+  on a table.
+  
+  Need to extend to fully support NULL/NOT NULL, FOREIGN KEY, plus
+  ENABLE/DISABLE.
 
 INCOMPATIBLE CHANGES
 
-  Version 0.22 dictionary and block format is incompatible with
+  Version 0.23 dictionary and block format is incompatible with
   previous release.  No upgrade path is supported.
 
 SEE ALSO

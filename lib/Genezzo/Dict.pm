@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 6.4 2004/08/24 21:58:23 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 6.12 2004/09/11 06:58:31 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -18,7 +18,7 @@ use Genezzo::Index::btHash;
 
 BEGIN {
     our $VERSION;
-    $VERSION = do { my @r = (q$Revision: 6.4 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 6.12 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -1552,6 +1552,9 @@ sub DictTableAllTab
             }
         }
 
+        # drop all constraints
+        $self->DictTableDropConstraint(tname => $tablename);
+
         my $alltables =  $self->_get_table(tname => "_tab1");
 
         my $t_rid = $self->{dict_tables}->{$tablename}->{table_rid};
@@ -2174,7 +2177,8 @@ sub DictTableCreate
                     );
 
     my %optional = (
-                    object_type => "TABLE"
+                    object_type => "TABLE",
+                    make_name   => 0 # make a new name if necessary
                     );
 
 
@@ -2194,13 +2198,56 @@ sub DictTableCreate
         return 0;
     }
 
+    my $make_name = $args{make_name};
     my $tablename = $args{tname} ;
+    my $o_type    = lc($args{object_type}); # TABLE or INDEX
+
+    # Note: check if index already exists
+    if (($o_type ne "table") &&
+        $self->DictTableExists(tname => $tablename,
+                               # don't complain if can make new name...
+                               silent_exists    => $make_name,
+                               silent_notexists => 1,
+                               str_exists =>
+                               "$o_type THETABLENAME already exists\n"))
+    {
+        return 0 
+            unless ($make_name);
+
+        # for system-defined indexes on primary key/unique
+        # constraints, use make_name to make a new unique index name.
+        # XXX XXX: Slight race condition here - better to move logic
+        # to dicttablealltab insert
+
+        # XXX XXX: not sure why magic autoincrement operator doesn't
+        # work here
+        my $tcount = 1;
+        my $t2 = sprintf("%s%02d", $tablename, $tcount);
+
+        while (
+               $self->DictTableExists(tname => $t2,
+                                      # don't complain if can make new name...
+                                      silent_exists    => $make_name,
+                                      silent_notexists => $make_name,
+                                      str_exists =>
+                                      "$o_type THETABLENAME already exists\n")
+               )
+        {
+            $tcount++;
+            $t2 = sprintf("%s%02d", $tablename, $tcount);
+            whisper "try $t2";
+        }
+
+        # reset the tablename
+        $args{tname} = $t2;
+        $tablename   = $t2;
+    }
 
     $self->{dict_tables}->{$tablename} = 
     {
-        tabdef => $args{tabdef},
-        tablespace => $args{tablespace},
-        colridlist => [],
+        tabdef      => $args{tabdef},
+        tablespace  => $args{tablespace},
+        colridlist  => [],
        
         object_type => $args{object_type}
     };
@@ -2208,13 +2255,17 @@ sub DictTableCreate
     unless ($self->DictTableAllTab(operation => "insert", %args))
     {
         # XXX: cleanup
-        print "failed to create table $tablename \n";
+        print "failed to create $o_type $tablename \n";
+
+        delete $self->{dict_tables}->{$tablename} ;
+
         return 0;
     }
 
-    print "table $tablename created \n" ;
+    print "$o_type $tablename created \n" ;
 
-    return 1 ;
+    my @stat = (1, $tablename);
+    return @stat ;
 }
 
 sub DictTableDrop
@@ -2241,6 +2292,21 @@ sub DictTableDrop
     return 0
         unless ($self->DictTableExists(tname => $tablename));
 
+    my $objtype = $self->{dict_tables}->{$tablename}->{object_type};
+
+    if ($objtype eq "INDEX")
+    {
+        return ($self->DictIndexDrop(index_name => $tablename));
+    }
+
+    return $self->_table_drop($tablename);
+}
+
+sub _table_drop
+{
+    my ($self, $tablename) = @_;
+
+    my $o_type = lc($self->{dict_tables}->{$tablename}->{object_type});
     {
         my $tsname = $self->{dict_tables}->{$tablename}->{tablespace};
         my $object_id = $self->{dict_tables}->{$tablename}->{object_id};
@@ -2254,10 +2320,11 @@ sub DictTableDrop
 #        greet $$ts1;
 
         #  delete the table from the dictionary
-        unless ($self->DictTableAllTab(operation => "delete", %args))
+        unless ($self->DictTableAllTab(operation => "delete", 
+                                       tname => $tablename))
         {
             # XXX: cleanup
-            print "failed to drop table $tablename \n";
+            print "failed to drop $o_type $tablename \n";
             return 0;
         }
 
@@ -2278,7 +2345,7 @@ sub DictTableDrop
         # fix the tablespaces to remove the tied table hash...
         delete $self->{tablespaces}->{$tsname}->{table_cache}->{$tablename};
 
-        print "dropped table $tablename \n" ;
+        print "dropped $o_type $tablename \n" ;
     }
 
     return 1 ;
@@ -2398,11 +2465,12 @@ sub DictTableAddConstraint
         my $itype =
             ($isPrimaryKey ? "PRIMARY KEY" : "UNIQUE");
 
-        my %nargs = (tname => $tablename,
+        my %nargs = (tname      => $tablename,
                      index_name => $index_name,
-                     cols => $args{cols},
+                     cols       => $args{cols},
                      tablespace => $tspace,
-                     itype => $itype
+                     itype      => $itype,
+                     make_name  => 1        # make a new name if necessary
                      );
 
         if (exists($args{cons_name}))
@@ -2438,16 +2506,134 @@ sub DictTableAddConstraint
         my $cfn = $self->_make_constraint_check_fn($tid);
         if (defined($cfn))
         {
-            print "got constraint for $tablename\n";
+            whisper "got constraint for $tablename\n";
 #                print ref($$thsh), "\n";
             my $realtie = tied(%{$$thsh});
             $realtie->_constraint_check($cfn);
         }
         else
         {
-            print "no constraint for $tablename\n";
+            whisper "no constraint for $tablename\n";
         }
     } # end if cached
+
+    my @stat = (1, $cons_name);
+    return @stat;
+} # end DictTableAddConstraint
+
+sub DictTableDropConstraint
+{
+    my $self = shift;
+
+    my %required = (
+                    );
+
+    my %args = (
+		@_);
+#		cons_name OR tname OR tid
+
+    whoami @_;
+
+#    return 0
+#        unless (Validate(\%args, \%required));
+
+    unless ($self->{started})
+    {
+        greet "dict not started";
+        return 0;
+    }
+
+    my $hashi  = $self->DictTableGetTable (tname => "cons1") ;
+    my $tv = tied(%{$hashi});
+    my @del_ary;
+
+    if (exists($args{tname}))
+    {
+        my $tablename = $args{tname} ;
+
+        unless ((exists ($self->{dict_tables})) &&
+                exists ($self->{dict_tables}->{$tablename} ))
+        {
+            print "no such table $tablename\n";
+            return 0;
+        }
+
+        my $tab_tid = $self->{dict_tables}->{$tablename}->{object_id};
+
+        # XXX XXX: replace with filter and SQLFetch...
+        while ( my ($kk, $vv) = each ( %{$hashi}))
+        { 
+            my $getcol  = $self->_get_col_hash("cons1"); 
+            my $cons_id = $vv->[$getcol->{cons_id}]; 
+            my $tid     = $vv->[$getcol->{tid}]; 
+
+            if ($tid == $tab_tid)
+            {
+                my $stat = 
+                    $self->_drop_constraint($vv);
+
+                push @del_ary, $kk;
+            }
+        }
+        
+    }
+    elsif (exists($args{cons_name}))
+    {
+        my $cons_name = $args{cons_name} ;
+        
+        # XXX XXX: replace with filter and SQLFetch...
+        while ( my ($kk, $vv) = each ( %{$hashi}))
+        { 
+            my $getcol    = $self->_get_col_hash("cons1"); 
+            my $cons_id   = $vv->[$getcol->{cons_id}]; 
+            my $c_name    = $vv->[$getcol->{cons_name}]; 
+            my $tid       = $vv->[$getcol->{tid}]; 
+
+            if ($cons_name eq $c_name)
+            {
+                my $stat = 
+                    $self->_drop_constraint($vv);
+
+                push @del_ary, $kk;
+            }
+        }    
+    }
+    else
+    {
+        print "no constraint name specified\n";
+        return 0;
+    }
+        
+    for my $kk (@del_ary)
+    {
+        $tv->DELETE($kk);
+    }
+
+    return 1;
+} # end DictTableDropConstraint
+
+sub _drop_constraint
+{
+    my $self     = shift;
+
+#    whoami @_;
+
+    my $vv = shift;
+    greet $vv;
+
+    my $getcol    = $self->_get_col_hash("cons1"); 
+    my $cons_id   = $vv->[$getcol->{cons_id}]; 
+    my $c_name    = $vv->[$getcol->{cons_name}]; 
+    my $tid       = $vv->[$getcol->{tid}]; 
+    my $c_text    = $vv->[$getcol->{check_text}]; 
+    my $c_type    = $vv->[$getcol->{cons_type}];
+
+    if ($c_type =~ m/(IK|PK|UQ)/)
+    {
+        my ($i_name, $iid) = split(":", $c_text, 2);
+        my $stat = $self->DictIndexDrop(index_name => $i_name, 
+                                        leave_cons1 => 1);
+    }
 
     return 1;
 }
@@ -2701,22 +2887,23 @@ sub DictIndexCreate
                     );
 
     my %optional = (
-                    itype => "nonunique" 
+                    itype => "nonunique" ,
+                    make_name => 0 # make a new name if necessary
                     );
-
 
     my %args = (
                 %optional,
 		@_);
 #		tname, tablespace, index_name, cols array,
 
-    my $stat = $self->_index_create(%args);
+    my ($stat, $newname) = $self->_index_create(%args);
 
     return 0
         unless ($stat);
 
     my $tablename = $args{tname} ;
-    my $i_name = $args{index_name};
+#    my $i_name = $args{index_name};
+    my $i_name = $newname;
     my $tspace = $args{tablespace};
 
     my $unique = ($args{itype} =~ m/^(UNIQUE|PRIMARY)/);
@@ -2825,11 +3012,158 @@ sub DictIndexCreate
     my $cfn = $self->_make_constraint_check_fn($tid);
     if (defined($cfn))
     {
-        greet "got constraint for $tablename\n";
+        whisper "got constraint for $tablename\n";
         $tv2->_constraint_check($cfn);
+    }
+    #              constraint name, index name,  
+    my @stat = (1,   $cons_name,    $newname);
+    return @stat;
+} # end DictIndexCreate
+
+sub DictIndexDrop
+{
+    my $self = shift;
+
+    whoami @_;
+
+#    my %required = (
+#                    );
+
+#    my %optional = (
+#                    );
+
+    my %args = (
+		@_);
+#		tname OR index_name
+
+    my $hashi  = $self->DictTableGetTable (tname => "ind1") ;
+    my $tv = tied(%{$hashi});
+    my @del_ary;
+
+    my $leave_cons1 = $args{leave_cons1};
+
+    if (exists($args{tname}))
+    {
+        my $tablename = $args{tname} ;
+
+        return 0
+            unless ($self->DictTableExists(tname => $tablename));
+
+        # XXX XXX: replace with filter and SQLFetch...
+        while ( my ($kk, $vv) = each ( %{$hashi}))
+        { 
+            my $getcol  = $self->_get_col_hash("ind1"); 
+            my $cons_id = $vv->[$getcol->{cons_id}]; 
+            my $tid     = $vv->[$getcol->{tid}]; 
+            my $tname   = $vv->[$getcol->{tname}]; 
+
+            if ($tablename eq $tname)
+            {
+                my $stat = 
+                    $self->_index_drop($vv, $leave_cons1);
+
+                push @del_ary, $kk;
+            }
+        }
+    }
+    elsif (exists($args{index_name}))
+    {
+        my $index_name = $args{index_name} ;
+        return 0
+            unless ($self->DictTableExists(tname => $index_name));
+
+        # XXX XXX: replace with filter and SQLFetch...
+        while ( my ($kk, $vv) = each ( %{$hashi}))
+        { 
+            my $getcol  = $self->_get_col_hash("ind1"); 
+            my $cons_id = $vv->[$getcol->{cons_id}]; 
+            my $tid     = $vv->[$getcol->{tid}]; 
+            my $iname   = $vv->[$getcol->{iname}]; 
+
+            if ($index_name eq $iname)
+            {
+                my $stat = 
+                    $self->_index_drop($vv, $leave_cons1);
+
+                push @del_ary, $kk;
+            }
+        }
+    }
+    else
+    {
+        print "no index name!\n";
+        return 0;
+    }
+
+    for my $kk (@del_ary)
+    {
+        $tv->DELETE($kk);
     }
 
     return 1;
+} # end DictIndexDrop
+
+sub _index_drop
+{
+    my $self = shift;
+    my $vv  = shift;
+    my $leave_cons1 = shift;
+    greet $vv;
+
+    my $getcol    = $self->_get_col_hash("ind1"); 
+    my $cons_id   = $vv->[$getcol->{cons_id}]; 
+    my $tid       = $vv->[$getcol->{tid}]; 
+    my $index_id  = $vv->[$getcol->{iid}]; 
+    my $iname     = $vv->[$getcol->{iname}]; 
+
+    # drop the index and constraint columns
+    
+    for my $tname qw(ind1_cols cons1_cols cons1)
+    {
+        my $hashi  = $self->DictTableGetTable (tname => $tname) ;
+        my $tv     = tied(%{$hashi});
+        my @del_ary;
+
+        if ($tname eq "cons1")
+        {
+            # don't delete the cons1 column if called from
+            # drop_constraint
+            next
+                if (defined($leave_cons1));
+        }
+
+        # XXX XXX: replace with filter and SQLFetch...
+        while ( my ($kk, $vv2) = each ( %{$hashi}))
+        { 
+            my $getcol2 = $self->_get_col_hash($tname); 
+
+            if ($tname eq "ind1_cols")
+            {
+                my $iid  = $vv2->[$getcol2->{iid}];                 
+                if ($iid == $index_id)
+                {
+                    push @del_ary, $kk;
+                }
+            }
+            elsif ($tname =~ m/cons1/) # cons1_cols, cons1
+            {
+                my $cid  = $vv2->[$getcol2->{cons_id}];                 
+                if ($cons_id == $cid)
+                {
+                    push @del_ary, $kk;
+                }
+            }
+
+        }
+        for my $kk (@del_ary)
+        {
+            $tv->DELETE($kk);
+        }
+
+    }
+
+    # Drop the index
+    return $self->_table_drop($iname);
 }
 
 sub _index_create
@@ -2846,9 +3180,10 @@ sub _index_create
                     );
 
     my %optional = (
-                    itype => "UNIQUE",
+                    itype       => "UNIQUE",
                     load_only   => 0,
                     define_only => 0,
+                    make_name   => 0 # make a new name if necessary
                     );
 
 
@@ -2875,11 +3210,12 @@ sub _index_create
     return 0
         unless (scalar(@index_col_info) > 1);
 
+    my $i_name    = shift @index_col_info; # args{index_name};
     my $tablename = $args{tname} ;
-    my $i_name = $args{index_name};
-    my $tspace = $args{tablespace};
+    my $tspace    = $args{tablespace};
 
-    my $unique = ($args{itype} eq "UNIQUE") ? 1 : 0;
+    my $unique    = ($args{itype} =~ m/^(UNIQUE|PRIMARY)/);
+#    my $unique = ($args{itype} eq "UNIQUE") ? 1 : 0;
 
     unless ($args{define_only})
     {
@@ -2892,7 +3228,8 @@ sub _index_create
         }
     }
 
-    return 1;
+    my @stat = (1, $i_name);
+    return @stat;
 }
 
 sub _index_define
@@ -2909,9 +3246,9 @@ sub _index_define
                     );
 
     my %optional = (
-#                    object_type => "TABLE"
-                    itype => "UNIQUE",
-                    do_create => 1
+                    itype     => "UNIQUE",
+                    do_create => 1,
+                    make_name => 0 # make a new name if necessary
                     );
 
     my %args = (
@@ -2977,8 +3314,8 @@ sub _index_define
                  tname       => $i_name,
                  tabdef      => \%coldatatype,
                  tablespace  => $tspace,
-                 object_type => "INDEX"
-#                 object_type => "TABLE"
+                 object_type => "INDEX",
+                 make_name   => $args{make_name}
                  );
 
     # XXX XXX XXX : use_keycount pkey_type
@@ -2988,9 +3325,13 @@ sub _index_define
 #    greet @index_key_types;
 #    greet @index_col_nums;
 
+    my ($stat, $newname);
+    $newname = $i_name;   # get newname from dicttablecreate if creating...
+
     if ($args{do_create})
     {
-        unless ($self->DictTableCreate( %nargs))
+        ($stat, $newname) = $self->DictTableCreate( %nargs);
+        unless ($stat)
         {
             # XXX: cleanup
             print "failed to create index $i_name on table $tablename \n";
@@ -2999,6 +3340,7 @@ sub _index_define
     }
 
     my @outi;
+    push @outi, $newname;
     push @outi, \@index_key_types;
     push @outi, \@index_col_nums;
     return @outi;
@@ -3090,6 +3432,9 @@ sub _index_load
     return 1 ;
 }
 
+
+# Phase 2 define constraints: add constraints for core tables when
+# database is initialized
 sub dictp2_define_cons
 {
 #    whoami;
@@ -3255,11 +3600,12 @@ sub _make_constraint_check_fn
     # need to watch case of building constraint for cons1_cols, which
     # might be recursive...
 
+    my %hsh_cons;
+
     my $getcol = $self->_get_col_hash("cons1"); 
 
     while (my ($kk, $vv) = each (%{$allcons}))
     {
-
         next 
             unless ($tid == $vv->[$getcol->{tid}]);
 
@@ -3293,17 +3639,152 @@ sub _make_constraint_check_fn
             whisper "could not create constraint $cons_name for table tid $tid";
             next;
         }
-        push @cons_func_list, $cons_func;
+
+        # XXX XXX : would be nice to figure out why we get duplicate
+        # rows from cons table -- should be able to just push the
+        # cons_func into the func list...
+
+        $hsh_cons{$cons_name} = $cons_func;
     }
+
+    @cons_func_list = values (%hsh_cons);
 
     return undef
         unless (scalar(@cons_func_list));
     
-    # XXX XXX: need to build a composite function:
-    # eval sub {return  (func1 or func2 or ... or funcN) }
-    return  ($cons_func_list[0]);
+    return ($self->_all_cons(\@cons_func_list));
 }
 
+# build hash of closures of all constraints combined
+sub _all_cons
+{
+#    whoami;
+    my ($self, $func_list) = @_;
+
+    return undef
+        unless (defined($func_list));
+
+    my %cons_ck_fn;    
+
+    # build callback using closure - pass in the btree, pkey_cols
+
+    $cons_ck_fn{check_insert} = sub {
+        for my $cons_check (@{$func_list})
+        {
+            if (exists($cons_check->{check_insert}))
+            {
+                my $cci = $cons_check->{check_insert};
+
+                return 1
+                    if (&$cci(@_));
+            }
+        }
+        return 0;
+    };
+    $cons_ck_fn{index_insert} = sub {
+
+        my $maxi = scalar(@{$func_list});
+
+        return 0 unless ($maxi);
+
+        my $maxj;
+
+        for my $i (0..($maxi - 1))
+        {
+            my $cons_check = $func_list->[$i];
+            if (exists($cons_check->{index_insert}))
+            {
+                my $cci = $cons_check->{index_insert};
+
+                if (&$cci(@_))
+                {
+                    # Note: may need to do deletes if already did some
+                    # inserts that succeeded
+                    return 1
+                        unless ($i); # no cleanup necessary if first
+                                     # insert failed
+                    $maxj = $i;
+                    last;
+                }
+
+            }
+        }
+        return 0
+            unless (defined($maxj));
+
+        # Failure case: some inserts succeeded, last one failed...
+
+        whisper "do cleanup";
+
+        # remove the successful inserts...
+        for my $j (0..($maxj - 1))
+        {
+            my $cons_check = $func_list->[$j];
+            if (exists($cons_check->{delete}))
+            {
+                my $ccd = $cons_check->{delete};
+
+                # XXX XXX: what if delete fails?
+                whisper (&$ccd(@_));
+            }
+        }
+        return 1;
+    };
+
+    # used by sub localDELETE
+    $cons_ck_fn{delete} = sub {
+        for my $cons_check (@{$func_list})
+        {
+            if (exists($cons_check->{delete}))
+            {
+                my $ccd = $cons_check->{delete};
+
+#                return 0
+#                    unless 
+                whisper (&$ccd(@_)); # XXX XXX: get status?
+            }
+        }
+        return 1;
+        
+    };
+
+    $cons_ck_fn{update} = sub {
+        my $stat = 0;
+        for my $cons_check (@{$func_list})
+        {
+            if (exists($cons_check->{update}))
+            {
+                my $ccu = $cons_check->{update};
+
+                $stat += (&$ccu(@_));
+            }
+        }
+        return ($stat > 0);
+
+    };
+
+    $cons_ck_fn{getkeys} = sub {
+        return undef; # XXX XXX : unused?
+    };
+
+    $cons_ck_fn{SQLPrepare} = sub {
+        for my $cons_check (@{$func_list})
+        {
+            if (exists($cons_check->{SQLPrepare}))
+            {
+                my $ccSqlPrep = $cons_check->{SQLPrepare};
+                # XXX XXX: just get the first one...
+                return  (&$ccSqlPrep(@_));
+            }
+        }
+        return undef;
+
+    };
+
+    return \%cons_ck_fn;    
+}
+
+# index (primary and unique) constraints
 sub _make_cons_pk_check
 {
 #    whoami;
@@ -3376,11 +3857,6 @@ sub _make_cons_pk_check
                   key_type  => \@key_type
                   );
 
-#    whoami %btargs;
-#    greet $i_name;
-#    my $bt = Genezzo::Index::bt3->new(%btargs);
-#    my $bth = $self->DictTableGetTable (%btargs)
-
     # Note: internal API takes extra args for index definition
     my $bth = $self->_get_table (%btargs);
 
@@ -3393,9 +3869,11 @@ sub _make_cons_pk_check
 
     my %cons_ck_fn;
 
+    $cons_ck_fn{c_name} = $cons_name;
+
     # build callback using closure - pass in the btree, pkey_cols
 
-    $cons_ck_fn{insert} = sub {
+    $cons_ck_fn{index_insert} = sub {
         my ($keyval, $place) = @_;
 
 #        greet $cons_name, $i_name;
@@ -3446,46 +3924,6 @@ sub _make_cons_pk_check
         return 0;
     };
 
-    $cons_ck_fn{update} = sub {
-        my ($keyval, $oldkeyval) = @_;
-
-#        greet $cons_name, $i_name;
-
-        unless (defined($keyval))
-        {
-            whisper "bad value!\n";
-            return 0; # not an error for update - let fail on insert
-        }
-
-        if (scalar(@{$keyval}) < scalar(@pkey_cols))
-        {
-            print "missing key cols\n";
-            return 0; # not an error for update - let fail on insert
-        } 
-
-        my (@rowarr1, @rowarr2);
-
-        my $colcnt = 0;
-        for my $colnum (@pkey_cols)
-        {
-            if ($key_type[$colcnt] eq "n")
-            {
-                return 1 # key mismatch
-                    unless ($keyval->[$colnum - 1] ==
-                            $oldkeyval->[$colnum - 1]);
-            }
-            else
-            {
-                return 1 # key mismatch
-                    unless ($keyval->[$colnum - 1] eq
-                            $oldkeyval->[$colnum - 1]);
-            }
-            $colcnt++;
-        }
-
-        return 0; # keys match - no need to update
-    };
-
     $cons_ck_fn{delete} = sub {
         my ($keyval, $place) = @_;
 
@@ -3520,6 +3958,57 @@ sub _make_cons_pk_check
             return ($bt->delete(\@rowarr, $place));
         }
         
+    };
+
+    $cons_ck_fn{update} = sub {
+        my ($keyval, $oldkeyval, $place, $op_list) = @_;
+
+#        greet $cons_name, $i_name;
+
+        unless (defined($keyval))
+        {
+            whisper "bad value!\n";
+            return 0; # not an error for update - let fail on insert
+        }
+
+        if (scalar(@{$keyval}) < scalar(@pkey_cols))
+        {
+            print "missing key cols\n";
+            return 0; # not an error for update - let fail on insert
+        } 
+
+        my (@rowarr1, @rowarr2);
+
+        my $colcnt = 0;
+        my $ccd = $cons_ck_fn{delete};
+        my $cci = $cons_ck_fn{index_insert};
+
+        for my $colnum (@pkey_cols)
+        {
+            if ($key_type[$colcnt] eq "n")
+            { # numeric compare
+                unless ($keyval->[$colnum - 1] ==
+                        $oldkeyval->[$colnum - 1])
+                {
+                    push @{$op_list}, [$cons_name, $ccd, $cci]
+                        if (defined($op_list));
+                    return 1; # key mismatch
+                }
+            }
+            else
+            { # char compare
+                unless ($keyval->[$colnum - 1] eq
+                        $oldkeyval->[$colnum - 1])
+                {
+                    push @{$op_list}, [$cons_name, $ccd, $cci]
+                        if (defined($op_list));
+                    return 1; # key mismatch
+                }
+            }
+            $colcnt++;
+        }
+
+        return 0; # keys match - no need to update
     };
 
     $cons_ck_fn{getkeys} = sub {
@@ -3591,12 +4080,15 @@ sub _make_cons_pk_check
 
 } # end make cons check
 
+# check constraints
 sub _make_cons_ck_check
 {
 #    whoami;
     my ($self, $tid, $consid, $cons_type, $cons_name, $check_text ) = @_;
 
     my %cons_ck_fn;
+
+    $cons_ck_fn{c_name} = $cons_name;
 
     # use WHERE clause code...
 
@@ -3617,7 +4109,7 @@ sub _make_cons_ck_check
 
     # build callback using closure 
 
-    $cons_ck_fn{insert} = sub {
+    $cons_ck_fn{check_insert} = sub {
         my ($val, $place) = @_;
 
 #        greet $cons_name, $i_name;
@@ -3639,10 +4131,20 @@ sub _make_cons_ck_check
         return 0;
     };
 
+    $cons_ck_fn{delete} = sub {
+        return 1;
+    };
+
     $cons_ck_fn{update} = sub {
-        my ($newval, $oldval, $place) = @_;
+        my ($newval, $oldval, $place, $op_list) = @_;
 
 #        greet $cons_name, $i_name;
+
+        my $ccd = $cons_ck_fn{delete};
+        my $cci = $cons_ck_fn{check_insert};
+
+        push @{$op_list}, [$cons_name, $ccd, $cci]
+            if (defined($op_list));
 
         return 1; # XXX XXX XXX XXX
 
@@ -3662,12 +4164,6 @@ sub _make_cons_ck_check
         }
         return 0;
     };
-
-    $cons_ck_fn{delete} = sub {
-        return 1;
-    };
-
-
 
     return \%cons_ck_fn;
 
@@ -3828,6 +4324,16 @@ Checking for the existance of a table would be something like:
 
 =item  need drop table/drop index linkage, delete constraints for
        table, etc
+
+=item  constraints: can fix check constraint in update case --
+       don't need to check insert if check columns aren't modified.
+
+=item  constraints: need not null/foreign key constraints
+
+=item  constraints: need to limit one primary key per table, prevent
+       creation of duplicate indexes on same ordered key columns
+
+=item  expose drop index, drop constraint.  tie drop index/drop table?
 
 =item  check usage of HCount for max tid, max fileidx, max consid.
        This won't work if have deletions

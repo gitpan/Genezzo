@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Util.pm,v 6.2 2004/08/24 21:30:56 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Util.pm,v 6.4 2004/09/11 06:59:57 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -20,7 +20,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 6.2 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 6.4 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
     @EXPORT      = qw(&whisper &whoami &greet 
@@ -122,7 +122,7 @@ our $QUIETWHISPER = 0;
 our $WHISPERDEPTH = 1;
 
 our $DEFBLOCKSIZE = 4096;
-our $DEFDBSIZE    = 163840;
+our $DEFDBSIZE    = 80 * $DEFBLOCKSIZE ; # 327680 was 163840
 
 our $MINBLOCKSIZE = 1024; # 512;
 
@@ -1320,72 +1320,6 @@ sub FileGetHeaderInfo
 
     return ($hdrsize, $version, $blocksize, \%h1);
 }
-
-
-sub VectorCompare
-{
-    my %args = (@_);    
-
-#    greet @_;
-
-    if (exists($args{keyvec}))
-    {
-        my ($eq_expr, $cmp_expr);
-
-        my $firsttime = 1;
-        my $colcnt  = 0;
-        my $lastcol = (scalar(@{$args{keyvec}}) - 1);
-
-        for my $tcolcnt (0..$lastcol)
-        {
-            my $colcnt  = $lastcol - $tcolcnt;
-            my $coltype = $args{keyvec}->[$colcnt];
-
-            my ($eq_op, $cmp_op);
-
-            if ($coltype =~ m/n/)
-            {
-                $eq_op  = "==";
-#                $cmp_op = ($colcnt == $lastcol) ? "<" : "<=";
-                $cmp_op = "<";
-            }
-            elsif ($coltype =~ m/c/)
-            {
-                $eq_op  = "eq";
-#                $cmp_op = ($colcnt == $lastcol) ? "lt" : "le";
-                $cmp_op = "lt";
-            }
-            else
-            {
-                # error!
-                return undef;
-            }
-            my $k1 = '($k1->[' . $colcnt . '] ';
-            my $k2 = ' $k2->[' . $colcnt . '])';
-
-            if ($firsttime)
-            {
-                $eq_expr  = $k1 . $eq_op  . $k2;
-                $cmp_expr = $k1 . $cmp_op . $k2;
-                $firsttime = 0;
-            }
-            else
-            {
-                my $eq1 = $k1 . $eq_op  . $k2;
-                $eq_expr  .= " && " . $eq1;
-                $cmp_expr = $k1 . $cmp_op . $k2 . ' || (' . $eq1 . 
-                    ' && ' . $cmp_expr . ')';
-
-            }
-            $colcnt++;
-        }
-
-#        greet $eq_expr, $cmp_expr;
-    return ($eq_expr, $cmp_expr);
-    }
-
-
-} # end vectorcompare
 
 sub GetIndexKeys
 {

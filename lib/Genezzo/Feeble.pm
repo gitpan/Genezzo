@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Feeble.pm,v 6.2 2004/08/19 21:45:27 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Feeble.pm,v 6.5 2004/09/11 06:59:12 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -1102,7 +1102,7 @@ sub add_list2
                             }
                             
                             # look for key
-                            greet $next_token;
+#                            greet $next_token;
 
                             unless ($next_token->{val} =~ m/^key$/i)
                             {
@@ -1499,7 +1499,7 @@ sub sql_alter
 
 sub update_list
 {
-    whoami;
+#    whoami;
     my $self = shift;
 
     my $badparse = 0;
@@ -1538,12 +1538,12 @@ sub update_list
             && ($token->{type} ne 'PAREN_LIST')
             && ($token->{val} =~ /$termtoken/))
         {
-            greet $termtoken;
+#            greet $termtoken;
             $got_where = 1;
             last ;
         }
 
-        greet $token;
+#        greet $token;
 
         if (1 == $ustate)
         {
@@ -1558,7 +1558,7 @@ sub update_list
             if ($token->{type} eq 'PAREN_LIST')
             {
                 my ($foo, $badparse, $msg) = $self->update_cols();
-                greet $foo;
+#                greet $foo;
 
                 if ($badparse)
                 {
@@ -1569,7 +1569,7 @@ sub update_list
             }
             else
             {
-                greet $token->{val};
+ #               greet $token->{val};
                 my $vv = $token->{val};
                 if ($token->{type} eq 'IDENTIFIER') # normal case
                 {
@@ -1605,7 +1605,7 @@ sub update_list
         {
             if ($token->{type} eq 'PAREN_LIST')
             {
-                greet $token;
+  #              greet $token;
                 my $foo;
                 ($foo, $badparse, $msg) = $self->update_expr();
                 greet $foo;
@@ -1621,7 +1621,7 @@ sub update_list
             else
             {
                 my $vv = $token->{val};
-                greet $token->{val};
+#                greet $token->{val};
 
                 if ($vv =~ m/^=/) # shouldn't have a leading ='s
                 {
@@ -1706,7 +1706,7 @@ sub update_list
 
 sub update_cols
 {
-   whoami;
+#   whoami;
 
     my $self = shift;
 
@@ -1746,12 +1746,12 @@ sub update_cols
         if ((defined ($termtoken))
             && ($token->{val} =~ /$termtoken/))
         {
-            greet $termtoken;
+#            greet $termtoken;
             last ;
         }
         if ($token->{type} eq 'RPAREN')
         {
-            greet $token;
+#            greet $token;
             last ;
         }
 
@@ -1899,7 +1899,7 @@ sub update_cols
 
 sub update_expr
 {
-    whoami;
+#    whoami;
 
     return $_[0]->where_clause2();
 }
@@ -1907,7 +1907,7 @@ sub update_expr
 # main UPDATE parsing
 sub sql_update
 {
-    whoami;
+#    whoami;
     my $self = shift;
 
     my ($pretty, $allwords) = @_;
