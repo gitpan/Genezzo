@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Feeble.pm,v 6.8 2005/02/02 06:44:02 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Feeble.pm,v 6.9 2005/03/19 08:59:05 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -3190,6 +3190,38 @@ sub c
 
 } # end create
 
+sub SQLInteractive
+{
+    local $Data::Dumper::Indent   = 1;
+    local $Data::Dumper::Sortkeys = 1;
+
+    my $parser = Genezzo::Feeble->new(); # build a feeble parser
+
+
+#print Data::Dumper->Dump([$parser], ['parser']);
+
+    print "\nsql> ";
+
+    while (<STDIN>)
+    {
+        my $ini = $_;
+        $ini =~ s/\;$//; # remove trailing semicolon
+        my ($sql, $pretty, $badparse) =
+            $parser->Parseall($ini);
+
+        if (defined($sql))
+        {
+#        print "ok\n";
+        }
+        else
+        {
+#        print "bad\n";
+        }
+        print Data::Dumper->Dump([$sql],['sql']);
+        print "\nsql> ";
+    }
+}
+
 
 END { }       # module clean-up code here (global destructor)
 
@@ -3206,6 +3238,10 @@ __END__
 Feeble.pm - a feeble parser
 
 =head1 SYNOPSIS
+
+ # primitive line-mode SQL parser - dumps parse tree
+ perl -Iblib/lib -MGenezzo::Feeble -e 'Genezzo::Feeble::SQLInteractive()'
+
 
 =head1 DESCRIPTION
 

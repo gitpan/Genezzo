@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/PushHash/RCS/HPHRowBlk.pm,v 6.3 2004/12/14 07:41:38 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/PushHash/RCS/HPHRowBlk.pm,v 6.4 2005/03/19 08:42:21 claude Exp claude $
 #
-# copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 use strict;
@@ -217,42 +217,11 @@ functions that split rows over multiple blocks..
 
 =head1 SYNOPSIS
 
+ use Genezzo::PushHash::HPHRowBlk;
  use Genezzo::PushHash::hph;
 
- sub make_fac {
-    my $tclass = shift;
-    my %args = (
-                @_);
+ # need more info here!!
 
-    my %td_hash1  = ();
-
-    my $newfunc = 
-        sub {
-            my $tiehash1 = 
-                tie %td_hash1, $tclass, %args;
-
-            return $tiehash1;
-        };
-    return $newfunc;
- }
-
- my $fac1 = make_fac('Genezzo::PushHash::PHFixed');
-
- %args = 
-    (
-     factory  => $fac1
-    );
-
- my %tied_hash = ();
-
- my $tie_val = 
-    tie %tied_hash, 'Genezzo::PushHash::hph', %args;
-
- my $newkey = $tie_val->HPush("this is a test");
-
- $tied_hash{$newkey} = "update this entry";
-
- my $getcount = $tie_val->HCount();
 
 =head1 DESCRIPTION
 
@@ -325,6 +294,14 @@ data over multiple blocks.  See L<Genezzo::Row::RSTab>.
 
 =back
 
+=head1 TODO
+
+=over 4
+
+=item  fix synopsis
+
+=back
+
 =head1 AUTHOR
 
 Jeffrey I. Cohen, jcohen@genezzo.com
@@ -335,7 +312,7 @@ L<Genezzo::PushHash::hph>,
 L<Genezzo::PushHash::PushHash>,
 L<perl(1)>. 
 
-Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2003, 2004, 2005 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -354,6 +331,6 @@ Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
 Address bug reports and comments to: jcohen@genezzo.com
 
 For more information, please visit the Genezzo homepage 
-at http://www.genezzo.com
+at L<http://www.genezzo.com>
 
 =cut

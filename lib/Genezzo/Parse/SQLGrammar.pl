@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Parse/RCS/SQLGrammar.pl,v 1.3 2005/02/25 08:58:54 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Parse/RCS/SQLGrammar.pl,v 1.10 2005/03/19 08:51:20 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -77,34 +77,34 @@ my @res_words = # list of all reserved words
        ABSOLUTE_ ACTION_ ADD_ ALL ALLOCATE_ ALTER_ AND ANY_ ARE_ ASC_
        ASSERTION_ AS_ AT_ AUTHORIZATION_ AVG_ sqBEGIN_ BETWEEN_ BIT_
        BIT_LENGTH_ BOTH_ BY_ CASCADED_ CASCADE_ CASE_ CAST_ CATALOG_
-       CHARACTER_ CHARACTER_LENGTH_ CHAR_ CHAR_LENGTH_ sqCHECK_ CLOSE_
+       sqCHARACTER CHARACTER_LENGTH_ sqCHAR CHAR_LENGTH_ sqCHECK_ CLOSE_
        COALESCE_ COLLATE_ COLLATION_ COLUMN_ COMMIT_ CONNECTION_
        CONNECT_ CONSTRAINTS_ CONSTRAINT_ CONTINUE_ CONVERT_
        CORRESPONDING_ COUNT_ CREATE_ CROSS CURRENT_ CURRENT_DATE_
        CURRENT_TIMESTAMP_ CURRENT_TIME_ CURRENT_USER_ CURSOR_ DATE_
-       DAY_ DEALLOCATE_ DECIMAL_ DECLARE_ DEC_ DEFAULT DEFERRABLE_
+       DAY_ DEALLOCATE_ DECIMAL DECLARE_ DEC DEFAULT DEFERRABLE_
        DEFERRED_ DELETE_ DESCRIBE_ DESCRIPTOR_ DESC_ DIAGNOSTICS_
-       DISCONNECT_ DISTINCT DOMAIN_ DOUBLE_ DROP_ ELSE_ sqEND_
+       DISCONNECT_ DISTINCT DOMAIN_ DOUBLE DROP_ ELSE_ sqEND_
        END_EXEC_ ESCAPE_ EXCEPTION_ EXCEPT EXECUTE_ EXEC_ EXISTS_
-       EXTERNAL_ EXTRACT_ FALSE FETCH_ FIRST_ FLOAT_ FOREIGN_ FOR_
+       EXTERNAL_ EXTRACT_ FALSE FETCH_ FIRST_ FLOAT FOREIGN FOR_
        FOUND_ FROM_ FULL GET_ GLOBAL_ GOTO_ GO_ GRANT_ GROUP_ HAVING_
        HOUR_ IDENTITY_ IMMEDIATE_ INDICATOR_ INITIALLY_ INNER INPUT_
-       INSENSITIVE_ INSERT_ INTEGER_ INTERSECT INTERVAL_ INTO_ INT_
-       IN_ ISOLATION_ IS JOIN KEY_ LANGUAGE_ LAST_ LEADING_ LEFT
+       INSENSITIVE_ INSERT_ INTEGER INTERSECT INTERVAL_ INTO_ INT
+       IN_ ISOLATION_ IS JOIN KEY LANGUAGE_ LAST_ LEADING_ LEFT
        LEVEL_ LIKE_ LOCAL_ LOWER_ MATCH_ MAX_ sqMINUS MINUTE_ MIN_
        MODULE_ MONTH_ NAMES_ NATIONAL_ NATURAL NCHAR_ NEXT_ NOT NO_
-       NULLIF_ NULL NUMERIC_ OCTET_LENGTH_ OF_ ONLY_ ON OPEN_
+       NULLIF_ NULL sqNUMERIC OCTET_LENGTH_ OF_ ONLY_ ON OPEN_
        OPTION_ ORDER_ OR OUTER OUTPUT_ OVERLAPS_ PAD_ PARTIAL_
-       POSITION_ PRECISION_ PREPARE_ PRESERVE_ PRIMARY_ PRIOR_
-       PRIVILEGES_ PROCEDURE_ PUBLIC_ READ_ REAL_ REFERENCES_
+       POSITION_ PRECISION PREPARE_ PRESERVE_ PRIMARY PRIOR_
+       PRIVILEGES_ PROCEDURE_ PUBLIC_ READ_ REAL REFERENCES_
        RELATIVE_ RESTRICT_ REVOKE_ RIGHT ROLLBACK_ ROWS_ SCHEMA_
        SCROLL_ SECOND_ SECTION_ SELECT_ SESSION_ SESSION_USER_ SET_
-       SIZE_ SMALLINT_ SOME_ SPACE_ SQLCODE_ SQLERROR_ SQLSTATE_ SQL_
+       SIZE_ SMALLINT SOME_ SPACE_ SQLCODE_ SQLERROR_ SQLSTATE_ SQL_
        SUBSTRING_ SUM_ SYSTEM_USER_ TABLE_ TEMPORARY_ THEN_ TIMESTAMP_
        TIMEZONE_HOUR_ TIMEZONE_MINUTE_ TIME_ TO_ TRAILING_
-       TRANSACTION_ TRANSLATE_ TRANSLATION_ TRIM_ TRUE UNION UNIQUE_
+       TRANSACTION_ TRANSLATE_ TRANSLATION_ TRIM_ TRUE UNION UNIQUE
        UNKNOWN_ UPDATE_ UPPER_ USAGE_ USER_ USING VALUES_ VALUE_
-       VARCHAR_ VARYING_ VIEW_ WHENEVER_ WHEN_ WHERE_ WITH_ WORK_
+       VARCHAR VARCHAR2 VARYING VIEW_ WHENEVER_ WHEN_ WHERE_ WITH_ WORK_
        WRITE_ YEAR_ ZONE_
        );
 
@@ -235,7 +235,27 @@ $grammar .= ')/ix' . "\n\n";
 
         sql_000 : sql_dml end_of_query
                  {  $item[1] }
-                | <error: unknown or invalid command>
+                | sql_ddl end_of_query
+                 {  $item[1] }
+                | { 
+# trick to reroute error messages
+                    foreach (@{$thisparser->{errors}}) {
+
+                        my $msg = "Line $_->[1]:$_->[0]\n";
+
+                        # check for a special error hook
+                        if (defined(&gnz_err_hook))
+                        {
+                            gnz_err_hook($msg);
+                        }
+                        else
+                        {
+                            print $msg;
+                        }
+                    }
+                    $thisparser->{errors} = undef;
+                }
+
 
         sql_dml : sql_insert 
 { $return = {sql_insert => $item{sql_insert}}}
@@ -249,7 +269,295 @@ $grammar .= ')/ix' . "\n\n";
                 | <error: unknown or invalid command>
 
 # DDL ALTER, DROP, CREATE
+        sql_ddl : sql_alter 
+{ $return = {sql_alter => $item{sql_alter}}}
+                | sql_drop 
+{ $return = {sql_drop => $item{sql_drop}}}
+                | sql_create 
+{ $return = {sql_create => $item{sql_create}}}
+                | <error: unknown or invalid command>
 
+        sql_alter  : ALTER_ <commit> ddl_object
+{ $return = $item{ddl_object}}
+
+        sql_create : CREATE_ <commit> create_guts
+{ $return = $item{create_guts}}
+
+        sql_drop   : DROP_ <commit> ddl_object
+{ $return = $item{ddl_object}}
+
+        ddl_object : TABLE_ table_name
+{ $return = { table_name   => $item{table_name} }}    
+                   | VIEW_  table_name
+{ $return = { view_name   => $item{table_name} }}    
+                   | /INDEX/i  table_name
+{ $return = { index_name   => $item{table_name} }}    
+                   | /TABLESPACE/i  table_name
+{ $return = { tablespace_name   => $item{table_name} }}    
+
+       create_guts : TABLE_ table_name create_table_def
+{ $return = { table_name   => $item{table_name},
+              table_def    => $item{create_table_def}
+          }
+}    
+                   | /INDEX/i  big_id ON table_name column_list
+{ $return = { index_name   => $item{big_id},
+              table_name   => $item{table_name},
+              column_list  => $item{column_list}
+          }
+}
+                   | /TABLESPACE/i  table_name
+{ $return = { tablespace_name   => $item{table_name} }}
+    
+       ct_as_select: AS_ sql_query
+{ $return = {sql_query      => $item{sql_query}}}
+
+# XXX XXX: optional table_constraint before table_elt_list [elcaro]
+# table element list is optional for create table as select
+# XXX XXX: need some sort of storage clause before ctas
+   create_table_def: table_constraint_def(?) 
+                     table_element_list(?) ct_as_select(?)
+{ $return = {column_list      => $item{'table_element_list(?)'},
+             table_query      => $item{'ct_as_select(?)'},
+             table_constraint => $item{'table_constraint_def(?)'}
+         }
+}
+
+table_element_list: '(' <commit> table_elt(s /,/) ')'                    
+# skip parens
+# lparen is 1, commit is 2, column list is 3
+# cannot use item{table_elt} because it repeats...    
+{ my @foo = @{$item[3]}; $return = \@foo; }
+                       | <error: invalid column list>
+
+# column definition or table_constraint 
+# column type is optional for create table as select
+        table_elt : column_name column_type(?) 
+                    column_default(?) col_cons_list(?)
+{$return = {column_name => $item{column_name},
+            column_type => $item{'column_type(?)'},
+            column_default => $item{'column_default(?)'},
+            col_cons_list => $item{'col_cons_list(?)'}}}
+                  | table_constraint_def
+{$return = {table_constraint => $item{table_constraint_def}}}
+
+   column_default : DEFAULT value_expression
+{$return = $item{value_expression}}
+
+   col_cons_list  : column_constraint_def(s)
+{$return = $item[1]}
+
+# XXX XXX: need constraint attibutes - deferrable, DISABLE etc
+column_constraint_def: constraint_name(?) col_cons
+{$return = {name => $item{'constraint_name(?)'},
+            constraint => $item{col_cons}
+        }
+}
+ table_constraint_def: constraint_name(?) table_cons
+{$return = {name => $item{'constraint_name(?)'},
+            constraint => $item{table_cons}
+        }
+}
+
+  constraint_name : CONSTRAINT_ big_id
+{$return = $item{big_id}}
+
+# XXX XXX: references on delete cascade - referential action
+     col_cons     : NOT(?) NULL
+                  | UNIQUE
+                  | PRIMARY KEY
+                  | REFERENCES_ big_id '(' identifier ')'
+                  | sqCHECK_ '(' search_cond ')'
+
+   table_cons     : UNIQUE column_list 
+                  | PRIMARY KEY column_list
+                  | FOREIGN KEY column_list 
+                    REFERENCES_ big_id '(' identifier ')'
+                  | sqCHECK_ '(' search_cond ')'
+
+     col_char_len : '(' numeric_literal ')'
+{ $return = $item{numeric_literal} }
+
+     col_num_scale:  ',' numeric_literal
+{ $return = $item{numeric_literal} }
+
+     col_num_prec : '(' numeric_literal col_num_scale(?) ')'
+{ $return = {
+    precision => $item{numeric_literal},
+    scale     => $item{'col_num_scale(?)'}
+}}
+
+# NOTE WELL: SQL tokens can be substrings of other tokens, which
+# messes up matching.  Need to have rules in reverse length order -
+# VARCHAR2 before VARCHAR, CHARACTER before CHAR, etc.  "c" and "n"
+# rules must be last.
+     column_type  : sqCHARACTER VARYING(?) col_char_len(?)
+{
+    if (scalar(@{$item{'VARYING(?)'}}))
+    { 
+        $return = 
+        { 
+            base => 'c',
+            spec => 'VARCHAR',
+            len  => $item{'col_char_len(?)'}
+        };
+    }
+    else
+    { 
+        $return = 
+        { 
+            base => 'c',
+            spec => 'CHAR',
+            len  => $item{'col_char_len(?)'}
+        };
+    }
+    $return;
+}
+                  | sqCHAR      VARYING(?) col_char_len(?)
+{
+    if (scalar(@{$item{'VARYING(?)'}}))
+    { 
+        $return = 
+        { 
+            base => 'c',
+            spec => 'VARCHAR',
+            len  => $item{'col_char_len(?)'}
+        };
+    }
+    else
+    { 
+        $return = 
+        { 
+            base => 'c',
+            spec => 'CHAR',
+            len  => $item{'col_char_len(?)'}
+        };
+    }
+    $return;
+}
+                  | (/long/i)(?) VARCHAR2 col_char_len(?)
+{ 
+    $return = 
+    { 
+        base => 'c',
+        spec => 'VARCHAR2',
+        len  => $item{'col_char_len(?)'}
+    };
+}
+                  | (/long/i)(?) VARCHAR col_char_len(?)
+{ 
+    $return = 
+    { 
+        base => 'c',
+        spec => 'VARCHAR',
+        len  => $item{'col_char_len(?)'}
+    };
+}
+                  | sqNUMERIC col_num_prec(?)
+{ 
+    $return = 
+    { 
+        base => 'n',
+        spec => 'NUMERIC',
+        precision  => $item{'col_num_prec(?)'}
+    };
+}
+# elcaro number
+                  | /number/i col_num_prec(?)
+{ 
+    $return = 
+    { 
+        base => 'n',
+        spec => 'NUMERIC',
+        precision  => $item{'col_num_prec(?)'}
+    };
+}
+
+                  | DECIMAL col_num_prec(?)
+{ 
+    $return = 
+    { 
+        base => 'n',
+        spec => 'DECIMAL',
+        precision  => $item{'col_num_prec(?)'}
+    };
+}
+                  | DEC col_num_prec(?)
+{ 
+    $return = 
+    { 
+        base => 'n',
+        spec => 'DECIMAL',
+        precision  => $item{'col_num_prec(?)'}
+    };
+}
+                  | INTEGER
+{ 
+    $return = 
+    { 
+        base => 'n',
+        spec => 'INTEGER'
+    };
+}
+                  | INT
+{ 
+    $return = 
+    { 
+        base => 'n',
+        spec => 'INTEGER'
+    };
+}
+                  | SMALLINT
+{ 
+    $return = 
+    { 
+        base => 'n',
+        spec => 'SMALLINT'
+    };
+}
+                  | FLOAT col_num_prec(?)
+{ 
+    $return = 
+    { 
+        base => 'n',
+        spec => 'FLOAT',
+        precision  => $item{'col_num_prec(?)'}
+    };
+}
+                  | REAL
+{ 
+    $return = 
+    { 
+        base => 'n',
+        spec => 'REAL'
+    };
+}
+                  | DOUBLE PRECISION
+{ 
+    $return = 
+    { 
+        base => 'n',
+        spec => 'DOUBLE PRECISION'
+    };
+}
+                  | /c/i
+{ 
+    $return = 
+    { 
+        base => 'c',
+        spec => 'c'
+    };
+}
+                  | /n/i
+{ 
+    $return = 
+    { 
+        base => 'n',
+        spec => 'n'
+    };
+}
+
+# DML
 # top query can have multiple SELECTs, but only a single ORDER BY clause
         top_query   :  sql_query orderby_clause(?)
 { $return = {sql_query      => $item{sql_query},
@@ -288,6 +596,7 @@ $grammar .= ')/ix' . "\n\n";
         update_colthing: column_list 
 {$return = $item[1]}
                        | column_name
+# XXX XXX XXX XXX ? why array?
 {$return = [$item[1]]}
         update_sources : value_expression
 {$return = $item{value_expression}}
@@ -438,7 +747,7 @@ $grammar .= ')/ix' . "\n\n";
 { my @ad1 = @{$item[1]};
   $return = $ad1[0]; }
 
-# XXX XXX: need INTO
+# XXX XXX: need INTO ?
         sql_select  : SELECT_ all_distinct(?) 
                                select_list from_clause
                                where_clause(?)                
@@ -478,10 +787,8 @@ $grammar .= ')/ix' . "\n\n";
         orderby_clause : ORDER_ BY_ expr_list
 { $return = $item{expr_list}}
 
-
-# XXX XXX: table name or identifier ??
-        table_alias : (AS_)(?) table_name 
-{ $return =  $item{table_name} }
+        table_alias : AS_(?) identifier
+{ $return =  $item{identifier} }
         table_name  : big_id
 { $return =  $item{big_id}}
                     | <error: invalid tablename>
@@ -519,7 +826,7 @@ $grammar .= ')/ix' . "\n\n";
   }
   $return;
 }
-        qj1            : (NATURAL)(?) (join_type)(?) JOIN
+        qj1            : NATURAL(?) join_type(?) JOIN
         qj_leftop      : <leftop: table_expr_prim qj1 table_expr_prim>
 { my @join_op  = @{$item[1]};
   if (exists($item{qj1}))
@@ -557,6 +864,7 @@ $grammar .= ')/ix' . "\n\n";
   $return;
 }
 
+# XXX XXX XXX: optional column list...
         table_expr_prim: table_name         table_alias(?)
 { $return = [{ table_name   => $item{table_name},
               table_alias  => $item{'table_alias(?)'}
@@ -593,12 +901,23 @@ $grammar .= ')/ix' . "\n\n";
         column_name   : big_id
 { $return = $item[1] }
                       | <error: invalid column name>
-        col_alias  : (AS_)(?) identifier
-{ $return = $item{identifier} }
+        col_alias  : AS_(?) identifier
+{ $return = $item{identifier}}
+               
         col_expr   : value_expression col_alias(?)
-{ $return = { value_expression  => $item{value_expression},
-              col_alias         => $item{'col_alias(?)'}
-          }
+{
+#
+# get start/stop position for value expression to make column name
+#
+    my $p1 = $itempos[1]{offset}{from};
+    my $p2 = $itempos[1]{offset}{to};
+
+    $return = { value_expression  => $item{value_expression},
+                col_alias         => $item{'col_alias(?)'},
+                p1 => $p1, p2 => $p2,
+#                col_str           => substr($text, $p1, $p2-$p1)
+#                col_str           => substr($text, 0, $p2-$p1+1)
+            }
 }
         col_expr_list : col_expr(s /,/)
 { my @foo = @{$item[1]}; $return = \@foo; }
@@ -609,6 +928,8 @@ $grammar .= ')/ix' . "\n\n";
 { $return = $item[1] }    
 # TRUE FALSE NULL 
                          | bool_TFN
+{ $return = $item[1] }
+                         | bind_placeholder
 { $return = $item[1] }
 # XXX XXX: need user, sysdate, etc
     
@@ -623,6 +944,14 @@ $grammar .= ')/ix' . "\n\n";
 #        num_val   : add_expr
         num_val   : concat_expr
 { $return = $item[1] }
+
+# do DBI-style bind, e.g. "select ?,? from emp"
+# get line and column number for bind value to determine order
+        bind_placeholder : '?'
+{ $return = {bind_placeholder => 
+             {offset => $thisoffset
+              }}
+}
 
 #
 # Make concatentation the highest "math" operation
@@ -734,6 +1063,8 @@ $grammar .= ')/ix' . "\n\n";
 { $return = {numeric_literal => $item{numeric_literal}}}
                     | string_literal
 { $return = {string_literal => $item[1] }}
+                    | bind_placeholder
+{ $return = $item[1] }
 #                    | value_expression
 #                    | (function_name)(?) '(' sql_query ')'
                     | scalar_subquery
@@ -810,9 +1141,9 @@ $grammar .= ')/ix' . "\n\n";
 {
     if (scalar(@{$item{'NOT(?)'}}))
     {
-        $return = [{NOT      => $item{'NOT(?)'},
+        $return = {NOT      => $item{'NOT(?)'},
                     operands => $item{bool_test}
-                }];
+                };
     }
     else
     {
@@ -824,9 +1155,9 @@ $grammar .= ')/ix' . "\n\n";
 {
     if (scalar(@{$item{'bool_isTFN(?)'}}))
     {
-        $return = [{IS       => $item{'bool_isTFN(?)'},
+        $return = {IS       => $item{'bool_isTFN(?)'},
                     operands => $item{bool_primary}
-                }];
+                };
     }
     else
     {
@@ -834,6 +1165,15 @@ $grammar .= ')/ix' . "\n\n";
     }
     $return;
 }
+# IN lists or subquery
+                   | function_name ...'(' 
+                      '(' <commit> 
+                         function_guts(?) ')'
+{$return = { function_name => $item{function_name},
+             operands      => $item{'function_guts(?)'}
+         }
+}
+
 
         bool_primary: predicate
 { $return = $item{predicate} }    
@@ -842,7 +1182,7 @@ $grammar .= ')/ix' . "\n\n";
 
         predicate   : comparison_predicate
 {$return = $item[1]}
-#  EXISTS, UNIQUE - 
+#  EXISTS, UNIQUE - subquery
                     | function_name ...'(' 
                       '(' <commit> 
                          function_guts(?) ')'
@@ -888,6 +1228,9 @@ $grammar .= ')/ix' . "\n\n";
             operands => $item[2]
         }
 }
+#
+# XXX XXX: isn't this rule really in bool test, since it must support 
+# a leading NOT ??? XXX XXX
 #  (need to support In and Like )
                     | function_name ...'(' 
                       '(' <commit> 
@@ -896,7 +1239,53 @@ $grammar .= ')/ix' . "\n\n";
              operands      => $item{'function_guts(?)'}
          }
 }
-        comparison_predicate : value_expression comp_or_perl(?)
+
+# XXX XXX XXX XXX: rewrite comparison predicate to look more like
+# bool_op, math_op
+
+        comp_pred1  : value_expression comp_op value_expression 
+{$return = {
+    comp_op => 'comp_op',
+    operator => $item{comp_op},
+    operands => [$item[1], $item{comp_op}, $item[3]]
+    }
+}
+# e.g. foo !~ m/foo/ for a search predicate, or
+# update t1 set a=~ s/foo/bar/ for an update expression
+                    | value_expression comp_perlish <perl_quotelike>
+{$return = {
+    comp_op  => 'comp_perlish',
+    operator => $item{comp_perlish},
+    operands => [$item[1], $item{comp_perlish}, $item[3]]
+    }
+}
+#
+# XXX XXX: isn't this rule really in bool test, since it must support 
+# a leading NOT ??? XXX XXX
+#  (need to support In and Like )
+                    | value_expression function_name ...'(' 
+                      '(' <commit> 
+                         function_guts(?) ')'
+{$return = { 
+    comp_op  => 'function',
+    operator => $item{function_name},
+    operands => [
+                 $item{value_expression},
+                 { 
+                     function_name => $item{function_name},
+                     operands      => $item{'function_guts(?)'}
+                 }
+                 ]
+                 }
+}
+                    | value_expression 
+{$return = $item[1]}
+
+
+#        comparison_predicate : value_expression comp_or_perl(?)
+        comparison_predicate : comp_pred1
+{$return = $item[1] }    
+
 
 # function operands: query, set function, regular function
        function_guts : sql_query
@@ -945,10 +1334,11 @@ $grammar .= ')/ix' . "\n\n";
 #
 # \w is [0-9a-zA-Z_]
 #
-# allow double colon in function names [a-z]((::)?\w)*
+# XXX XXX XXX XXX: 
+# allow double colon in function names 
 #
         function_name: ...!reserved_non_funcs /[a-z]\w*/i
-#        function_name: ...!reserved_non_funcs /[a-z]((::)?\w)*/i
+#        function_name: ...!reserved_non_funcs /([a-z]\w*)((::)\w*)?/i
 { $return = $item[-1] }
  	bareword: ...!reserved_word /[a-z]\w*/i
 { $return = $item[-1] }
@@ -977,11 +1367,11 @@ sub SQLPrecompile
 #
 #=head1 NAME
 #
-#Genezzo::Parser::SQL - SQL parser
+#Genezzo::Parse::SQL - SQL parser
 #
 #=head1 SYNOPSIS
 #
-# use Genezzo::Parser::SQL;
+# use Genezzo::Parse::SQL;
 # use Parse::RecDescent;
 # use Data::Dumper;
 #
@@ -997,7 +1387,7 @@ sub SQLPrecompile
 #=head1 DESCRIPTION
 #
 #  The SQL parser is a L<Parse::RecDescent> parser generated by 
-#  L<Genezzo::Parser::SQLGrammar>.  It shouldn't be looked at with
+#  L<Genezzo::Parse::SQLGrammar>.  It shouldn't be looked at with
 #  human eyes.  
 #
 #  Still reading this?  You must be a glutton for punishment.
@@ -1085,7 +1475,9 @@ sub SQLInteractive
 
     while (<STDIN>)
     {
-        my $sql = $parser->sql_000($_);
+        my $ini = $_;
+        $ini =~ s/\;$//; # remove trailing semicolon
+        my $sql = $parser->sql_000($ini);
         if (defined($sql))
         {
 #        print "ok\n";
@@ -1117,7 +1509,7 @@ __END__
 
 =head1 NAME
 
-Genezzo::Parser::SQLGrammar.pl - Generate SQL Parser
+Genezzo::Parse::SQLGrammar.pl - Generate SQL Parser
 
 =head1 SYNOPSIS
 
@@ -1140,6 +1532,12 @@ with some non-standard perlish functions thrown in for good measure.
 Originally derived from the Parse::RecDescent demo demo_operator.pl,
 but it bears as little resemblance to its predecessor as a rocket ship
 to a rocking chair.
+
+Special thanks to Damian Conway for Parse::RecDescent, as well as
+Terrence Brannon for the Parse::RecDescent::FAQ.  An honorable mention
+goes to Terence Parr at ANTLR.org for his help on parsing issues.
+
+
 
 =head1 AUTHORS
 

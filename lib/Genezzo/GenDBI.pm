@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 6.25 2005/02/25 08:59:56 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 6.26 2005/03/19 08:51:59 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -16,6 +16,7 @@ require Exporter;
 use Carp;
 use Data::Dumper ;
 use Genezzo::Feeble;
+use Genezzo::Plan;
 use Genezzo::Dict;
 use Genezzo::Util;
 #use SQL::Statement;
@@ -48,11 +49,11 @@ BEGIN {
 	
 }
 
-our $VERSION   = '0.37';
+our $VERSION   = '0.38';
 our $RELSTATUS = 'Alpha'; # release status
 # grab the code check-in date and convert to YYYYMMDD
 our $RELDATE   = 
-    do { my @r = (q$Date: 2005/02/25 08:59:56 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
+    do { my @r = (q$Date: 2005/03/19 08:51:59 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
 
 our $errstr; # DBI errstr
 
@@ -184,6 +185,9 @@ sub _init
     $self->{feeble}  = Genezzo::Feeble->new(%nargs); # build a feeble parser
     return 0
         unless (defined($self->{feeble}));
+    $self->{plan}  = Genezzo::Plan->new(%nargs);    # build a real parser 
+    return 0
+        unless (defined($self->{plan}));
 
     my $init_db = 0;
 
@@ -485,6 +489,39 @@ sub Kgnz_Dump
     my $dictobj = $self->{dictobj};
     return $dictobj->DictDump (@_);
 
+}
+
+sub Kgnz_Explain
+{
+    # explain query plan
+    my $self = shift;
+    my $sqltxt = $self->{current_line};
+
+    # explain [plan [for]] sql statement
+    $sqltxt =~ s/(?i)^(\s)*(explain)((\s)*plan((\s)*(for))?)?//;
+
+    {
+        local $Data::Dumper::Indent   = 1;
+        local $Data::Dumper::Sortkeys = 1;
+
+        my $parse_tree = $self->{plan}->Parse(statement => $sqltxt);
+
+        return 0
+            unless (defined($parse_tree));
+
+        print Data::Dumper->Dump([$parse_tree],['parse_tree']);
+
+        print "\n\n";
+
+        my $algebra = $self->{plan}->Algebra(parse_tree => $parse_tree);
+
+        print Data::Dumper->Dump([$algebra],['algebra']);
+
+        print "\n\n";
+
+    }
+
+    return 1;
 }
 
 sub Kgnz_AddFile
@@ -3138,6 +3175,7 @@ qw(
    quit   Kgnz_Quit 
    reload Kgnz_Reload
    dump   Kgnz_Dump
+   explain Kgnz_Explain
    spool  Kgnz_Spool
 
    h       Kgnz_History
@@ -3702,18 +3740,52 @@ sub Interactive
 #    greet $term->Features ;
 
     my $prompt = "\ngendba $self->{histcounter}> ";
+    my $prompt_2 = "> ";
 
-    my $in_line;
+    my $in_line;        # current input line
+    my $prev_line;      # accumulated input of multi-line statement
+    my $multiline = 0;  # =1 if require a semicolon to terminate statement
+
+    # build pattern to match commands that require a terminating semicolon
+    my $need_semi = join('|', qw(SELECT INSERT UPDATE DELETE EXPLAIN));
+    $need_semi    = '(?i)^(\s)*(' . $need_semi . ')';
 
     while ( defined ($in_line = $term->readline($prompt)))
     {
-        $in_line =~ s/;(\s*)$//; # XXX: remove the semicolon
-        next unless ($in_line =~ m/\S/);
-        $term->addhistory($in_line);
-        $self->histpush($self->{histcounter}, $in_line);
-        $self->Parseall ($in_line);
+        if (defined($prev_line))
+        {
+            $prev_line .= "\n" ;
+        }
+        else
+        {
+            next unless ($in_line =~ m/\S/);
+
+            $prev_line = "" ;
+            $multiline = 1     # check if need terminator
+                if ($in_line =~ m/$need_semi/);
+        }
+        $prev_line .= $in_line;
+
+        # NOTE: not all commands are multiline and require semicolon...
+        if ($multiline && ($in_line !~ m/;$/))
+        {
+            $prompt = $prompt_2;
+            next;
+        }
+        else
+        {
+            $prev_line =~ s/;(\s*)$//  # Note: remove the semicolon
+                ;
+#                if ($multiline);
+        }
+
+        $term->addhistory($prev_line);
+        $self->histpush($self->{histcounter}, $prev_line);
+        $self->Parseall ($prev_line);
         ($self->{histcounter}) += 1;
         $prompt = "\ngendba $self->{histcounter}> ";
+        $prev_line = undef;
+        $multiline = 0;
     } # end big while
 
     return 1; 

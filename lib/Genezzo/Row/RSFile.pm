@@ -286,7 +286,7 @@ sub _make_new_chunk # override the hph method
     $self->{current_chunk_for_insert} = $blockno;
 
     $bc->{bceref} = 
-        $self->{realbc}->ReadBlock(filenum => $bc->{realbcfileno},
+        $self->{realbc}->ReadBlock(filenum  => $bc->{realbcfileno},
                                    blocknum => $blockno);
     
     unless ($bc->{bceref})
@@ -442,7 +442,7 @@ sub _get_a_chunk # override the hph method
     }
 
     $bc->{bceref} = 
-        $self->{realbc}->ReadBlock(filenum => $bc->{realbcfileno},
+        $self->{realbc}->ReadBlock(filenum  => $bc->{realbcfileno},
                                    blocknum => $blocknum);
     
     unless ($bc->{bceref})
@@ -467,6 +467,13 @@ sub _get_a_chunk # override the hph method
     
     return ($self->{rowd});
 
+}
+
+sub STORE # override the hph method and standard hash method
+{
+    my $self = shift;
+    my $stat = $self->SUPER::STORE(@_);
+    return $stat;
 }
 
 sub _First_Chunkno # override the hph method

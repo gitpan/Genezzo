@@ -389,7 +389,12 @@ NEW FEATURES - database export, rollback, quoted strings,
   foo\bar's.  Finally, a new Havok module called SysHook supports 
   extensions to basic Genezzo database functions.  SysHook is 
   restructured in version 0.34.
- 
+
+NEW FEATURES - multiline SQL statements
+
+  Version 0.38 allows multiline SQL statements for SELECT, INSERT,
+  UPDATE, DELETE, and EXPLAIN in the gendba interactive line mode.
+  These statements must be terminated by a semicolon.
 
 
 INCOMPATIBLE CHANGES

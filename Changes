@@ -1,5 +1,10 @@
 Revision history for Perl extension Genezzo
 
+0.38 Sat Mar 19 01:05:06 2005
+        - Add Plan and MakeAlgebra packages to support new parser
+        - Allow multiline SQL statements/require semicolon terminator
+        - Hook the Parse::RecDescent grammar to gnz_err.
+
 0.37 Fri Feb 25 00:55:10 2005
         - Add Parse::RecDescent dependency -- prelude to
           new SQL parser.  
