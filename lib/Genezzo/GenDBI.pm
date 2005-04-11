@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 6.26 2005/03/19 08:51:59 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 6.30 2005/04/11 07:08:25 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -19,7 +19,7 @@ use Genezzo::Feeble;
 use Genezzo::Plan;
 use Genezzo::Dict;
 use Genezzo::Util;
-#use SQL::Statement;
+
 use Term::ReadLine;
 use Text::ParseWords qw(shellwords quotewords parse_line);
 use warnings::register;
@@ -49,11 +49,11 @@ BEGIN {
 	
 }
 
-our $VERSION   = '0.38';
+our $VERSION   = '0.39';
 our $RELSTATUS = 'Alpha'; # release status
 # grab the code check-in date and convert to YYYYMMDD
 our $RELDATE   = 
-    do { my @r = (q$Date: 2005/03/19 08:51:59 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
+    do { my @r = (q$Date: 2005/04/11 07:08:25 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
 
 our $errstr; # DBI errstr
 
@@ -273,6 +273,9 @@ sub _init
                                           init_db => $init_db, %dictargs);
     return 0
         unless (defined($self->{dictobj}));
+
+    # pass dictionary information to the planner
+    $self->{plan}->Dict($self->{dictobj});
 
     return 1;
 }
@@ -516,6 +519,14 @@ sub Kgnz_Explain
         my $algebra = $self->{plan}->Algebra(parse_tree => $parse_tree);
 
         print Data::Dumper->Dump([$algebra],['algebra']);
+
+        print "\n\n";
+
+        my ($tc, $err_status) 
+            = $self->{plan}->TypeCheck(algebra   => $algebra,
+                                       statement => $sqltxt);
+
+        print Data::Dumper->Dump([$tc],['type_analysis']);
 
         print "\n\n";
 
@@ -1470,7 +1481,9 @@ sub Kgnz_Update
 sub SQLSelect
 {
     my $self = shift;
-    my @ggg = $self->SQLSelectPrepare(@_);
+# XXX XXX XXX XXX: use new parser
+#    my @ggg = $self->SQLSelectPrepare(@_);
+    my @ggg = $self->SQLSelectPrepare2(@_);
 
     return undef
         unless (scalar(@ggg));
@@ -1487,6 +1500,8 @@ sub SQLSelectPrepare
 {
     my $self = shift;    
 
+    return undef; # XXX XXX XXX XXX use new parser
+
     my $sqltxt = $self->{current_line};
 
     my ($sql_cmd, $pretty, $badparse) =
@@ -1496,6 +1511,125 @@ sub SQLSelectPrepare
         if ($badparse);
 
     return $self->_SQLselprep($sql_cmd);
+}
+
+# XXX XXX: use new parser
+sub SQLSelectPrepare2
+{
+    my $self = shift;    
+
+    my $sqltxt = $self->{current_line};
+
+    greet $sqltxt;
+
+    my $parse_tree = $self->{plan}->Parse(statement => $sqltxt);
+
+    greet $parse_tree;
+
+    unless (defined($parse_tree))
+    {
+        my $msg  = "Input: " . $sqltxt;
+        my %earg = (self => $self, msg => $msg, severity => 'warn');
+
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
+        return undef;
+    }
+
+    my $algebra = $self->{plan}->Algebra(parse_tree => $parse_tree);
+
+    my ($tc, $err_status) = 
+        $self->{plan}->TypeCheck(algebra   => $algebra,
+                                 statement => $sqltxt);
+
+    greet $tc, $err_status;
+
+    return undef
+        if ($err_status);
+
+    return $self->_SQLselprep2($tc);
+}
+
+sub _SQLselprep2
+{
+    my ($self, $sql_cmd) = @_;
+    my @colpairs;
+
+    # XXX: no joins supported yet!
+
+    my ($tc, $from, $sel_list, $where) = 
+        $self->{plan}->GetFromWhereEtc(algebra   => $sql_cmd);
+
+    whoami;
+    greet $from, $sel_list, $where;
+
+    unless (
+            exists($sql_cmd->{sql_query}) &&
+            exists($sql_cmd->{sql_query}->{operands}) &&
+            exists($sql_cmd->{sql_query}) &&
+            exists($sql_cmd->{sql_query}->{operands}->[0]->{sql_select}) &&
+            exists($sql_cmd->{sql_query}->{operands}->[0]->{sql_select}->{alg_oper_child})
+            )
+    {
+        greet $sql_cmd->{sql_query};
+        my $msg = "query too complex";
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'warn');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
+        
+        return undef;
+    }
+
+    my $tablename = $from->[0]->[0]->{tc_table_fullname};
+
+    foreach my $i (@{$sel_list})
+    {
+        my $v1 = $i->{value_expression};
+        my $val;
+        if (ref($v1) eq 'HASH')
+        {
+            if (exists($i->{value_expression}->{tc_column_name}))
+            {
+                $val = $i->{value_expression}->{tc_column_name};
+            }
+            elsif (exists($i->{value_expression}->{function_name}))
+            {
+                $val = $i->{value_expression}->{function_name};
+            }
+        }
+        
+        my $nam = $i->{tc_col_header};
+
+        if (!defined($val))
+        {
+            my $msg = "cannot process column for $nam";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+        
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
+            return undef;
+
+        }
+
+        push @colpairs, [$val, $nam];
+    }
+
+    if (defined($where))
+    {
+        greet $where;
+    }
+
+    return ($self->SelectPrepare(tablename   => $tablename, 
+                                 colpairs    => \@colpairs,
+                                 where2      => $where,
+                                 select_list => $sel_list
+                                 )
+            );
 }
 
 sub _SQLselprep
@@ -1645,7 +1779,8 @@ sub SQLWhere
                                 push @filtary, 
                                      $bang . '(defined(' . $gg . '))';
 
-                                $AndPurity = ($isnot > 0);
+                                $AndPurity = 0
+                                    unless ($isnot > 0);
 
                                 last L_isnull;
                             }
@@ -1802,6 +1937,94 @@ sub SQLWhere
 #    greet %hh;
     return \%hh;
 } # end SQLWhere
+
+sub SQLWhere2
+{
+    my $self = shift;    
+    my $dictobj = $self->{dictobj};
+    my %args = (@_);
+
+    my $tablename = $args{tablename};
+    my $where = $args{where};
+
+#    greet $where;
+
+
+    # XXX XXX: filter will complain about "uninitialized" strings
+
+    my $filterstring = '
+   $filter = sub {
+
+        no warnings qw(uninitialized); # shut off null string warnings
+
+        my ($tabdef, $rid, $outarr) = @_;
+        return 1
+            if (defined($outarr) &&
+                scalar(@{$outarr}) &&
+                ( ';
+
+    my $AndPurity = 0;    # WHERE clauses of ANDed predicates may
+    my $AndTokens = [];   # be suitable for index lookups, but ORs
+
+    $filterstring .= $where->[0]->{sc_tree}->{vx};
+
+    $filterstring .= "));};";
+
+    my $where_text = $where->[0]->{sc_txt};
+    $AndPurity     = $where->[0]->{sc_and_purity};
+
+#    greet $filterstring;
+#    greet "pure", $AndPurity, @AndTokens;
+    $AndTokens = $where->[0]->{sc_index_keys}
+       if ($AndPurity);
+
+    my $filter;     # the anonymous subroutine which is the 
+                    # result of eval of filterstring
+
+    my $status;
+
+    my ($msg, %earg);
+    my $badparse;
+    if ($badparse)
+    {
+        %earg = (self => $self, msg => $msg,
+                 severity => 'warn');
+                    
+        &$GZERR(%earg)
+            if (defined($GZERR));
+    }
+    else
+    {
+        $status = eval " $filterstring ";
+    }
+
+    unless (defined($status))
+    {
+        $msg = "";
+#        warn $@ if $@;
+        $msg .= $@ 
+            if $@;
+        $msg .= "\nbad filter:\n";
+        $msg .= $filterstring . "\n";
+        $msg .= "\nWHERE clause:\tWHERE " . $where_text . "\n";
+        %earg = (self => $self, msg => $msg,
+                 severity => 'warn');
+                    
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
+        return undef;
+    }
+#    greet $filter; 
+
+    my %hh = (idxfilter => $AndTokens);
+    $hh{filter} = $filter
+        if (defined($filter));
+    $hh{where_text} = $where_text;
+    $hh{filter_text} = $filterstring;
+#    greet %hh;
+    return \%hh;
+} # end SQLWhere2
 
 sub SQLCreate
 {
@@ -2846,6 +3069,30 @@ sub SelectPrepare
                 return @outi;
             }
         }
+        if (defined($args{where2}))
+        {
+            return @outi # make sure have a table
+                unless $dictobj->DictTableExists (tname => $tablename);
+
+            $filter =
+                $self->SQLWhere2(tablename => $tablename,
+                                 where => $args{where2});
+
+            unless (defined($filter))
+            {
+                whisper "invalid where clause";
+
+                my $msg = "invalid where clause";
+                my %earg = (self => $self, msg => $msg,
+                            severity => 'warn');
+                    
+                &$GZERR(%earg)
+                    if (defined($GZERR));
+
+                return @outi;
+            }
+        }
+
 
     }
 
@@ -4133,7 +4380,7 @@ sub _init
                 shift @{$self->{param}};
                 $self->{select} = [];
                 push @{$self->{select}},
-                    $self->{gnz_h}->SQLSelectPrepare(@{$self->{param}});
+                    $self->{gnz_h}->SQLSelectPrepare2(@{$self->{param}});
 
                 # check if prepare failed
                 return 0

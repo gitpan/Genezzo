@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Parse/RCS/SQLGrammar.pl,v 1.10 2005/03/19 08:51:20 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Parse/RCS/SQLGrammar.pl,v 1.17 2005/04/11 07:09:27 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -72,7 +72,7 @@ $::RD_AUTOACTION = q {
 ## XXX XXX: use an ANTLR-like rule - don't generate AST nodes for
 ## rules which end in underscore
 
-my @res_words = # list of all reserved words
+my @res_word_rules = # list of all reserved words
     qw(
        ABSOLUTE_ ACTION_ ADD_ ALL ALLOCATE_ ALTER_ AND ANY_ ARE_ ASC_
        ASSERTION_ AS_ AT_ AUTHORIZATION_ AVG_ sqBEGIN_ BETWEEN_ BIT_
@@ -106,71 +106,14 @@ my @res_words = # list of all reserved words
        UNKNOWN_ UPDATE_ UPPER_ USAGE_ USER_ USING VALUES_ VALUE_
        VARCHAR VARCHAR2 VARYING VIEW_ WHENEVER_ WHEN_ WHERE_ WITH_ WORK_
        WRITE_ YEAR_ ZONE_
+       ECOUNT
        );
-
-
-my $grammar;
-
-# build rule for each word
-for my $ww (@res_words)
-{
-
-    # reserved words with trailing underscore are "private" -- they do
-    # not show up in the AST.
-    my $private1 = ($ww =~ m/\_$/);
-
-    # strip off trailing underscore for match rule
-    my $rul = $private1 ?  substr($ww, 0, -1) : $ww;
-
-    # reserved words with a leading lowercase "sq", like "sqBEGIN",
-    # need the sq removed for the real token.  Keep the "sq" in the
-    # rule name to avoid conflicts with special grammar constructs.
-    $rul = substr($rul, 2) if ($rul =~ m/^sq/);
-
-    # build a rule - match case insensitively
-    $grammar .= $ww . ' : /' . $rul . '/i';
-    $grammar .= "\n" . '  { [] }' . "\n" if $private1; # no action
-
-    $grammar .= "\n\n";
-
-}
-
-# build a rule to match all reserved words...
-$grammar .= 'reserved_word: /(' ;
-
-my $firsttime  = 1;
-for my $ww (@res_words)
-{
-
-    # reserved words with trailing underscore are "private" -- they do
-    # not show up in the AST.
-    my $private1 = ($ww =~ m/\_$/);
-
-    # strip off trailing underscore for match rule
-    my $rul = $private1 ?  substr($ww, 0, -1) : $ww;
-
-    # reserved words with a leading lowercase "sq", like "sqBEGIN",
-    # need the sq removed for the real token.  Keep the "sq" in the
-    # rule name to avoid conflicts with special grammar constructs.
-    $rul = substr($rul, 2) if ($rul =~ m/^sq/);
-
-    if ($firsttime)
-    {
-        $firsttime = 0;
-    }
-    else
-    {
-        $grammar .= "\n | ";
-    }
-    $grammar .= $rul;
-}
-$grammar .= ')/ix' . "\n\n";
-
-# build a rule to match all reserved words that aren't valid function names
-$grammar .= 'reserved_non_funcs: /(' ;
+# XXX XXX XXX: need to make ECOUNT a reserved word...
 
 # function names and function-like subquery expressions
 # Note: special rule to handle COUNT (for COUNT(*)...)
+# XXX XXX: plus ECOUNT...
+# XXX XXX: what about TRIM, UPPER, etc??
 my @standard_funcs = qw(
                         MIN
                         MAX
@@ -194,8 +137,12 @@ for my $fname (@standard_funcs)
     $std_funcs{$fname} = 1;
 }
 
-$firsttime  = 1;
-for my $ww (@res_words)
+my $grammar;
+
+my (@all_res_words, @res_minus_fns);
+
+# build rule for each word
+for my $ww (@res_word_rules)
 {
 
     # reserved words with trailing underscore are "private" -- they do
@@ -210,22 +157,37 @@ for my $ww (@res_words)
     # rule name to avoid conflicts with special grammar constructs.
     $rul = substr($rul, 2) if ($rul =~ m/^sq/);
 
+    # build a rule - match case insensitively
+    $grammar .= $ww . ' : /' . $rul . '/i';
+    $grammar .= "\n" . '  { [] }' . "\n" if $private1; # no action
+
+    $grammar .= "\n\n";
+
+    # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX
+    # build a regexp with negative lookahead in order to allow
+    # identifiers with a reserved word prefix, e.g. a column 
+    # COUNTY which contains the prefix COUNT.
+    # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX
+    my $regex = $rul . '(?!([a-z0-9_]))';
+    push @all_res_words, $regex; 
+
     # don't put valid function names in this list...
-    next
-        if (exists($std_funcs{uc($rul)}));
-
-    if ($firsttime)
-    {
-        $firsttime = 0;
-    }
-    else
-    {
-        $grammar .= "\n | ";
-    }
-    $grammar .= $rul;
-
+    push @res_minus_fns, $regex
+        unless (exists($std_funcs{uc($rul)}));
 }
-$grammar .= ')/ix' . "\n\n";
+
+@all_res_words = sort @all_res_words;
+@res_minus_fns = sort @res_minus_fns;
+
+# build a rule to match all reserved words...
+$grammar .= 'reserved_word:  /' . 
+    join('|', @all_res_words);
+$grammar .=  "/i \n\n";
+
+# build a rule to match all reserved words that aren't valid function names
+$grammar .= 'reserved_non_funcs: /' .
+    join('|', @res_minus_fns);
+$grammar .=  "/i \n\n";
 
 # build the rest of the grammar
 ($grammar .= << 'END_OF_GRAMMAR') =~ s/^\#.*//gm;
@@ -734,11 +696,14 @@ column_constraint_def: constraint_name(?) col_cons
 # return a single item array, since other njq rules 
 # operate on arrays of simpler queries
         njq_simple     : simple_table
-{ $return = [$item{simple_table}]}
+{ $return = {sql_setop => $item[0],
+             operands  => [$item{simple_table}]}
+}
+#{ $return = $item{simple_table}}
 #
 # this should work since it's not left-recursive
                        | '(' non_join_query ')'
-{ $return = [$item{non_join_query}]}
+{ $return = $item{non_join_query}}
 
         all_distinct: ALL 
 { my @ad1 = @{$item[1]};
@@ -779,7 +744,18 @@ column_constraint_def: constraint_name(?) col_cons
                        | <error: invalid column list>
 
         where_clause   : WHERE_ search_cond
-{ $return = $item{search_cond}}
+{
+#
+# get start/stop position for WHERE clause
+#
+    my $p1 = $itempos[2]{offset}{from};
+    my $p2 = $itempos[2]{offset}{to};
+    $return = {
+        p1 => $p1,
+        p2 => $p2,
+        sc_tree => $item{search_cond}
+    };
+}
         groupby_clause : GROUP_ BY_ expr_list
 { $return = $item{expr_list}}
         having_clause  : HAVING_ search_cond
@@ -805,20 +781,22 @@ column_constraint_def: constraint_name(?) col_cons
 { $return = $item[1]}
         join_tab   : cross_join
 { $return = $item[1]}
+# this should work since it's not left-recursive
+                   | '(' join_tab ')'
+{ $return = $item[2]}
 
-
-# XXX XXX XXX XXX: some weird stuff here.  FROM list is always an
-# array.  Do some monkey business to always return arrays for the join
-# operations.  Can probably simplify this...
+# XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
+# START JOIN DEFINITIONS
+# XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
 
         cj1            : CROSS JOIN
         cross_join     : <leftop: qualified_join cj1 qualified_join>
 { my @join_op  = @{$item[1]};
   if (exists($item{cj1}))
   {
-      $return = [{join      => $item[0],
+      $return = {join_op   => $item[0],
                  operands  => \@join_op
-                 }];
+                 };
   }
   else
   {
@@ -831,9 +809,9 @@ column_constraint_def: constraint_name(?) col_cons
 { my @join_op  = @{$item[1]};
   if (exists($item{qj1}))
   {
-      $return = [{join      => $item[0],
+      $return = {join_op   => $item[0],
                  operands  => \@join_op
-                 }];
+                 };
   }
   else
   {
@@ -843,19 +821,21 @@ column_constraint_def: constraint_name(?) col_cons
 }
 
 
+# XXX XXX XXX: maybe can collapse qualified join with qj_leftop?
+
         qualified_join :  qj_leftop join_spec(?)
 {
 
 ##    print Data::Dumper->Dump([$item[1]]), "\n\n";
-
- my @join_op  = @{$item[1]};
+# special case because only a single operand
+ my @join_op  = [$item[1]];
 # is there a non-null join spec array containing ON or USING? 
   if (scalar(@{$item{'join_spec(?)'}}))
   {
-      $return = [{join      => $item[0],
+      $return = {join_op   => $item[0],
                  operands  => \@join_op,
                  join_spec => $item{'join_spec(?)'}
-                 }];
+                 };
   }
   else
   {
@@ -866,15 +846,20 @@ column_constraint_def: constraint_name(?) col_cons
 
 # XXX XXX XXX: optional column list...
         table_expr_prim: table_name         table_alias(?)
-{ $return = [{ table_name   => $item{table_name},
+{ $return = { table_name   => $item{table_name},
               table_alias  => $item{'table_alias(?)'}
-          }]
+          }
 }
                        | '(' sql_query ')'  table_alias(?)
-{ $return = [{ sql_query    => $item{sql_query},
+{ $return = { sql_query    => $item{sql_query},
               table_alias  => $item{'table_alias(?)'}
-          }]
+          }
 }
+# this should work since it's not left-recursive
+                       | '(' join_tab ')'
+{ $return = $item[2]}
+
+
 
         join_LRF  : LEFT 
 { $return = $item[1] }    
@@ -897,6 +882,10 @@ column_constraint_def: constraint_name(?) col_cons
 { $return = {ON => $item{search_cond}}}
                   | USING column_list
 { $return = {USING => $item{column_list}}} 
+
+# XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
+# END JOIN DEFINITIONS
+# XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
 
         column_name   : big_id
 { $return = $item[1] }
@@ -934,7 +923,9 @@ column_constraint_def: constraint_name(?) col_cons
 # XXX XXX: need user, sysdate, etc
     
         string_val : string_literal
-{ $return = {string_literal => $item[1] }}
+{ $return = {string_literal => $item[1],
+             tc_expr_type => 'c'
+             }}
 #        string_val : concat_expr
 #{ $return = $item[1] }
 #                   | str_primary
@@ -962,6 +953,7 @@ column_constraint_def: constraint_name(?) col_cons
   if (exists($item{concat_op}))
   {
       $return = {math_op => $item[0],
+                 tc_expr_type => 'c',
                  operands  => \@math_op
                  };
   }
@@ -982,6 +974,7 @@ column_constraint_def: constraint_name(?) col_cons
   if (exists($item{add_op}))
   {
       $return = {math_op => $item[0],
+                 tc_expr_type => 'n',
                  operands  => \@math_op
                  };
   }
@@ -1002,6 +995,7 @@ column_constraint_def: constraint_name(?) col_cons
   if (exists($item{mult_op}))
   {
       $return = {math_op => $item[0],
+                 tc_expr_type => 'n',
                  operands  => \@math_op
                  };
   }
@@ -1023,6 +1017,7 @@ column_constraint_def: constraint_name(?) col_cons
     if (scalar(@{$item{'unary_op(?)'}}))
     {
         $return = {unary => $item{'unary_op(?)'},
+                   tc_expr_type => 'n',
                     val   => $item{num_primary}
                }
     }
@@ -1045,13 +1040,21 @@ column_constraint_def: constraint_name(?) col_cons
              operands      => $item{'function_guts(?)'}
          }
 }
+# XXX XXX XXX: allow ecount
 # treat count special to handle count(*)
                     | /count/i '(' <commit> 
                         countfunc_guts ')'
 {$return = { function_name => 'count',
-             operands      => $item{'countfunct_guts'}
+             operands      => $item{'countfunc_guts'}
          }
 }
+                    | /ecount/i '(' <commit> 
+                        countfunc_guts ')'
+{$return = { function_name => 'ecount',
+             operands      => $item{'countfunc_guts'}
+         }
+}
+
  value_expr_primary : '(' value_expression ')'
 { $return = $item{value_expression}}
 #
@@ -1060,9 +1063,15 @@ column_constraint_def: constraint_name(?) col_cons
                     | column_name ...!'('
 { $return = {column_name => $item{column_name}}}
                     | numeric_literal
-{ $return = {numeric_literal => $item{numeric_literal}}}
+{ $return = {numeric_literal => $item{numeric_literal},
+             tc_expr_type  => 'n'
+         }
+}
                     | string_literal
-{ $return = {string_literal => $item[1] }}
+{ $return = {string_literal => $item[1],
+             tc_expr_type => 'c'
+         }
+}
                     | bind_placeholder
 { $return = $item[1] }
 #                    | value_expression
@@ -1078,7 +1087,9 @@ column_constraint_def: constraint_name(?) col_cons
         str_primary : '(' string_val ')'
 {$return = $item[1] }
                     | string_literal
-{$return = {string_literal => $item{string_literal}}}
+{$return = {string_literal => $item{string_literal},
+            tc_expr_type => 'c'
+            }}
                     | value_expression
 {$return = $item[1] }
 
@@ -1300,7 +1311,8 @@ column_constraint_def: constraint_name(?) col_cons
        count_operand : '*' 
 { $return = 'STAR' }
                      | value_expression
-{ $return = { value_expression  => $item{value_expression}}}
+# XXX XXX: return an array like an expr_list in function_guts
+{ $return = [{ value_expression  => $item{value_expression}}]}
 
        countfunc_guts: all_distinct(?) count_operand
 { $return = {all_distinct   => $item{'all_distinct(?)'},
@@ -1340,7 +1352,10 @@ column_constraint_def: constraint_name(?) col_cons
         function_name: ...!reserved_non_funcs /[a-z]\w*/i
 #        function_name: ...!reserved_non_funcs /([a-z]\w*)((::)\w*)?/i
 { $return = $item[-1] }
- 	bareword: ...!reserved_word /[a-z]\w*/i
+
+
+# XXX XXX: CHEAT - allow genezzo dictionary tables unquoted
+ 	bareword: ...!reserved_word /([a-z]\w*)|(_tab1|_col1|_pref1|_tspace|_tsfiles)/i
 { $return = $item[-1] }
         numeric_literal :   /[+-]?(?=\d|\.\d)\d*(\.\d*)?([Ee]([+-]?\d+))?/
 { $return = $item[1] }
@@ -1414,6 +1429,35 @@ sub SQLPrecompile
 #=over 4
 #
 #=item  Support for DDL, ANSI Interval, Date, Timestamp, etc.
+#
+#=item  fix the extra array deref in join rules
+#
+#=item  error messages everywhere
+#
+#=item ECOUNT reserved word issues
+#
+#=item TRIM, UPPER, etc in standard function list?
+#
+#=item use of negative lookahead in reserved_word regex?
+#
+#=item table constraint, storage clause
+#
+#=item constraint attributes - deferrable, disable
+#
+#=item delete cascade referential action
+#
+#=item maybe can collapse qualified join with qj_leftop?
+#
+#=item table expr optional column list
+#
+#=item "system" literals like USER, SYSDATE
+#
+#=item better separation of strings and numbers (see concatenate)
+#
+#=item leading NOT
+#
+#=item double colon in function names?
+#
 #
 #=back
 #

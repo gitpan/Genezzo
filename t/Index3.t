@@ -398,7 +398,7 @@ if (1)
     my $del_rid = $lastfetch->{rid};
     my $del_id = $lastfetch->{id};
 
-    my $delstr = "delete from duptab where rid = \"" . $del_rid . "\"";
+    my $delstr = 'delete from duptab where rid = \'' . $del_rid . '\'';
 
     if ($dbh->do($delstr))
     {       
@@ -410,7 +410,7 @@ if (1)
     }
 
     $sth = 
-      $dbh->prepare("select rid, id, _trid from dup_idx where id = $del_id");
+      $dbh->prepare("select rid, id, \"_trid\" as trid from dup_idx where id = $del_id");
 
     print $sth->execute(), " rows \n";
 
@@ -422,7 +422,7 @@ if (1)
             unless (defined($ggg));
         $lastfetch = $ggg;
 
-        if ($lastfetch->{_trid} eq $del_rid)
+        if ($lastfetch->{trid} eq $del_rid)
         {
             not_ok("index delete failed : $del_rid");
         }

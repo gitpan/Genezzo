@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 6.21 2005/01/30 09:36:11 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 6.22 2005/03/28 00:13:19 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -19,7 +19,7 @@ use Genezzo::Havok;
 
 BEGIN {
     our $VERSION;
-    $VERSION = do { my @r = (q$Revision: 6.21 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 6.22 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -1402,8 +1402,8 @@ my $tabexists = sub {
     my %optional = (
                     silent_exists    => 1,
                     silent_notexists => 0,
-                    str_exists    => "table THETABLENAME already exists\n",
-                    str_notexists => "table THETABLENAME does not exist\n" 
+                    str_exists    => "table \'THETABLENAME\' already exists\n",
+                    str_notexists => "table \'THETABLENAME\' does not exist\n" 
                     );
 
     my %required = (

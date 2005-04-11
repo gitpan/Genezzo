@@ -70,7 +70,7 @@ rmtree($gnz_home, 1, 1);
         not_ok ("could not startup");
     }
 
-    if ($fb->Parseall("select * from _tab1;"))
+    if ($fb->Parseall("select * from _tab1"))
     {
         ok();
     }
@@ -106,7 +106,7 @@ rmtree($gnz_home, 1, 1);
         not_ok ("could not insert");
     }
 
-    if ($fb->Parseall("insert into test1 values (a1, b1, c1, e1, f1, g1);"))
+    if ($fb->Parseall("insert into test1 values (a1, b1, c1, e1, f1, g1)"))
     {
         ok();
     }
@@ -133,7 +133,7 @@ rmtree($gnz_home, 1, 1);
         not_ok ("could not select3");
     }
 
-    if ($fb->Parseall("SELECT col2 as MYCOLUMN1, col3 FROM test1 ;"))
+    if ($fb->Parseall("SELECT col2 as MYCOLUMN1, col3 FROM test1 "))
     {
         ok();
     }

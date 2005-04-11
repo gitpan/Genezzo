@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Plan/RCS/MakeAlgebra.pm,v 1.2 2005/03/19 08:48:47 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Plan/RCS/MakeAlgebra.pm,v 1.5 2005/03/29 08:36:48 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -17,7 +17,7 @@ use Carp;
 our $VERSION;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 1.2 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.5 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -97,14 +97,20 @@ sub Convert # public
 
     my $parse_tree = $args{parse_tree};
 
-    return convert_algebra($parse_tree);
+    my $current_qb = {qb => 0};
+    my $alg = convert_algebra($parse_tree, $current_qb);
+
+    # label parent query blocks
+    $current_qb = {qb => 0, qb_parent => []};
+    $alg = $self->_label_qb($alg, $current_qb);
+    return $alg;
 }
 
 # recursive function to convert parse tree to relational algebra
 sub convert_algebra # private
 {
 #    whoami;
-    my $sql = shift;
+    my ($sql, $current_qb) = @_;
 
     # recursively convert all elements of array
     if (ref($sql) eq 'ARRAY')
@@ -113,7 +119,7 @@ sub convert_algebra # private
         $maxi--;
         for my $i (0..$maxi)
         {
-            $sql->[$i] = convert_algebra($sql->[$i]);
+            $sql->[$i] = convert_algebra($sql->[$i], $current_qb);
         }
 
     }
@@ -127,10 +133,15 @@ sub convert_algebra # private
         {
             if ($kk !~ m/^sql_select$/)
             {
-                $sql->{$kk} = convert_algebra($vv);
+                $sql->{$kk} = convert_algebra($vv, $current_qb);
             }
             else
             {
+                # add a unique id for each query block
+                my $qb_num = $current_qb->{qb};
+                $qb_num++;
+                $current_qb->{qb}   = $qb_num;
+                $sql->{query_block} = $qb_num; 
                 
                 # convert SQL SELECT to a basic relational algebra,
                 # (PROJECT ( FILTER (THETA-JOIN)))
@@ -141,18 +152,19 @@ sub convert_algebra # private
                 # Next, filter out the rows that don't satisfy the
                 # WHERE clause.
                 #
-                # Perform grouping and filter the results of the
-                # HAVING clause.
-                #
-                # Finally, project the required SELECT list entries as
+                # Project the required SELECT list entries as
                 # output.
+                #
+                # Finally, perform grouping and filter the results of
+                # the HAVING clause.  
+                #
 
                 my @op_list = qw(
                                  theta_join    from_clause
                                  filter        where_clause
+                                 project       select_list
                                  alg_group     groupby_clause
                                  hav           having_clause
-                                 project       select_list
                                  );
 
                 # build a list of each relational algebra operation and
@@ -167,7 +179,9 @@ sub convert_algebra # private
                     # SELECTs, so process them recursively with
                     # convert_algebra.
 
-                    $alg_oper{$operkey} = convert_algebra($vv->{$operval});
+                    $alg_oper{$operkey} = convert_algebra($vv->{$operval}, 
+                                                          $current_qb
+                                                          );
                 }
 
                 # build a nested hash of relational algebra
@@ -177,7 +191,7 @@ sub convert_algebra # private
                 # The simplest output is just a degenerate
                 # theta-join of a single table.
                 # The most complex output is a 
-                # (project (filter(groupby(filter(theta-join)))))
+                #  (filter(groupby(project(filter(theta-join)))))
                 # 
                 # More complicated combinations arise from compound
                 # statements using set operations (UNION, INTERSECT)
@@ -203,9 +217,8 @@ sub convert_algebra # private
                         
                         $hashi = 
                         {
-                            $oper => {
-                                $alg_oper_map{$oper} => $alg_oper{$oper}
-                            }
+                            alg_op_name => $oper,
+                            $alg_oper_map{$oper} => $alg_oper{$oper}
                         };
                         $prev = $oper;
                     }
@@ -294,16 +307,16 @@ sub convert_algebra # private
 
                         $hashi = 
                         {
-                            $oper_alias => {
-                                $operands_key => $alg_oper{$oper},
-                                $prev         => $hashi->{$prev}
-                            }
+                            alg_op_name   => $oper_alias,
+                            $operands_key => $alg_oper{$oper},
+                            alg_oper_child  => $hashi
                         };
+
                         if ($oper eq "project")
                         {
                             # project has additional all/distinct attribute
 
-                            $hashi->{$oper}->{all_distinct} =
+                            $hashi->{all_distinct} =
                                 $vv->{all_distinct};
                         }
 
@@ -320,6 +333,74 @@ sub convert_algebra # private
 
     return $sql;
 } # end convert_algebra
+
+sub _label_qb # private
+{
+#    whoami;
+
+    # NOTE: get the current subroutine name so it is easier 
+    # to call recursively
+    my $subname = (caller(0))[3];
+
+    my $self = shift;
+    # generic tree of hashes/arrays
+    my ($genTree, $current_qb) = @_;
+
+    # recursively convert all elements of array
+    if (ref($genTree) eq 'ARRAY')
+    {
+        my $maxi = scalar(@{$genTree});
+        $maxi--;
+        for my $i (0..$maxi)
+        {
+            $genTree->[$i] = $self->$subname($genTree->[$i], $current_qb);
+        }
+    }
+    if (ref($genTree) eq 'HASH')
+    {
+        keys( %{$genTree} ); # XXX XXX: need to reset expression!!
+        # recursively convert all elements of hash, but treat
+        # table name specially
+
+        my $qb_setup = 0; # TRUE if top hash of query block
+
+        if (exists($genTree->{sql_select})
+            && exists($genTree->{query_block}))
+        {
+            $qb_setup = 1;
+
+            $current_qb->{qb} = $genTree->{query_block};
+
+            if (scalar(@{$current_qb->{qb_parent}}))
+            {
+                # setup list of parent query blocks to current block
+                my @foo = @{$current_qb->{qb_parent}};
+                $genTree->{query_block_parent} = \@foo;
+            }
+            # push on the front
+            unshift @{$current_qb->{qb_parent}}, $genTree->{query_block};
+        }
+
+        while ( my ($kk, $vv) = each ( %{$genTree})) # big while
+        {
+            if ($kk !~ m/^search_cond$/)
+            {
+                $genTree->{$kk} = $self->$subname($vv, $current_qb);
+            }
+            else # search_cond
+            {
+                $genTree->{$kk} = $self->$subname($vv, $current_qb);
+            } # end search_cond
+        } # end big while
+
+        if ($qb_setup)
+        {
+            # pop from the front
+            shift @{$current_qb->{qb_parent}};
+        }
+    } # end HASH
+    return $genTree;
+}
 
 
 END { }       # module clean-up code here (global destructor)

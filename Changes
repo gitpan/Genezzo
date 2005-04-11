@@ -1,5 +1,18 @@
 Revision history for Perl extension Genezzo
 
+0.39 Mon Apr 11 00:35:29 2005
+        - More typechecking and analysis.
+        - Phase in new parser for SELECT with the following
+          pluses and minuses: 
+          + understands more of SQL grammar
+          + better support for perl regex comparisons
+          + added primitive EXPLAIN PLAN support
+          + better complex expression support
+          - more restrictive on quoting conventions
+          - slower
+          - need to improve parser error messages/recovery
+          - identifiers still case-sensitive
+
 0.38 Sat Mar 19 01:05:06 2005
         - Add Plan and MakeAlgebra packages to support new parser
         - Allow multiline SQL statements/require semicolon terminator

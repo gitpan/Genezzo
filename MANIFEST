@@ -47,6 +47,7 @@ lib/Genezzo/Parse/SQLGrammar.pl
 lib/Genezzo/Parse/SQL.pm
 lib/Genezzo/Plan.pm
 lib/Genezzo/Plan/MakeAlgebra.pm
+lib/Genezzo/Plan/TypeCheck.pm
 lib/Genezzo/GenDBI.pm
 lib/Genezzo/Util.pm
 lib/Genezzo/PushHash/PHArray.pm

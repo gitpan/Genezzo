@@ -205,10 +205,13 @@ Lissajous
         my $a1 = shift @ary;
         my $a2 = shift @ary;
 
+        # XXX XXX: may need to concatenate soundex with empty string
+        # to force string type.  This happens to work because default
+        # compare is string.
         my $s1 = 
                "select sname from sonictest where " .
                ' soundex(sname) = ' .
-               ' soundex("'. $a2 . '") ' ;
+               ' soundex(\''. $a2 . '\') ' ;
 
         greet $s1;
 

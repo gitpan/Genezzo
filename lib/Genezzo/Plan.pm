@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Plan.pm,v 1.2 2005/03/19 08:42:51 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Plan.pm,v 1.5 2005/04/09 06:16:01 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -8,6 +8,7 @@
 package Genezzo::Plan;
 use Genezzo::Util;
 
+use Genezzo::Plan::TypeCheck;
 use Genezzo::Plan::MakeAlgebra;
 use Genezzo::Parse::SQL;
 use Parse::RecDescent;
@@ -21,7 +22,7 @@ use Carp;
 our $VERSION;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 1.2 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.5 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -52,8 +53,14 @@ sub _init
 {
     my $self = shift;
 
+    $self->{dictobj}    = undef; # nothing
     $self->{parser}     = Genezzo::Parse::SQL->new();
     $self->{getAlgebra} = Genezzo::Plan::MakeAlgebra->new();
+
+    my %nargs = @_;
+    $nargs{plan_ctx}    = $self; # add self to args list;
+
+    $self->{typeCheck}  = Genezzo::Plan::TypeCheck->new(%nargs);
 
     # Be stunned and amazed at the power of Perl!
     # Supply a hook to the parser to reroute its error reporting thru GZERR
@@ -145,6 +152,18 @@ sub new
 
 } # end new
 
+# get or set the dictionary object
+sub Dict
+{
+    my $self = shift;
+
+    if (scalar(@_))
+    {
+        $self->{dictobj} = shift;
+    }
+    return $self->{dictobj};    
+}
+
 
 sub Parse
 {
@@ -157,7 +176,7 @@ sub Parse
     my %args = ( # %optional,
                 @_);
 
-    return 0
+    return undef
         unless (Validate(\%args, \%required));
 
     return ($self->{parser}->sql_000($args{statement}));
@@ -196,6 +215,46 @@ sub Algebra
     }
 
     return $self->{getAlgebra}->Convert(parse_tree => $parse_tree);
+
+}
+
+sub TypeCheck
+{
+    my $self = shift;
+
+    my %required = (
+                    algebra   => "no algebra !",
+                    statement => "no sql statement !"
+                    );
+
+    my %args = ( # %optional,
+                @_);
+
+    return undef
+        unless (Validate(\%args, \%required));
+
+    return $self->{typeCheck}->TypeCheck(algebra   => $args{algebra},
+                                         statement => $args{statement},
+                                         dict      => $self->Dict());
+
+}
+
+sub GetFromWhereEtc
+{
+    my $self = shift;
+
+    my %required = (
+                    algebra   => "no algebra !"
+                    );
+
+    my %args = ( # %optional,
+                @_);
+
+    return undef
+        unless (Validate(\%args, \%required));
+
+    return $self->{typeCheck}->GetFromWhereEtc(algebra   => $args{algebra},
+                                               dict      => $self->Dict());
 
 }
 

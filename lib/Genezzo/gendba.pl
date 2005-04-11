@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/gendba.pl,v 6.7 2005/02/02 06:42:50 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/gendba.pl,v 6.8 2005/04/11 08:03:18 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -81,7 +81,7 @@ Genezzo supports some very basic SQL create/drop/alter/describe table,
 select, insert, update and delete syntax, but unlike standard SQL,
 table and column names are case-sensitive.  More complex SQL, such as
 joins, parses, but is ignored.  The only supported functions are
-count(*) and ecount, a non-blocking count estimation function.  The
+count(*) and ecount(*), a non-blocking count estimation function.  The
 database also supports commit to force changes to disk, but no
 rollback.  NOTE: Data definition (such as create table or ct) must be
 manually committed to keep the database in a consistent state.
@@ -93,15 +93,12 @@ guarantee whether the changes will or will not take effect.
     select * from _col1;
     select rid, rownum, tname, colname from _col1;
     select count(*) from _col1;
-    select ecount from _col1;
+    select ecount(*) from _col1;
 
     rem  SELECTs with WHERE, perl and SQL style.
-    rem  This functionality is somewhat fragile
-    rem
-    rem  note use of /x in regexp - fix problem when parser adds extra space
-    select * from _tab1 where tname =~ m/col/x;
+    select * from _tab1 where tname =~ m/col/;
     select * from _tab1 where tid < 5;
-    select * from _tab1 where (numcols > 3) && (numcols < 6);
+    select * from _tab1 where (numcols > 3) AND (numcols < 6);
     select tid as Table_ID, tname Name from _tab1;
 
     rem  Basic INSERT
@@ -113,10 +110,10 @@ guarantee whether the changes will or will not take effect.
     insert into test2 (col1) select col1 from test1;
 
     rem  DELETE with WHERE
-    delete from test1 where (col1 < "bravo") && (col2 > 5);
+    delete from test1 where (col1 < 'bravo') AND (col2 > 5);
 
     rem  UPDATE with WHERE (no subqueries supported)
-    update test2 set col2 = "foo" where col2 is null;
+    update test2 set col2 = 'foo' where col2 is null;
 
     rem CREATE an INDEX
     create index test1_ix on test1(col1);
@@ -168,11 +165,11 @@ Genezzo also supports the following "short" commands: ct, dt, s, i, d, u
   -- you cannot specify a predicate.
 
   example: d emp 1.2.3
-  SQL equivalent: DELETE FROM EMP WHERE RID=1.2.3 ;
+  SQL equivalent: DELETE FROM EMP WHERE RID='1.2.3' ;
 
   example: u emp 1.2.3 wilbur 4
   SQL equivalent: UPDATE EMP SET NAME='wilbur', 
-                                 ID='4' WHERE RID=1.2.3 ;
+                                 ID='4' WHERE RID='1.2.3' ;
 
 
 =back

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/UserExtend.pm,v 1.10 2005/02/02 06:43:24 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/UserExtend.pm,v 1.11 2005/04/11 07:19:12 claude Exp claude $
 #
 # copyright (c) 2004, 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -282,6 +282,8 @@ into Genezzo::GenDBI namespace, versus creating stub functions.
 Use "import" and "export_to_level".
 
 =item Could just load Acme::Everything and we'd be done...
+
+=item Need function "type" information so can validate argument lists, determine return type of function
 
 =back
 

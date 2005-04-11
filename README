@@ -86,15 +86,12 @@ EXAMPLES
     select * from _col1;
     select rid, rownum, tname, colname from _col1;
     select count(*) from _col1;
-    select ecount from _col1;
+    select ecount(*) from _col1;
 
     rem  SELECTs with WHERE, perl and SQL style.
-    rem  This functionality is somewhat fragile
-    rem
-    rem  note use of /x in regexp - fix problem when parser adds extra space
-    select * from _tab1 where tname =~ m/col/x;
+    select * from _tab1 where tname =~ m/col/;
     select * from _tab1 where tid < 5;
-    select * from _tab1 where (numcols > 3) && (numcols < 6);
+    select * from _tab1 where (numcols > 3) AND (numcols < 6);
     select tid as Table_ID, tname Name from _tab1;
 
     rem  Basic INSERT
@@ -106,10 +103,10 @@ EXAMPLES
     insert into test2 (col1) select col1 from test1;
 
     rem  DELETE with WHERE
-    delete from test1 where (col1 < "bravo") && (col2 > 5);
+    delete from test1 where (col1 < 'bravo') and (col2 > 5);
 
     rem  UPDATE with WHERE (no subqueries supported)
-    update test2 set col2 = "foo" where col2 is null;
+    update test2 set col2 = 'foo' where col2 is null;
 
     commit
 
@@ -213,7 +210,7 @@ NEW FEATURES - Indexed Tables
     Failed to insert row 1 in table EMP at lib/Genezzo/gendba.pl line 230
     inserted 0 rows into table EMP.
 
-    gendba 13> select tid, tname, otype from _tab1 where tname = "EMP"
+    gendba 13> select tid, tname, otype from _tab1 where tname = 'EMP'
     tid     tname   otype
     ___     _____   _____
 
@@ -265,7 +262,7 @@ NEW FEATURES - Primary Key Indexes
   uses an index.  In general, additional predicates may accompany the
   equality expression as long as they are ANDed:
 
-      Select * from EMP where ID = 5 and ENAME =~ m/BOB/x
+      Select * from EMP where ID = 5 and ENAME =~ m/BOB/
 
   However, the presence of ORs causes the plan to revert to a full
   table scan:
@@ -396,10 +393,27 @@ NEW FEATURES - multiline SQL statements
   UPDATE, DELETE, and EXPLAIN in the gendba interactive line mode.
   These statements must be terminated by a semicolon.
 
+NEW FEATURES - Improved Parser
+
+  Version 0.39 uses a new parser based upon Parse::RecDescent
+  for SELECT statements.  The new parser is stricter about 
+  quoting conventions and identifier names -- standard identifiers
+  must start with an alpha character, or be specified in double quotes.
+  Only identifiers can be unquoted.  String literals must be in single
+  quotes.  The parser does make an exception for dictionary tables like
+  _tab1 and _col1, which do *not* need to quoted.  Boolean operations
+  must use AND and OR, not && and ||.  || is the SQL string concatenation 
+  operation.  The count estimation function ECOUNT must be specified as
+  ecount(*) in the select list.
+
+  While the parser is smarter, the execution phase is not improved.
+  The select list can still only contain individual columns or count(*)
+  or ecount(*).  Joins, Group By, and Order By are still missing.
+
 
 INCOMPATIBLE CHANGES
 
-  Version 0.31 dictionary and block format is incompatible with
+  Version 0.39 dictionary and block format is incompatible with
   previous releases.  No upgrade path is supported.
   Version 0.33 and 0.32 are compatible with version 0.31.
   Version 0.34 and 0.35 are compatible.  Previously, version 0.34
