@@ -1,5 +1,8 @@
 Revision history for Perl extension Genezzo
 
+0.40 Tue May 10 02:04:16 2005
+        - Allow arbitrary expressions in SELECT lists.
+
 0.39 Mon Apr 11 00:35:29 2005
         - More typechecking and analysis.
         - Phase in new parser for SELECT with the following

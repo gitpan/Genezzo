@@ -99,7 +99,7 @@ sub _init
                       bufcache  => "no buffer cache"
                       );
     my %optional  =  (
-                      dbh_ctx  => {}
+                      dbh_ctx  => {} # XXX XXX XXX: is this used?
                       );
     
     my %args = (@_);

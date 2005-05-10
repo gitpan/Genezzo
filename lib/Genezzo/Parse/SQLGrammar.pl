@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Parse/RCS/SQLGrammar.pl,v 1.17 2005/04/11 07:09:27 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Parse/RCS/SQLGrammar.pl,v 1.20 2005/05/10 09:06:30 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -1348,8 +1348,43 @@ column_constraint_def: constraint_name(?) col_cons
 #
 # XXX XXX XXX XXX: 
 # allow double colon in function names 
+
+#        pkg_sep_chr    : '::'
+#{ $return = $item[1] }
+
+#        func_pkg_name  : bareword pkg_sep_chr
+#{
+#    print Data::Dumper->Dump(\@item,['@item']);
+#    print Data::Dumper->Dump([%item],['%item']);
+#    print "\n";
 #
-        function_name: ...!reserved_non_funcs /[a-z]\w*/i
+#    $return = $item[1] . '::';
+#}
+
+#        function_name: func_pkg_name(?) function_base_name 
+        function_name: function_base_name 
+{
+#    print Data::Dumper->Dump(\@item,['@item']);
+#    print Data::Dumper->Dump([%item],['%item']);
+#    print "\n";
+
+    if ((exists($item{'func_pkg_name(?)'}))
+        && (defined($item{'func_pkg_name(?)'}))
+        && (scalar(@{$item{'func_pkg_name(?)'}})))
+    {
+
+        $return =
+            $item{'func_pkg_name(?)'}->[0] .
+            $item{function_base_name};
+    }
+    else
+    {
+        $return = $item{function_base_name};
+    }
+    $return;
+}
+
+        function_base_name: ...!reserved_non_funcs /[a-z]\w*/i
 #        function_name: ...!reserved_non_funcs /([a-z]\w*)((::)\w*)?/i
 { $return = $item[-1] }
 

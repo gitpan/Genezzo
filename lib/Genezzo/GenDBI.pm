@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 6.30 2005/04/11 07:08:25 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 6.33 2005/05/10 09:10:08 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -49,11 +49,11 @@ BEGIN {
 	
 }
 
-our $VERSION   = '0.39';
+our $VERSION   = '0.40';
 our $RELSTATUS = 'Alpha'; # release status
 # grab the code check-in date and convert to YYYYMMDD
 our $RELDATE   = 
-    do { my @r = (q$Date: 2005/04/11 07:08:25 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
+    do { my @r = (q$Date: 2005/05/10 09:10:08 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
 
 our $errstr; # DBI errstr
 
@@ -1558,6 +1558,16 @@ sub _SQLselprep2
 
     # XXX: no joins supported yet!
 
+# XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX 
+# XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX 
+# XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX 
+# move to XEval
+# XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX 
+# XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX 
+# XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX 
+# XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX 
+
+
     my ($tc, $from, $sel_list, $where) = 
         $self->{plan}->GetFromWhereEtc(algebra   => $sql_cmd);
 
@@ -1605,15 +1615,25 @@ sub _SQLselprep2
 
         if (!defined($val))
         {
-            my $msg = "cannot process column for $nam";
-            my %earg = (self => $self, msg => $msg,
-                        severity => 'warn');
-        
-            &$GZERR(%earg)
-                if (defined($GZERR));
+            # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
+            # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
+            # placeholder - not necessary anymore
+            # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
+            # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
+#            $val = '$tc_rid';
+            $val = '$rid';
+            if (0)
+            {
 
-            return undef;
-
+                my $msg = "cannot process column for $nam";
+                my %earg = (self => $self, msg => $msg,
+                            severity => 'warn');
+                
+                &$GZERR(%earg)
+                    if (defined($GZERR));
+                
+                return undef;
+            }
         }
 
         push @colpairs, [$val, $nam];
@@ -1945,7 +1965,7 @@ sub SQLWhere2
     my %args = (@_);
 
     my $tablename = $args{tablename};
-    my $where = $args{where};
+    my $where     = $args{where};
 
 #    greet $where;
 
@@ -1965,6 +1985,7 @@ sub SQLWhere2
 
     my $AndPurity = 0;    # WHERE clauses of ANDed predicates may
     my $AndTokens = [];   # be suitable for index lookups, but ORs
+                          # can be a problem.  Test for "And Purity".
 
     $filterstring .= $where->[0]->{sc_tree}->{vx};
 
@@ -2732,7 +2753,8 @@ sub HCountPrepare
         
 	last unless $dictobj->DictTableExists (tname => $tablename);
 
-        push @outi, $tablename;
+        my $prep_th = {tablename => $tablename};
+        push @outi, $prep_th;
         push @outi, "HCOUNT";
         push @outi, ["COUNT(*)"];
         push @outi, [
@@ -2817,7 +2839,8 @@ sub ECountPrepare
         
 	last unless $dictobj->DictTableExists (tname => $tablename);
 
-        push @outi, $tablename;
+        my $prep_th = {tablename => $tablename};
+        push @outi, $prep_th;
         push @outi, "ECOUNT";
         my @colaliaslist = ("ESTIMATE", "CURRENT", "STDDEV", "PCT_COMPLETE");
         push @outi, \@colaliaslist;
@@ -3169,10 +3192,28 @@ sub SelectPrepare
                 }
                 next L_PPL;
             }
-     
-            my ($colnum, $coltype)
-                = $dictobj->DictTableColExists (tname => $tablename,
-                                                colname => $colname);
+
+            my ($colnum, $coltype);
+
+            if (defined($args{select_list}))
+            {
+                # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
+                # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
+                # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
+                # code now in typecheck
+                # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
+                # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
+                # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
+
+                $colnum = 1;
+                $coltype = 'c';
+            }
+            else
+            {
+                ($colnum, $coltype)
+                    = $dictobj->DictTableColExists (tname => $tablename,
+                                                    colname => $colname);
+            }
             if ($colnum)
             {
                 push @colaliaslist, $colalias ;
@@ -3190,7 +3231,13 @@ sub SelectPrepare
 
         @outi = (); # clear colnames
 
-        push @outi, $tablename;
+        my $prep_th = {tablename => $tablename};
+        if (defined($args{select_list}))
+        {
+            $prep_th->{select_list} = $args{select_list};
+        }
+
+        push @outi, $prep_th;
         push @outi, "SELECT";
         # Note: save the column alias list for GStatement::execute
         push @outi, \@colaliaslist;
@@ -3204,10 +3251,11 @@ sub SelectPrepare
 
 sub SelectExecute
 {
-    my $self = shift @_;
-    my $tablename = shift @_;
-    my $filter = pop @_;
-    my $dictobj = $self->{dictobj};
+    my $self      = shift @_;
+    my $prep_th   = shift @_;
+    my $tablename = $prep_th->{tablename};
+    my $filter    = pop @_;
+    my $dictobj   = $self->{dictobj};
     my @outi;
 
 #    greet $filter;
@@ -3225,11 +3273,41 @@ sub SelectExecute
 
     # XXX XXX: ok to sqlexecute even for hcount, ecount
     {
+        use Genezzo::Row::RSExpr;
+
         my $tv = tied(%{$hashi});
+
+        my %nargs = (
+                     GZERR     => $self->{GZERR},
+                     rs        => $tv
+                     );
+
+        if (exists($prep_th->{select_list}))
+        {
+            $nargs{select_list} = $prep_th->{select_list};
+        }
+
+        # XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX
+        # XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX
+        # XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX
+        # XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX
+        # XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX
+        my %rsx_h;
+        my $rsx_tv = tie %rsx_h, 'Genezzo::Row::RSExpr', %nargs;
+
         my %prep;
         $prep{filter} = $filter    # fix for hcount/ecount
             if (defined($filter)); # where filter is undef
-        $sth = $tv->SQLPrepare(%prep);
+
+        if (1)
+        {
+            $sth = $rsx_tv->SQLPrepare(%prep);
+            $hashi = \%rsx_h;
+        }
+        else
+        {
+            $sth = $tv->SQLPrepare(%prep);
+        }
         return @outi
             unless ($sth->SQLExecute());
     }
@@ -3264,18 +3342,39 @@ sub SelectFetch
     {
         my $tv = tied(%{$hashi});
 
+        my $got_select_list = $tv->SelectList();
+
+      L_w1:
         while (1)
         {
             my $vv;
 
             ($kk, $vv) = $sth->SQLFetch($kk);
+            greet $kk, $vv;
 
-            last
+            last L_w1
                 unless (defined($kk));
 
-            next # XXX XXX: skip bad rows
-                unless (defined($vv));
+            unless (defined($vv))
+            {
+                greet "bad row for key $kk";
+                next L_w1; # XXX XXX: skip bad rows
+            }
             my @rarr = @{ $vv };
+
+            if (defined($got_select_list))
+            {
+                # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
+                # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
+                # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
+                # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
+                # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
+                # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
+
+                @outi = ();
+                push @outi, @rarr;
+                last L_w1;
+            }
 
 	    foreach my $coldef (@{$collist})
 	    {
@@ -3303,7 +3402,7 @@ sub SelectFetch
                     push @outi, $rval;
                 }
             }
-            last;
+            last L_w1;
         } # end while
     }
 
@@ -3314,7 +3413,7 @@ sub SelectFetch
         unshift @outi, $kk;
     }
 
-#    greet @outi;
+    greet @outi;
 
     return @outi;
 	
@@ -3342,6 +3441,11 @@ sub SelectPrint
     }
 
     {
+        my $tv = tied(%{$hashi});
+
+        my $got_select_list = $tv->SelectList();
+
+
         # print column name headers
         foreach my $coldef (@{$collist})
         {
@@ -3373,6 +3477,28 @@ sub SelectPrint
             my @rarr = @{ $vv };
 
             $rownum++;
+
+
+            if (defined($got_select_list))
+            {
+                # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
+                # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
+                # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
+                # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
+                # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
+                # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
+                
+                for my $colval (@rarr)
+                {
+                    $colval = '<undef>' # NOTE: deal with undefs
+                        unless (defined($colval));
+                    
+                    print $colval ;
+                    print "\t";
+                }
+                print "\n";
+                next;
+            }
 
 	    foreach my $coldef (@{$collist})
 	    {
@@ -4512,19 +4638,21 @@ sub _fetchrow_internal
         unless ($fetchtype =~ m/^HASHREF$/);
 
     # XXX XXX: fix here too
+#    print Data::Dumper->Dump([$self->{sel_ex}->[3]]), "\n";
     my $colnames = $self->{sel_ex}->[3];
 
-    my $outi = {};
+    my $outi2 = {};
 
     for my $i (0..scalar(@{$colnames}))
     {
         my $v1 = $colnames->[$i];
-        $outi->{$v1} = shift @val;
+        $outi2->{$v1} = shift @val;
         last
             unless (scalar(@val));
     }
+#    print Data::Dumper->Dump([$outi2]), "\n";
 
-    return $outi;
+    return $outi2;
 } # end _fetchrow_internal
 
 sub fetchall_arrayref
@@ -4580,6 +4708,7 @@ sub fetchrow_array
     # re-execute in the middle of a fetch?
 
 #    greet $self->{prevkey}, $self->{rownum};
+#    print Data::Dumper->Dump([$self->{prevkey}, $self->{rownum}]), "\n";
 
     my ($key, $rownum, @vals) = 
         $self->{gnz_h}->SelectFetch(
@@ -4587,6 +4716,7 @@ sub fetchrow_array
                                     $self->{rownum},
                                     @{$self->{sel_ex}});
 #    greet $k2, $rownum;
+#    print Data::Dumper->Dump([$key, $rownum]), "\n";
     $self->{prevkey} = $key;
     $self->{rownum} = $rownum
         if (defined($rownum));

@@ -27,6 +27,7 @@ lib/Genezzo/gendba.pl
 lib/Genezzo/genexp.pl
 lib/Genezzo/Row/RSIdx1.pm
 lib/Genezzo/Row/RSTab.pm
+lib/Genezzo/Row/RSExpr.pm
 lib/Genezzo/Row/RSFile.pm
 lib/Genezzo/Row/RSBlock.pm
 lib/Genezzo/SpaceMan/SMFile.pm

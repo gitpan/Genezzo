@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Plan/RCS/TypeCheck.pm,v 1.14 2005/04/11 07:58:57 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Plan/RCS/TypeCheck.pm,v 1.15 2005/05/10 09:09:27 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -17,7 +17,7 @@ use Carp;
 our $VERSION;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 1.14 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.15 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -1406,7 +1406,12 @@ sub _sql_where
             {
                 if ($genTree->{tc_column_name} =~ m/^rid$/i)
                 {
+#                    $genTree->{vx} = '$tc_rid';
                     $genTree->{vx} = '$rid';
+                }
+                if ($genTree->{tc_column_name} =~ m/^rownum$/i)
+                {
+                    $genTree->{vx} = '$tc_rownum';
                 }
             }
         }

@@ -165,13 +165,15 @@ our $GZERR = sub {
     }
 
     my $sth = $dbh->prepare(
-        "select tid, tname from _tab1 where tname =~ m/aaa_cons/x");
+#        "select tid, tname from _tab1 where tname =~ m/aaa_cons/x");
+        "select tid, tname from _tab1 where tname = \'aaa_cons\'");
 
     print $sth->execute(), " rows \n";
 
     my $f1 = $sth->fetchrow_hashref();
 
     my $aaa_tid = $f1->{'tid'};
+    print "tid: ",$aaa_tid, "\n";
 
     # 4 constraints on aaa_cons
     $sth = $dbh->prepare("select * from cons1 where tid = $aaa_tid");

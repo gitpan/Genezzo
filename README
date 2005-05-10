@@ -410,10 +410,13 @@ NEW FEATURES - Improved Parser
   The select list can still only contain individual columns or count(*)
   or ecount(*).  Joins, Group By, and Order By are still missing.
 
+  Version 0.40 allows arbitrary expressions in SELECT lists, e.g:
+
+      Select tid+5/2 from _tab1;
 
 INCOMPATIBLE CHANGES
 
-  Version 0.39 dictionary and block format is incompatible with
+  Version 0.40 dictionary and block format is incompatible with
   previous releases.  No upgrade path is supported.
   Version 0.33 and 0.32 are compatible with version 0.31.
   Version 0.34 and 0.35 are compatible.  Previously, version 0.34

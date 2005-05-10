@@ -71,6 +71,8 @@ rmtree($gnz_home, 1, 1);
     use Genezzo::Havok;
 
     my $dbh = Genezzo::GenDBI->connect($gnz_home, "NOUSER", "NOPASSWORD");
+#    my $dbh = Genezzo::GenDBI->new(exe => $0, gnz_home => $gnz_home,  defs => {_QUIETWHISPER=>0});
+
 
     unless (defined($dbh))
     {
@@ -213,29 +215,30 @@ Lissajous
                ' soundex(sname) = ' .
                ' soundex(\''. $a2 . '\') ' ;
 
-        greet $s1;
+#        greet $s1;
+#        print $s1, "\n";
 
         my $sth = $dbh->prepare($s1);
 
         print $sth->execute(), " rows \n";
 
-        my @f1 = $sth->fetchrow_array();
-        unless (scalar(@f1))
+        for my $loopi (1..2)
         {
-            not_ok ("no match for first fetch $a1, $a2");
-        }
+            my @f1 = $sth->fetchrow_array();
 
-        while (scalar(@f1))
-        {
-            if ($f1[0] =~ m/$a1|$a2/)
+            if (scalar(@f1))
             {
-                ok();
+                if ($f1[0] =~ m/$a1|$a2/)
+                {
+#                    print "$loopi: ",$f1[0], "\n";
+                    ok();
+                }
+                next;
             }
             else
             {
-                not_ok ("no match for fetch $a1, $a2");
+                not_ok ("no match for fetch $loopi: $a1, $a2");
             }
-            @f1 = $sth->fetchrow_array();
         }
 
     }
