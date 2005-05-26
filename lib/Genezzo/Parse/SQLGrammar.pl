@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Parse/RCS/SQLGrammar.pl,v 1.20 2005/05/10 09:06:30 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Parse/RCS/SQLGrammar.pl,v 1.25 2005/05/25 07:43:08 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -239,8 +239,10 @@ $grammar .=  "/i \n\n";
 { $return = {sql_create => $item{sql_create}}}
                 | <error: unknown or invalid command>
 
-        sql_alter  : ALTER_ <commit> ddl_object
-{ $return = $item{ddl_object}}
+#        sql_alter  : ALTER_ <commit> ddl_object
+#{ $return = $item{ddl_object}}
+        sql_alter  : ALTER_ <commit> alter_guts
+{ $return = $item{alter_guts}}
 
         sql_create : CREATE_ <commit> create_guts
 { $return = $item{create_guts}}
@@ -248,7 +250,7 @@ $grammar .=  "/i \n\n";
         sql_drop   : DROP_ <commit> ddl_object
 { $return = $item{ddl_object}}
 
-        ddl_object : TABLE_ table_name
+        ddl_object : TABLE_ table_name 
 { $return = { table_name   => $item{table_name} }}    
                    | VIEW_  table_name
 { $return = { view_name   => $item{table_name} }}    
@@ -256,6 +258,12 @@ $grammar .=  "/i \n\n";
 { $return = { index_name   => $item{table_name} }}    
                    | /TABLESPACE/i  table_name
 { $return = { tablespace_name   => $item{table_name} }}    
+
+       alter_guts : TABLE_ table_name add_table_cons
+{ $return = { table_name     => $item{table_name},
+              add_table_cons => $item{add_table_cons}
+          }
+}    
 
        create_guts : TABLE_ table_name create_table_def
 { $return = { table_name   => $item{table_name},
@@ -279,7 +287,7 @@ $grammar .=  "/i \n\n";
 # XXX XXX: need some sort of storage clause before ctas
    create_table_def: table_constraint_def(?) 
                      table_element_list(?) ct_as_select(?)
-{ $return = {column_list      => $item{'table_element_list(?)'},
+{ $return = {tab_column_list  => $item{'table_element_list(?)'},
              table_query      => $item{'ct_as_select(?)'},
              table_constraint => $item{'table_constraint_def(?)'}
          }
@@ -332,10 +340,50 @@ column_constraint_def: constraint_name(?) col_cons
                   | sqCHECK_ '(' search_cond ')'
 
    table_cons     : UNIQUE column_list 
+{$return = {operator => $item[1],
+            cons_type => 'unique',
+            operands => $item{column_list}, # XXX XXX XXX: cleanup
+            column_list => $item{column_list}
+        }
+}
                   | PRIMARY KEY column_list
+{$return = {operator => $item[1],
+            cons_type => 'primary_key',
+            operands => $item{column_list}, # XXX XXX XXX: cleanup
+            column_list => $item{column_list}
+        }
+}
                   | FOREIGN KEY column_list 
                     REFERENCES_ big_id '(' identifier ')'
+{$return = {operator => $item[1],
+            cons_type => 'foreign_key',
+            operands => 
+            {
+                column_list => $item{column_list},
+                table       => $item{big_id},
+                keycol      => $item{identifier}
+            }
+        }
+}
                   | sqCHECK_ '(' search_cond ')'
+{
+#
+# get start/stop position for search condition
+#
+    my $p1 = $itempos[3]{offset}{from};
+    my $p2 = $itempos[3]{offset}{to};
+    $return = {operator => $item[1],
+               cons_type => 'check',
+               operands => {
+                   p1 => $p1,
+                   p2 => $p2,
+                   sc_tree => $item{search_cond}
+               }
+           };
+}
+
+   add_table_cons : ADD_ table_constraint_def
+{$return = $item{table_constraint_def}}
 
      col_char_len : '(' numeric_literal ')'
 { $return = $item{numeric_literal} }
@@ -530,10 +578,27 @@ column_constraint_def: constraint_name(?) col_cons
 #                    { my $foo = [$item[2]]; push @{$foo}, $item[1]; $foo;}    
         sql_insert  : INSERT_ <commit> INTO_ table_name <commit>
                       column_list(?) insert_values
-{ $return = { table_name  => $item{table_name},
-              column_list => $item{'column_list(?)'},
-              insert_values => $item{insert_values}
-          }
+{
+
+    my $tabinfo = {
+        table_name  => $item{table_name}
+    };
+    if (scalar(@{$item{'column_list(?)'}}))
+    {
+        # get the optional column list if it exists
+        $tabinfo->{column_list} = $item{'column_list(?)'}->[0];
+    }
+    my $t1 = {insert_tabinfo => $tabinfo};
+    my $t2 = {insert_values  => $item{insert_values}};
+    $return = [
+               # NOTE: split the table info from "values" to create
+               # separate, non-nested query blocks.  Needs to be an
+               # array to force ordering of qb's, since query block 1
+               # must precede query block 2 if not nested, and a hash
+               # doesn't guarantee traversal order.
+               $t1,
+               $t2
+               ];
 }
         sql_update  : UPDATE_ <commit> table_name SET_
                       update_set_exprlist where_clause(?)
@@ -1110,11 +1175,21 @@ column_constraint_def: constraint_name(?) col_cons
 
 
         bool_TFN    : TRUE
-{ $return = $item[1] }    
+{ $return = {tfn_literal   => 1,
+             tc_expr_type  => 'n'
+         }
+}
                     | FALSE
-{ $return = $item[1] }    
+{ $return = {tfn_literal   => 0,
+             tc_expr_type  => 'n'
+         }
+}
                     | NULL
-{ $return = $item[1] }    
+{ $return = {tfn_literal   => undef,
+             tc_expr_type  => 'n'
+         }
+}
+
         bool_isTFN  : IS NOT(?) bool_TFN
 { $return = { not => $item{'NOT(?)'},
               TFN => $item{bool_TFN}
@@ -1390,7 +1465,7 @@ column_constraint_def: constraint_name(?) col_cons
 
 
 # XXX XXX: CHEAT - allow genezzo dictionary tables unquoted
- 	bareword: ...!reserved_word /([a-z]\w*)|(_tab1|_col1|_pref1|_tspace|_tsfiles)/i
+ 	bareword: ...!reserved_word /([a-z]\w*)|((_tab1|_col1|_pref1|_tspace|_tsfiles)(?!([a-z0-9_])))/i
 { $return = $item[-1] }
         numeric_literal :   /[+-]?(?=\d|\.\d)\d*(\.\d*)?([Ee]([+-]?\d+))?/
 { $return = $item[1] }

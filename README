@@ -414,13 +414,16 @@ NEW FEATURES - Improved Parser
 
       Select tid+5/2 from _tab1;
 
+  Version 0.41 adds support for the literals TRUE, FALSE, and NULL,
+  and extends the new parser to cover ALTER TABLE, DELETE, and INSERT.
+  INSERT can now handle arbitrary expressions, e.g:
+
+     Insert into mytable values (1+1, 2*2, 3/4);
+
 INCOMPATIBLE CHANGES
 
-  Version 0.40 dictionary and block format is incompatible with
+  Version 0.41 dictionary and block format is incompatible with
   previous releases.  No upgrade path is supported.
-  Version 0.33 and 0.32 are compatible with version 0.31.
-  Version 0.34 and 0.35 are compatible.  Previously, version 0.34
-  was incorrectly listed as compatible with 0.33, etc.  
 
 SEE ALSO
 

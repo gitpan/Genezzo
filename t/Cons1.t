@@ -139,7 +139,7 @@ our $GZERR = sub {
         not_ok ("could not add primary key");
     }
     if ($dbh->do(
-        'alter table aaa_cons add constraint AAA_CK check (col1 != "foo")'))
+        'alter table aaa_cons add constraint AAA_CK check (col1 != \'foo\')'))
     {       
         ok();
     }
@@ -254,7 +254,7 @@ our $GZERR = sub {
     }
 
     $sth = 
-        $dbh->prepare('insert into aaa_cons values ("a", 1, "foo", "b", 2, "baz")');
+        $dbh->prepare('insert into aaa_cons values (\'a\', 1, \'foo\', \'b\', 2, \'baz\')');
 
     greet $sth->rows;
 
@@ -268,7 +268,7 @@ our $GZERR = sub {
     }
 
     $sth = 
-        $dbh->prepare('insert into aaa_cons values ("a", 3, "foo")');
+        $dbh->prepare('insert into aaa_cons values (\'a\', 3, \'foo\')');
 
     greet $sth->rows;
 
@@ -282,7 +282,7 @@ our $GZERR = sub {
     }
 
     $sth = 
-        $dbh->prepare('insert into aaa_cons values ("c", 3, "foo")');
+        $dbh->prepare('insert into aaa_cons values (\'c\', 3, \'foo\')');
 
     greet $sth->rows;
 
@@ -296,7 +296,7 @@ our $GZERR = sub {
     }
 
     $sth = 
-        $dbh->prepare('insert into aaa_cons values ("c", 2, "foo")');
+        $dbh->prepare('insert into aaa_cons values (\'c\', 2, \'foo\')');
 
     greet $sth->rows;
 
@@ -310,7 +310,7 @@ our $GZERR = sub {
     }
 
     $sth = 
-        $dbh->prepare('update aaa_cons set col1="foo" where col3 = "foo"');
+        $dbh->prepare('update aaa_cons set col1=\'foo\' where col3 = \'foo\'');
 
     greet $sth->rows;
 

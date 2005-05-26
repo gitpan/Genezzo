@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Plan.pm,v 1.5 2005/04/09 06:16:01 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Plan.pm,v 1.8 2005/05/23 07:29:55 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -22,7 +22,7 @@ use Carp;
 our $VERSION;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 1.5 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.8 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -247,16 +247,116 @@ sub GetFromWhereEtc
                     algebra   => "no algebra !"
                     );
 
-    my %args = ( # %optional,
+    my %args = (#%optional,
                 @_);
 
     return undef
         unless (Validate(\%args, \%required));
 
-    return $self->{typeCheck}->GetFromWhereEtc(algebra   => $args{algebra},
-                                               dict      => $self->Dict());
+    $args{dict}  = $self->Dict();
+
+    return $self->{typeCheck}->GetFromWhereEtc(%args);
 
 }
+
+sub SQLWhere2
+{
+#    whoami;
+    my $self = shift;    
+    my $dictobj = $self->{dictobj};
+    my %args = (@_);
+
+    my $tablename = $args{tablename};
+    my $where     = $args{where};
+
+#    greet $where;
+
+
+    # XXX XXX: filter will complain about "uninitialized" strings
+
+    my $filterstring = '
+   $filter = sub {
+
+        no warnings qw(uninitialized); # shut off null string warnings
+
+        my ($tabdef, $rid, $outarr) = @_;
+        return 1
+            if (defined($outarr) &&
+                scalar(@{$outarr}) &&
+                ( ';
+
+    my $AndPurity = 0;    # WHERE clauses of ANDed predicates may
+    my $AndTokens = [];   # be suitable for index lookups, but ORs
+                          # can be a problem.  Test for "And Purity".
+
+    if (defined($where->[0]->{sc_tree}->{vx}))
+    {
+        $filterstring .= $where->[0]->{sc_tree}->{vx}
+    }
+    else
+    {
+        # handle NULL/UNDEF
+        $filterstring .= ' undef';
+    }
+
+    $filterstring .= "));};";
+
+    my $where_text = $where->[0]->{sc_txt};
+    $AndPurity     = $where->[0]->{sc_and_purity};
+
+#    greet $filterstring;
+#    greet "pure", $AndPurity, @AndTokens;
+    $AndTokens = $where->[0]->{sc_index_keys}
+       if ($AndPurity);
+
+    my $filter;     # the anonymous subroutine which is the 
+                    # result of eval of filterstring
+
+    my $status;
+
+    my ($msg, %earg);
+    my $badparse;
+    if ($badparse)
+    {
+        %earg = (self => $self, msg => $msg,
+                 severity => 'warn');
+                    
+        &$GZERR(%earg)
+            if (defined($GZERR));
+    }
+    else
+    {
+        $status = eval " $filterstring ";
+    }
+
+    unless (defined($status))
+    {
+        $msg = "";
+#        warn $@ if $@;
+        $msg .= $@ 
+            if $@;
+        $msg .= "\nbad filter:\n";
+        $msg .= $filterstring . "\n";
+        $msg .= "\nWHERE clause:\tWHERE " . $where_text . "\n";
+        %earg = (self => $self, msg => $msg,
+                 severity => 'warn');
+                    
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
+        return undef;
+    }
+#    greet $filter; 
+
+    my %hh = (idxfilter => $AndTokens);
+    $hh{filter} = $filter
+        if (defined($filter));
+    $hh{where_text} = $where_text;
+    $hh{filter_text} = $filterstring;
+#    greet %hh;
+    return \%hh;
+} # end SQLWhere2
+
 
 
 END { }       # module clean-up code here (global destructor)

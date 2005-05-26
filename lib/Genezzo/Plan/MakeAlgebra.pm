@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Plan/RCS/MakeAlgebra.pm,v 1.5 2005/03/29 08:36:48 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Plan/RCS/MakeAlgebra.pm,v 1.8 2005/05/26 07:46:36 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -17,7 +17,7 @@ use Carp;
 our $VERSION;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 1.5 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.8 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -98,10 +98,38 @@ sub Convert # public
     my $parse_tree = $args{parse_tree};
 
     my $current_qb = {qb => 0};
+
+    # Note: handle "query blocks" for non-query statements,
+    # e.g.  UPDATE, DELETE (but not INSERT)
+
+    unless (exists($parse_tree->{sql_query}))
+    {
+        $current_qb->{qb} = 1;
+
+        if (exists($parse_tree->{sql_insert}))
+        {
+
+#                && exists($parse_tree->{sql_insert}->{insert_values})
+#                && (ref($parse_tree->{sql_insert}->{insert_values}) ne 'ARRAY')
+#                )
+
+            # NOTE: create first query block in insert_tabinfo subtree
+            # (which is a sibling, not a parent of subtree
+            # "insert_values") in order to have separate, non-nested
+            # query blocks
+            my $op1 = $parse_tree->{sql_insert}->[0];
+            $op1->{insert_tabinfo}->{query_block} = 1;
+        }
+        else
+        {
+            $parse_tree->{query_block} = 1;
+        }
+    }
     my $alg = convert_algebra($parse_tree, $current_qb);
 
     # label parent query blocks
     $current_qb = {qb => 0, qb_parent => []};
+
     $alg = $self->_label_qb($alg, $current_qb);
     return $alg;
 }
@@ -423,6 +451,8 @@ use Genezzo::Plan::MakeAlgebra;
 
 =head1 DESCRIPTION
 
+This module converts a SQL parse tree into a set of relational algebra
+operations.
 
 =head1 ARGUMENTS
 
@@ -449,7 +479,7 @@ use Genezzo::Plan::MakeAlgebra;
 
 =over 4
 
-=item update pod
+=item need additional work for non-query operations/special cases
 
 =back
 

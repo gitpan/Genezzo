@@ -132,7 +132,7 @@ rmtree($gnz_home, 1, 1);
         not_ok ("could not create table sonictest");
     }
     if ($dbh->do(
-        "insert into sonictest values (Euler, Ellery, Gauss, Ghosh)"))
+        'insert into sonictest values (\'Euler\', \'Ellery\', \'Gauss\', \'Ghosh\')'))
     {       
         ok();
     }
@@ -141,7 +141,7 @@ rmtree($gnz_home, 1, 1);
         not_ok ("could not insert into sonictest");
     }
     if ($dbh->do(
-        "insert into sonictest values (Hilbert, Heilbronn, Knuth, Kant)"))
+        'insert into sonictest values (\'Hilbert\', \'Heilbronn\', \'Knuth\', \'Kant\')'))
     {       
         ok();
     }
@@ -150,7 +150,7 @@ rmtree($gnz_home, 1, 1);
         not_ok ("could not insert into sonictest");
     }
     if ($dbh->do(
-        "insert into sonictest values (Lloyd, Ladd, Lukasiewicz, Lissajous)"))
+        'insert into sonictest values (\'Lloyd\', \'Ladd\', \'Lukasiewicz\', \'Lissajous\')'))
     {       
         ok();
     }

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Plan/RCS/TypeCheck.pm,v 1.15 2005/05/10 09:09:27 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Plan/RCS/TypeCheck.pm,v 1.22 2005/05/26 07:46:36 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -17,7 +17,7 @@ use Carp;
 our $VERSION;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 1.15 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.22 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -422,6 +422,12 @@ sub _check_table_info # private
 
         while ( my ($kk, $vv) = each ( %{$genTree})) # big while
         {
+
+            # XXX XXX XXX: may be an issue here on whether hash
+            # traversal sees alias before tablename -- sometimes get
+            # spurious warning on INSERT - duplicate table name
+            # XXX XXX XXX XXX XXX 
+
             if ($kk !~ m/^tc_table_fullname$/)
             {
                 $genTree->{$kk} = $self->$subname($vv, $dict);
@@ -445,6 +451,8 @@ sub _check_table_info # private
                 # query block
                 my $current_qb = $treeCtx->{qb_list}->[0];
                 my $tablist    = $treeCtx->{tablist}->[$current_qb]->{tables};
+
+
 
                 # use the alias, rather than the tablename -- this is
                 # ok since the alias points to the base table info.
@@ -783,7 +791,19 @@ sub _get_col_alias # private
 
         while ( my ($kk, $vv) = each ( %{$genTree})) # big while
         {
-            if ($kk !~ m/^(column_name|col_alias)$/)
+            if ($kk =~ m/^(column_list)$/)
+            {
+                $genTree->{tc_column_list} = [];
+
+                for my $all_cols (@{$genTree->{$kk}})
+                {
+                    my @full_name = _process_name_pieces(@{$all_cols});
+                    # build a "dot" separated string
+                    my $full_name_str = join('.', @full_name);
+                    push @{$genTree->{tc_column_list}}, $full_name_str;
+                }
+            }
+            elsif ($kk !~ m/^(column_name|col_alias)$/)
             {
                 $genTree->{$kk} = $self->$subname($vv, $dict);
             }
@@ -1421,6 +1441,11 @@ sub _sql_where
             $genTree->{vx} = $genTree->{numeric_literal};
         }
 
+        if (exists($genTree->{tfn_literal}))
+        {
+            $genTree->{vx} = $genTree->{tfn_literal};
+        }
+
         if (exists($genTree->{string_literal}))
         {
             $genTree->{vx} = $genTree->{string_literal};
@@ -1511,11 +1536,11 @@ sub _sql_where
                 }
             }
 
-            my $tfn1 = $genTree->{IS}->[0]->{TFN}->[0];
+            my $tfn1 = $genTree->{IS}->[0]->{TFN}->{tfn_literal};
             my $not1 = scalar(@{$genTree->{IS}->[0]->{not}});
 
             my $s2;
-            if ($tfn1 =~ m/null/i)
+            if (!(defined($tfn1)))
             {
                 # not null = is defined
                 $s2 = '(';
@@ -1533,7 +1558,7 @@ sub _sql_where
                 # not true = is false
                 $s2 = '(('.$bigstr .') == ';
                 my $tf_val = ($not1) ? 1 : 0;
-                if ($tfn1 =~ m/true/i)
+                if ($tfn1) # true
                 {
                     $tf_val = ($not1) ? 0 : 1;
                 }
@@ -1579,7 +1604,15 @@ sub _sql_where
                 {
                     if (exists($op1->{vx}))
                     {
-                        $bigstr .= $op1->{vx} . ' ';
+                        if (defined($op1->{vx}))
+                        {
+                            $bigstr .= ' ' . $op1->{vx} ;
+                        }
+                        else
+                        {
+                            # handle NULL/UNDEF
+                            $bigstr .= ' undef';
+                        }
                     }
                 }
                 elsif (ref($op1) eq 'ARRAY')
@@ -1614,7 +1647,42 @@ sub _sql_where
 
         if (exists($genTree->{function_name}))
         {
-            my $bigstr = ' ' . $genTree->{function_name} . '( ';
+            my $foundIt = 0;
+            my $fn_name = 'Genezzo::GenDBI::'. $genTree->{function_name};
+
+            # look in GenDBI namespace first, then system
+            for my $numtries (1..2)
+            {
+                # check if function exists
+                if (defined(&$fn_name))
+                {
+                    $foundIt = 1;
+                    last;
+                } 
+                last
+                    if ($numtries > 1);
+                $fn_name = $genTree->{function_name};
+                # XXX XXX XXX XXX: how to do check for MAIN functions?
+                $foundIt = 1;
+                last; # XXX XXX XXX XXX: how to do check for MAIN functions?
+                # XXX XXX XXX also min, max, count, in, any, etc
+            }
+
+            unless ($foundIt)
+            {
+                my $msg = "function \'$fn_name\' not found\n";
+                
+                my %earg = (self => $self, msg => $msg,
+                            severity => 'warn');
+                
+                &$GZERR(%earg)
+                    if (defined($GZERR));
+                
+#                       return undef; # XXX XXX XXX XXX
+            }
+
+
+            my $bigstr  = ' ' . $fn_name . '( ';
             
             # 
 
@@ -1636,7 +1704,15 @@ sub _sql_where
                         if (exists($op1->{vx}))
                         {
                             $bigstr .= ',' if ($cnt_ff);
-                            $bigstr .= ' ' . $op1->{vx} ;
+                            if (defined($op1->{vx}))
+                            {
+                                $bigstr .= ' ' . $op1->{vx} ;
+                            }
+                            else
+                            {
+                                # handle NULL/UNDEF
+                                $bigstr .= ' undef';
+                            }
                         }
                         $cnt_ff++;
                     }
@@ -1666,9 +1742,11 @@ sub GetFromWhereEtc
                     algebra   => "no algebra !",
                     dict      => "no dictionary !"
                     );
-    
-    my %args = ( # %optional,
-                 @_);
+
+    my %optional = (top_cmd => "SELECT");
+
+    my %args = (%optional,
+                @_);
     
     return undef
         unless (Validate(\%args, \%required));
@@ -1680,9 +1758,19 @@ sub GetFromWhereEtc
     $self->{tc4} = $tc4;
 
     # local tree walk state
+    $tc4->{top_qb_num} = 1;     # top query block number is 1
+    if ($args{top_cmd} =~ m/INSERT/i)
+    {
+        # NOTE: "top" query block number 2 for INSERT...SELECT 
+        # (use qb 1 to resolve insert table/column info)
+        $tc4->{top_qb_num} = 2; 
+    }
+
     $tc4->{qb_list} = []; # build an arr starting with current query block num
     $tc4->{index_keys} = []             # only build index keys 
         if ($self->{tc3}->{AndPurity}); # if pure AND search condition
+
+    greet $tc4;
 
     $algebra = $self->_get_from_where($algebra, $args{dict});
 
@@ -1754,7 +1842,7 @@ sub _get_from_where
         {
             my $current_qb = $treeCtx->{qb_list}->[0];
             
-            if ($current_qb == 1)
+            if ($current_qb == $treeCtx->{top_qb_num})
             {
 
                 if (exists($genTree->{from_clause}))
@@ -1795,7 +1883,7 @@ sub _get_from_where
 }
 
 
-
+# XXX XXX: OBSOLETE ?
 sub convert_valex
 {
     my ($expr, $VX, $txt) = @_;
@@ -2126,6 +2214,7 @@ use Genezzo::Plan::TypeCheck;
 
 =head1 DESCRIPTION
 
+Perform type-checking/analysis on relational algebra.
 
 =head1 ARGUMENTS
 
@@ -2133,7 +2222,19 @@ use Genezzo::Plan::TypeCheck;
 
 =over 4
 
-=item Convert
+=item TypeCheck
+
+Perform typechecking on a relational algebra, and add type information
+to the tree
+
+=item TableCheck
+
+Check table references in the relational algebra, and provide type information.
+
+=item ColumnCheck
+
+Resolve each column reference in the relational algebra back to some
+base table.
 
 =back
 
@@ -2152,11 +2253,11 @@ use Genezzo::Plan::TypeCheck;
 
 =over 4
 
+=item check for function existance in GenDBI and main namespaces
+
 =item update pod
 
 =item need to handle FROM clause subqueries -- some tricky column type issues.
-
-=item explode STARs with column names - need consistent join table position
 
 =item check bool_op - AND purity if no OR's.
 
@@ -2169,6 +2270,11 @@ use Genezzo::Plan::TypeCheck;
 
 =item refactor to common TreeWalker 
 
+=item _process_name_pieces: quoted string/case-insensitivity 
+
+=item handle all pseudo cols
+
+=item most value expression stuff needs to migrate to XEval
 
 =back
 

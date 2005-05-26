@@ -115,7 +115,7 @@ rmtree($gnz_home, 1, 1);
         not_ok ("could not insert");
     }
 
-    if ($fb->Parseall("insert into test1 values (a1, b1, c1, d1,  e1, f1, g1, h1);"))
+    if ($fb->Parseall('insert into test1 values (\'a1\', \'b1\', \'c1\', \'d1\', \'e1\', \'f1\', \'g1\', \'h1\')'))
     {
         ok();
     }
@@ -158,7 +158,7 @@ rmtree($gnz_home, 1, 1);
     for my $jj (1..10)
     {
         $fb->Parseall("i test1 a b c d  e f g h  i j k l");
-        $fb->Parseall("insert into test1 values (a1, b1, c1, d1,  e1, f1, g1, h1);");
+        $fb->Parseall('insert into test1 values (\'a1\', \'b1\', \'c1\', \'d1\', \'e1\', \'f1\', \'g1\', \'h1\')');
 
         $tv->HPush (\@plist);
         for my $ii (1..100)
@@ -208,7 +208,7 @@ rmtree($gnz_home, 1, 1);
         not_ok ("could not startup");
     }
 
-    my $sth = $dbh->prepare("insert into test1 values (a,b,c,d, e,f,g,h)");
+    my $sth = $dbh->prepare('insert into test1 values (\'a\',\'b\',\'c\',\'d\',\'e\',\'f\',\'g\',\'h\')');
 
     greet $sth->rows;
     print $sth->execute(), " rows \n";
@@ -224,7 +224,7 @@ rmtree($gnz_home, 1, 1);
         not_ok ("could not create table");
     }
 
-    $sth = $dbh->prepare("insert into test2 values (alpha, bravo, charlie, delta, echo, foxtrot, golf, hotel)");
+    $sth = $dbh->prepare('insert into test2 values ( \'alpha\', \'bravo\', \'charlie\', \'delta\', \'echo\', \'foxtrot\', \'golf\', \'hotel\')');
 
     greet $sth->rows;
 

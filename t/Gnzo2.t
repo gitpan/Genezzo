@@ -112,7 +112,7 @@ rmtree($gnz_home, 1, 1);
         not_ok ("could not insert");
     }
 
-    if ($fb->Parseall("insert into test1 values (a1, b1, c1, d1,  e1, f1, g1, h1);"))
+    if ($fb->Parseall('insert into test1 values (\'a1\', \'b1\', \'c1\', \'d1\', \'e1\', \'f1\', \'g1\', \'h1\')'))
     {
         ok();
     }

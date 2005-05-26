@@ -27,6 +27,7 @@ lib/Genezzo/gendba.pl
 lib/Genezzo/genexp.pl
 lib/Genezzo/Row/RSIdx1.pm
 lib/Genezzo/Row/RSTab.pm
+lib/Genezzo/Row/RSDual.pm
 lib/Genezzo/Row/RSExpr.pm
 lib/Genezzo/Row/RSFile.pm
 lib/Genezzo/Row/RSBlock.pm
@@ -67,5 +68,8 @@ lib/Genezzo/Block/Std.pm
 lib/Genezzo/Index/bt2.pm
 lib/Genezzo/Index/bt3.pm
 lib/Genezzo/Index/btHash.pm
+lib/Genezzo/XEval.pm
+lib/Genezzo/XEval/Prepare.pm
+lib/Genezzo/XEval/SQLAlter.pm
 
 META.yml                                Module meta-data (added by MakeMaker)

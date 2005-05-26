@@ -50,8 +50,9 @@ rmtree($gnz_home, 1, 1);
 
 {
     my $fb = Genezzo::GenDBI->new(exe => $0, 
-                             gnz_home => $gnz_home, 
-                             dbinit => $dbinit);
+                                  gnz_home => $gnz_home, 
+                                  dbinit => $dbinit
+                                  );
 
     unless (defined($fb))
     {
@@ -106,7 +107,7 @@ rmtree($gnz_home, 1, 1);
         not_ok ("could not insert");
     }
 
-    if ($fb->Parseall("insert into test1 values (a1, b1, c1, e1, f1, g1)"))
+    if ($fb->Parseall('insert into test1 values (\'a1\', \'b1\', \'c1\', \'e1\', \'f1\', \'g1\')'))
     {
         ok();
     }

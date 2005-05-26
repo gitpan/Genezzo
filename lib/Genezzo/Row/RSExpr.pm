@@ -306,6 +306,7 @@ sub SQLFetch
 {
     my $self = shift;
     my $rs = $self->{sql_rs};
+    my $is_undef;
 
 #    whoami;
 
@@ -314,6 +315,9 @@ sub SQLFetch
 #    my ($tc_rid, $vv) = $rs->SQLFetch(@_);
     my ($rid, $vv) = $rs->SQLFetch(@_);
     greet $rid, $vv;
+
+    return undef # check if child has terminated
+        unless (defined($rid));
 
     my @big_arr;
 
@@ -335,26 +339,50 @@ sub SQLFetch
                         if (defined($GZERR));
                     return undef;
                 }
-                unless (defined($valex->{value_expression}->{vx}))
+                if (defined($valex->{value_expression}->{vx}))
                 {
-                    my $msg = "no value expression vx!";
-                    my %earg = (self => $self, msg => $msg,
-                                severity => 'warn');
-        
-                    &$GZERR(%earg)
-                        if (defined($GZERR));
-                    return undef;
+                    $is_undef = 0;
+                }
+                else
+                {
+                    $is_undef = 1;
+
+                    # NOTE: undefined value expression only legal for
+                    # TFN literal
+                    unless (exists($valex->{value_expression}->{tfn_literal}))
+                    {
+                        my $msg = "no value expression vx!";
+                        my %earg = (self => $self, msg => $msg,
+                                    severity => 'warn');
+                        
+                        &$GZERR(%earg)
+                            if (defined($GZERR));
+                        return undef;
+                    }
                 }
                 
                 my $vx_val;
-                my $v_str = 
-                    '$vx_val = ' . $valex->{value_expression}->{vx} . ';' ;
+                my $v_str;
+                $v_str = 
+                    '$vx_val = ' . $valex->{value_expression}->{vx} . ';' 
+                    unless ($is_undef); 
 
 #                whoami $v_str;
 
                 {
                     my $msg = "";
-                    my $status = eval "$v_str";
+                    my $status;
+
+                    if ($is_undef)
+                    {
+                        # just set the vx_val to return an undef
+                        $vx_val = undef;
+                        $status = 1;
+                    }
+                    else
+                    {
+                        $status = eval "$v_str";
+                    }
 
                     unless (defined($status))
                     {
@@ -425,7 +453,7 @@ __END__
 
 =head1 NAME
 
-Genezzo::Row::RSBlock - Row Source Block
+Genezzo::Row::RSExpr - Row Source Expression Evaluation
 
 =head1 SYNOPSIS
 

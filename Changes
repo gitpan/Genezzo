@@ -1,5 +1,11 @@
 Revision history for Perl extension Genezzo
 
+0.41 Thu May 26 00:42:38 2005
+        - allow TRUE, FALSE, and NULL in SELECT lists.
+        - New parser, execution for ALTER TABLE, DELETE, INSERT.
+        - Fix multi-line commands from input file (@file on command line).
+        - update SQL in tests to conform to standards.
+
 0.40 Tue May 10 02:04:16 2005
         - Allow arbitrary expressions in SELECT lists.
 

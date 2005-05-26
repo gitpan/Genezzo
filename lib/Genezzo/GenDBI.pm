@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 6.33 2005/05/10 09:10:08 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 6.42 2005/05/26 07:46:05 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -17,6 +17,7 @@ use Carp;
 use Data::Dumper ;
 use Genezzo::Feeble;
 use Genezzo::Plan;
+use Genezzo::XEval;
 use Genezzo::Dict;
 use Genezzo::Util;
 
@@ -49,13 +50,18 @@ BEGIN {
 	
 }
 
-our $VERSION   = '0.40';
+our $VERSION   = '0.41';
 our $RELSTATUS = 'Alpha'; # release status
 # grab the code check-in date and convert to YYYYMMDD
 our $RELDATE   = 
-    do { my @r = (q$Date: 2005/05/10 09:10:08 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
+    do { my @r = (q$Date: 2005/05/26 07:46:05 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
 
 our $errstr; # DBI errstr
+
+# build pattern to match commands that require a terminating semicolon
+our $need_semi = '(?i)^(\s)*(' .
+    join('|', qw(SELECT INSERT UPDATE DELETE EXPLAIN))
+    . ')';
 
 #
 # GZERR: the GeneZzo ERRor message handler
@@ -188,6 +194,11 @@ sub _init
     $self->{plan}  = Genezzo::Plan->new(%nargs);    # build a real parser 
     return 0
         unless (defined($self->{plan}));
+    $self->{xeval}  = Genezzo::XEval->new(%nargs,   # build evaluator
+                                          plan => $self->{plan}
+                                          );
+    return 0
+        unless (defined($self->{xeval}));
 
     my $init_db = 0;
 
@@ -276,6 +287,8 @@ sub _init
 
     # pass dictionary information to the planner
     $self->{plan}->Dict($self->{dictobj});
+    # pass dictionary information to the evaluator
+    $self->{xeval}->Dict($self->{dictobj});
 
     return 1;
 }
@@ -1481,9 +1494,7 @@ sub Kgnz_Update
 sub SQLSelect
 {
     my $self = shift;
-# XXX XXX XXX XXX: use new parser
-#    my @ggg = $self->SQLSelectPrepare(@_);
-    my @ggg = $self->SQLSelectPrepare2(@_);
+    my @ggg = $self->SQLSelectPrepare(@_);
 
     return undef
         unless (scalar(@ggg));
@@ -1497,24 +1508,6 @@ sub SQLSelect
 }
 
 sub SQLSelectPrepare
-{
-    my $self = shift;    
-
-    return undef; # XXX XXX XXX XXX use new parser
-
-    my $sqltxt = $self->{current_line};
-
-    my ($sql_cmd, $pretty, $badparse) =
-        $self->{feeble}->Parseall($sqltxt);
-
-    return undef
-        if ($badparse);
-
-    return $self->_SQLselprep($sql_cmd);
-}
-
-# XXX XXX: use new parser
-sub SQLSelectPrepare2
 {
     my $self = shift;    
 
@@ -1548,12 +1541,12 @@ sub SQLSelectPrepare2
     return undef
         if ($err_status);
 
-    return $self->_SQLselprep2($tc);
+    return $self->_SQLselprep_Algebra($tc);
 }
 
-sub _SQLselprep2
+sub _SQLselprep_Algebra
 {
-    my ($self, $sql_cmd) = @_;
+    my ($self, $sql_cmd, $top_cmd) = @_;
     my @colpairs;
 
     # XXX: no joins supported yet!
@@ -1567,9 +1560,18 @@ sub _SQLselprep2
 # XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX 
 # XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX 
 
+    my %nargs = (algebra   => $sql_cmd);
+
+    if (defined($top_cmd) &&
+        $top_cmd =~ m/INSERT/i)
+    {
+        # NOTE: treat INSERT...SELECT a little different
+        $nargs{top_cmd} = $top_cmd;
+        greet $top_cmd, $nargs{top_cmd};
+    }
 
     my ($tc, $from, $sel_list, $where) = 
-        $self->{plan}->GetFromWhereEtc(algebra   => $sql_cmd);
+        $self->{plan}->GetFromWhereEtc(%nargs);
 
     whoami;
     greet $from, $sel_list, $where;
@@ -1594,6 +1596,7 @@ sub _SQLselprep2
     }
 
     my $tablename = $from->[0]->[0]->{tc_table_fullname};
+    greet "table:",$tablename;
 
     foreach my $i (@{$sel_list})
     {
@@ -1644,15 +1647,15 @@ sub _SQLselprep2
         greet $where;
     }
 
-    return ($self->SelectPrepare(tablename   => $tablename, 
-                                 colpairs    => \@colpairs,
-                                 where2      => $where,
-                                 select_list => $sel_list
-                                 )
+    return ($self->CommonSelectPrepare(tablename   => $tablename, 
+                                       colpairs    => \@colpairs,
+                                       where2      => $where,
+                                       select_list => $sel_list
+                                       )
             );
 }
 
-sub _SQLselprep
+sub _OLD__SQLselprep
 {
     my ($self, $sql_cmd) = @_;
     my @colpairs;
@@ -1678,9 +1681,9 @@ sub _SQLselprep
 #        greet $where;
     }
 
-    return ($self->SelectPrepare(tablename => $tablename, 
-                                 colpairs  => \@colpairs,
-                                 where     => $where));
+    return ($self->CommonSelectPrepare(tablename => $tablename, 
+                                       colpairs  => \@colpairs,
+                                       where     => $where));
 }
 
 sub SQLWhere
@@ -1958,94 +1961,6 @@ sub SQLWhere
     return \%hh;
 } # end SQLWhere
 
-sub SQLWhere2
-{
-    my $self = shift;    
-    my $dictobj = $self->{dictobj};
-    my %args = (@_);
-
-    my $tablename = $args{tablename};
-    my $where     = $args{where};
-
-#    greet $where;
-
-
-    # XXX XXX: filter will complain about "uninitialized" strings
-
-    my $filterstring = '
-   $filter = sub {
-
-        no warnings qw(uninitialized); # shut off null string warnings
-
-        my ($tabdef, $rid, $outarr) = @_;
-        return 1
-            if (defined($outarr) &&
-                scalar(@{$outarr}) &&
-                ( ';
-
-    my $AndPurity = 0;    # WHERE clauses of ANDed predicates may
-    my $AndTokens = [];   # be suitable for index lookups, but ORs
-                          # can be a problem.  Test for "And Purity".
-
-    $filterstring .= $where->[0]->{sc_tree}->{vx};
-
-    $filterstring .= "));};";
-
-    my $where_text = $where->[0]->{sc_txt};
-    $AndPurity     = $where->[0]->{sc_and_purity};
-
-#    greet $filterstring;
-#    greet "pure", $AndPurity, @AndTokens;
-    $AndTokens = $where->[0]->{sc_index_keys}
-       if ($AndPurity);
-
-    my $filter;     # the anonymous subroutine which is the 
-                    # result of eval of filterstring
-
-    my $status;
-
-    my ($msg, %earg);
-    my $badparse;
-    if ($badparse)
-    {
-        %earg = (self => $self, msg => $msg,
-                 severity => 'warn');
-                    
-        &$GZERR(%earg)
-            if (defined($GZERR));
-    }
-    else
-    {
-        $status = eval " $filterstring ";
-    }
-
-    unless (defined($status))
-    {
-        $msg = "";
-#        warn $@ if $@;
-        $msg .= $@ 
-            if $@;
-        $msg .= "\nbad filter:\n";
-        $msg .= $filterstring . "\n";
-        $msg .= "\nWHERE clause:\tWHERE " . $where_text . "\n";
-        %earg = (self => $self, msg => $msg,
-                 severity => 'warn');
-                    
-        &$GZERR(%earg)
-            if (defined($GZERR));
-
-        return undef;
-    }
-#    greet $filter; 
-
-    my %hh = (idxfilter => $AndTokens);
-    $hh{filter} = $filter
-        if (defined($filter));
-    $hh{where_text} = $where_text;
-    $hh{filter_text} = $filterstring;
-#    greet %hh;
-    return \%hh;
-} # end SQLWhere2
 
 sub SQLCreate
 {
@@ -2145,142 +2060,38 @@ sub SQLAlter
     my $dictobj = $self->{dictobj};
     my $sqltxt = $self->{current_line};
 
-    my ($sql_cmd, $pretty, $badparse) =
-        $self->{feeble}->Parseall($sqltxt);
+    my $parse_tree = $self->{plan}->Parse(statement => $sqltxt);
 
-    return undef
-        if ($badparse);
+    greet $parse_tree;
 
-#    greet $sql_cmd;
-
-    my $tablename;
-    my ($msg, %earg);
-
-    if (exists($sql_cmd->{operation}))
+    unless (defined($parse_tree))
     {
-        if (($sql_cmd->{operation} =~ m/^table$/i)
-            && exists($sql_cmd->{alt_table_list}))
-        {
-            my @outi;
+        my $msg  = "Input: " . $sqltxt;
+        my %earg = (self => $self, msg => $msg, severity => 'warn');
 
-            return undef
-                unless (exists($sql_cmd->{alt_table_list}->{tablename}));
+        &$GZERR(%earg)
+            if (defined($GZERR));
 
-            $tablename = $sql_cmd->{alt_table_list}->{tablename};
-
-            return undef
-                unless $dictobj->DictTableExists (tname => $tablename);
-
-#            push @outi, $sql_cmd->{alt_table_list}->{tablename};
-            
-            if (exists($sql_cmd->{alt_table_list}->{add_list}))
-            {
-#                greet $sql_cmd;
-                
-                my $alist = $sql_cmd->{alt_table_list}->{add_list};
-
-                if (exists($alist->{type})
-                    && ($alist->{type} eq 'constraint'))
-                {
-                    my %nargs = (
-                                 tname   => $tablename,
-                                 dbh_ctx => $self->{dbh_ctx}
-                                 );
-
-                    my $cons_name;
-                    if (exists($alist->{cons_name}))
-                    {
-                        $cons_name = $alist->{cons_name};
-                        $nargs{cons_name} = $cons_name;
-                    }
-
-                    if (exists($alist->{cons_type}))
-                    {
-                        $nargs{cons_type} = $alist->{cons_type};
-                    }
-
-                    if (exists($alist->{cons_type}))
-                    { 
-                       if ($alist->{cons_type} =~ m/unique|primary/i)
-                       { # UNIQUE or PRIMARY KEY
-                           if (exists($alist->{col_list}))
-                           {
-                               $nargs{cols} = $alist->{col_list};
-                           }
-                       }
-                       elsif ($alist->{cons_type} eq 'check')
-                       {
-
-                           my $where_clause =
-                               $alist->{where_clause};
-
-                           my $filter =
-                               $self->SQLWhere(tablename => $tablename,
-                                               where     => $where_clause);
-
-                           unless (defined($filter))
-                           {
-                               $msg = "invalid where clause";
-                               %earg = (self => $self, msg => $msg,
-                                        severity => 'warn');
-                    
-                               &$GZERR(%earg)
-                                   if (defined($GZERR));
-
-                               return 0;
-                           }
-#                         greet $filter;
-
-                           $nargs{where_clause} = $filter->{where_text};
-                           $nargs{where_filter} = $filter->{filter_text};
-
-                           # XXX XXX XXX: need to get constraint name if
-                           # defined by system
-                       }
-                       else
-                       {
-                           $msg = "unknown constraint\n";
-                           $msg .= Dumper( %nargs);
-                           %earg = (self => $self, msg => $msg,
-                                    severity => 'warn');
-                    
-                           &$GZERR(%earg)
-                               if (defined($GZERR));
-
-                           return 0;
-                       }
-
-                       my ($stat, $new_consname, $new_iname) = 
-                           $dictobj->DictTableAddConstraint(%nargs);
-
-                       my $severity;
-                       if ($stat)
-                       {
-                           $cons_name = $new_consname
-                               unless (defined($cons_name));
-                           $msg = "Added constraint $cons_name" .
-                               " to table $tablename\n";
-                           $severity = 'info';
-                       }
-                       else
-                       {
-                           $msg = "Failed to add constraint\n";
-                           $severity = 'warn';
-                       }
-                       %earg = (self => $self, msg => $msg,
-                                severity => $severity);
-                       
-                       &$GZERR(%earg)
-                           if (defined($GZERR));
-
-                       return $stat;
-                   } # end if exists constraint
-                }
-            }
-        }
+        return undef;
     }
 
-    return 0;
+    my $algebra = $self->{plan}->Algebra(parse_tree => $parse_tree);
+
+    my ($tc, $err_status) = 
+        $self->{plan}->TypeCheck(algebra   => $algebra,
+                                 statement => $sqltxt);
+
+    greet $tc, $err_status;
+
+    return undef
+        if ($err_status);
+
+    # XXX XXX: need AndPurity in typecheck
+
+    return  ($self->{xeval}->SQLAlter(plan    => $tc,
+                                      dbh_ctx => $self->{dbh_ctx}
+                                      ));
+
 } # end SQLAlter
 
 sub SQLUpdate
@@ -2402,7 +2213,7 @@ sub SQLUpdate
     $sel_cmd->{where_list} = $sql_cmd->{where_list}
        if (exists($sql_cmd->{where_list}) &&
            scalar(@{$sql_cmd->{where_list}}));
-    my @sel_prep = $self->_SQLselprep($sel_cmd);
+    my @sel_prep = $self->_OLD__SQLselprep($sel_cmd);
 #    greet @sel_prep;
 
     return undef
@@ -2478,24 +2289,90 @@ sub SQLInsert
 
     my $sqltxt = $self->{current_line};
 
-    my ($sql_cmd, $pretty, $badparse) =
-        $self->{feeble}->Parseall($sqltxt);
+    my (@got_vals, @sel_prep_info);
 
-#    greet $sql_cmd;
+    my $parse_tree = $self->{plan}->Parse(statement => $sqltxt);
+
+    greet $parse_tree;
+
+    unless (defined($parse_tree))
+    {
+        my $msg  = "Input: " . $sqltxt;
+        my %earg = (self => $self, msg => $msg, severity => 'warn');
+
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
+        return undef;
+    }
+
+    my $algebra = $self->{plan}->Algebra(parse_tree => $parse_tree);
+
+    my ($tc, $err_status) = 
+        $self->{plan}->TypeCheck(algebra   => $algebra,
+                                 statement => $sqltxt);
+
+    greet $tc, $err_status;
+
     return undef
-        if ($badparse);
+        if ($err_status);
 
+    my @iii =  ($self->{xeval}->SQLInsert(plan    => $tc,
+                                          dbh_ctx => $self->{dbh_ctx}
+                                          ));
+
+    return undef
+        unless (scalar(@iii) > 1);
+        
+    if (scalar(@iii) > 1)
+    {
+        if ($iii[0] =~ m/vanilla/)
+        {
+            my $sth = $iii[1];
+            greet $sth->SQLExecute();
+            my @foo = $sth->SQLFetch();
+
+            while (scalar(@foo) > 1)
+            {
+                push @got_vals, @{$foo[1]};
+                greet @foo, @got_vals;
+                # join(" ", @foo), "\n";
+                @foo = $sth->SQLFetch();
+            }
+        }
+        else
+        {
+#            my @ggg = $self->SQLSelectPrepare($iii[1]);           
+            @sel_prep_info = $self->_SQLselprep_Algebra($iii[1], "INSERT"); 
+ 
+        }
+    }
+        
     my @outi;
+    my $tabinfo = $tc->{sql_insert}->[0]->{insert_tabinfo};
 
-    push @outi, $sql_cmd->{tablename};
-    push @outi, $sql_cmd->{colnames};
+#    push @outi, $sql_cmd->{tablename};
+#    push @outi, $sql_cmd->{colnames};
+    my $tablename   = $tabinfo->{tc_table_fullname};
+    my $column_list = # create an empty column list if none exists
+        (exists($tabinfo->{tc_column_list})) ? 
+        $tabinfo->{tc_column_list} : [];
+
+    push @outi, $tablename, $column_list;
+
 
     my ($key, $rownum, @vals, @selex_state);
 
-    # if INSERT SELECT
-    if (exists($sql_cmd->{selclause}))
+    if (scalar(@got_vals))
     {
-        my $colcnt = scalar(@{$sql_cmd->{colnames}});
+        # INSERT ... VALUES - done!
+        push @outi, @got_vals;
+        greet @outi;
+    }
+    # if INSERT SELECT
+    elsif (scalar(@sel_prep_info))
+    {
+        my $colcnt = scalar(@{$column_list});
 
         unless ($colcnt)
         {
@@ -2503,27 +2380,21 @@ sub SQLInsert
 
             return undef
                 unless ($dictobj->DictTableExists (tname => 
-                                                   $sql_cmd->{tablename}));
+                                                   $tablename));
             $colcnt 
                 = scalar(keys(%{$dictobj->
                                     DictTableGetCols (tname => 
-                                                      $sql_cmd->{tablename}
+                                                      $tablename
                                                       )}));
         }
 
 #        greet $sql_cmd->{selclause};
 
-        # internal select prepare
-        my @ggg = $self->_SQLselprep($sql_cmd->{selclause});
-        
-        return undef
-            unless (scalar(@ggg));
-
-#        greet @ggg;
+#        greet @sel_prep_info;
         # compare insert column list to select list
         # XXX XXX : need to fix here too
         # XXX XXX : is too few cols legal?  pad remainder with nulls?
-        my $comp = ($colcnt <=> scalar(@{$ggg[2]}));
+        my $comp = ($colcnt <=> scalar(@{$sel_prep_info[2]}));
         unless (0 == $comp) # should be zero if match
         {
             my $msg = "Cannot insert: too " . (($comp == -1) ? "many": "few") .
@@ -2537,7 +2408,7 @@ sub SQLInsert
             return undef;
         }
 
-        my @selex_state = $self->SelectExecute(@ggg);
+        my @selex_state = $self->SelectExecute(@sel_prep_info);
 
         return undef 
             unless (scalar(@selex_state));
@@ -2545,8 +2416,8 @@ sub SQLInsert
         $rownum = 0;
         
         # fetch all rows if self-modifying table -- kind of expensive...
-        my $fetchall = ($sql_cmd->{tablename} eq $ggg[0]);
-#        greet @ggg;
+        my $fetchall = ($tablename eq $sel_prep_info[0]);
+#        greet @sel_prep_info;
 
         # XXX XXX XXX: could do multiple inserts if not self-modifying table
         while (1)
@@ -2565,66 +2436,7 @@ sub SQLInsert
     }
     else
     {
-        if (exists($sql_cmd->{colvals}))
-        {
-            for my $newval (@{$sql_cmd->{colvals}})
-            {
-
-                if ($newval =~ m/^NULL$/i)
-                {
-                    # Convert unquoted NULL value to an undef
-                    $newval = undef;
-                }
-                else
-                {
-                    # strip double and single quotes
-                    my @getquotes = ($newval =~ m/^\"(.*)\"$/);
-                    if (scalar(@getquotes))
-                    {
-                        $newval = shift @getquotes;
-                    }
-                    else
-                    {
-                        # NOTE: Special treat for single-quoted strings, 
-                        # e.g.: 'foo'.  Allow/require backslash as a quote
-                        # character, so must use '\\' to enter a single
-                        # backslash and '\'' (backslash quote) to embed a
-                        # single-quote in a single-quoted string.
-                        
-                        # if have leading and trailing single quote
-                        @getquotes = ($newval =~ m/^\'(.*)\'$/);
-                        
-                        if (scalar(@getquotes))
-                        {
-#                            greet @getquotes;
-
-                            # strip lead/trail quotes so parse_line can work
-                            # its magic
-                            $newval = $getquotes[0];
-
-                            # use parse line to process quoted characters 
-                            
-                            # XXX XXX: some weirdness using \n for delimiter
-                            # -- seems to work since shouldn't have embedded
-                            # newlines in these strings, so we only
-                            # split the line into a single token
-                            @getquotes = &parse_line('\n', 0, $newval);
-#                            greet @getquotes;
-
-                            # backslashes have been processed
-                            $newval = shift @getquotes;
-                            for my $tk (@getquotes)
-                            {
-                                $newval .= $tk
-                                    if (defined($tk));
-                            }
-
-                        }
-                    }
-                }
-                push @outi, $newval;
-            } # end for
-        }
+        # XXX XXX XXX : ???
     }
 
     my $colcnt = 0;
@@ -2641,8 +2453,8 @@ sub SQLInsert
     {
         @outi = ();
 
-        push @outi, $sql_cmd->{tablename};
-        push @outi, $sql_cmd->{colnames};
+        push @outi, $tablename;
+        push @outi, $column_list;
 
         for my $ii (1..10) # do a multirow insert
         {
@@ -2673,34 +2485,42 @@ sub SQLDelete
 
     my $sqltxt = $self->{current_line};
 
-    my ($sql_cmd, $pretty, $badparse) =
-        $self->{feeble}->Parseall($sqltxt);
+    my $parse_tree = $self->{plan}->Parse(statement => $sqltxt);
 
-#    greet $sql_cmd;
-    return undef
-        if ($badparse);
+    greet $parse_tree;
 
-    my @outi;
-
-    unless (exists($sql_cmd->{tablename}))
+    unless (defined($parse_tree))
     {
-        greet $sql_cmd;
+        my $msg  = "Input: " . $sqltxt;
+        my %earg = (self => $self, msg => $msg, severity => 'warn');
+
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return undef;
     }
 
-    my $tablename = $sql_cmd->{tablename};
-#    push @outi, $tables[0];
+    my $algebra = $self->{plan}->Algebra(parse_tree => $parse_tree);
 
-    my ($where, $where_clause);
-    if (exists($sql_cmd->{where_list}))
+    my ($tc, $err_status) = 
+        $self->{plan}->TypeCheck(algebra   => $algebra,
+                                 statement => $sqltxt);
+
+    greet $tc, $err_status;
+
+    return undef
+        if ($err_status);
+
+    my ($tablename, $where, $where_clause);
+
     {
-        $where = $sql_cmd->{where_list};
-#        greet $where;
-        for my $val (@{$where})
+        $tablename = $tc->{sql_delete}->{tc_table_fullname};
+        if (scalar(@{$tc->{sql_delete}->{where_clause}}))
         {
-            $where_clause .= "$val->{val} ";
+            $where_clause = $tc->{sql_delete}->{where_clause}->[0]->{sc_txt};
         }
     }
+
     my $sel = "select rid from $tablename ";
     $sel .= "where " . $where_clause
         if (defined($where_clause));
@@ -3012,7 +2832,7 @@ sub ECountPrint
 sub Kgnz_Select
 {
     my $self = shift;
-    my @ggg = $self->SelectPrepare(basic => \@_);
+    my @ggg = $self->CommonSelectPrepare(basic => \@_);
 
     return undef
         unless (scalar(@ggg));
@@ -3025,7 +2845,7 @@ sub Kgnz_Select
     return $self->SelectPrint(@hhh);
 }
 
-sub SelectPrepare
+sub CommonSelectPrepare
 {
     my $self = shift;
     my $dictobj = $self->{dictobj};
@@ -3071,6 +2891,7 @@ sub SelectPrepare
 
         if (defined($args{where}))
         {
+
             return @outi # make sure have a table
                 unless $dictobj->DictTableExists (tname => $tablename);
 
@@ -3098,8 +2919,8 @@ sub SelectPrepare
                 unless $dictobj->DictTableExists (tname => $tablename);
 
             $filter =
-                $self->SQLWhere2(tablename => $tablename,
-                                 where => $args{where2});
+                $self->{plan}->SQLWhere2(tablename => $tablename,
+                                         where => $args{where2});
 
             unless (defined($filter))
             {
@@ -3247,7 +3068,7 @@ sub SelectPrepare
     }
 
     return @outi;
-} # end SelectPrepare
+} # end CommonSelectPrepare
 
 sub SelectExecute
 {
@@ -3287,11 +3108,6 @@ sub SelectExecute
             $nargs{select_list} = $prep_th->{select_list};
         }
 
-        # XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX
-        # XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX
-        # XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX
-        # XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX
-        # XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX  XXX XXX
         my %rsx_h;
         my $rsx_tv = tie %rsx_h, 'Genezzo::Row::RSExpr', %nargs;
 
@@ -3367,6 +3183,7 @@ sub SelectFetch
                 # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
                 # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
                 # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
+                # after cleanup, should always have the select list
                 # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
                 # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
                 # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
@@ -3484,6 +3301,7 @@ sub SelectPrint
                 # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
                 # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
                 # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
+                # after cleanup, should always have select list
                 # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
                 # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
                 # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
@@ -3889,12 +3707,55 @@ sub Kgnz_Prepare
 		    last  L_inifile;                    
                 }
 
-		while (<$fh>) {
-		    print "$inifile> $_ \n";
-                    my $in_line = $_;
-                    $in_line =~ s/;(\s*)$//; # XXX: remove the semicolon
-                    $self->Parseall ($in_line);
+                # Note: need loop like Interactive() to
+                # continue SQL command until get semicolon
 
+                my $prev_line = undef;  # accumulated input of 
+                                        # multi-line statement
+
+                my $multiline = 0;      # =1 if require a semicolon to 
+                                        # terminate statement
+
+                my $prompt = "\n$inifile> ";
+                my $prompt_2 = (" " x length($inifile)) . "> ";
+
+              L_w1:
+		while (<$fh>) {
+		    print $prompt, $_; # input is already newline terminated
+                    my $in_line = $_;
+                    if (defined($prev_line))
+                    {
+#                        $prev_line .= "\n" ;
+                        # input is already newline terminated
+                    }
+                    else
+                    {
+                        next L_w1 unless ($in_line =~ m/\S/);
+
+                        $prev_line = "" ;
+                        $multiline = 1     # check if need terminator
+                            if ($in_line =~ m/$need_semi/);
+                    }
+                    $prev_line .= $in_line;
+
+                    # NOTE: not all commands are multiline and require
+                    # semicolon...
+                    if ($multiline && ($in_line !~ m/;$/))
+                    {
+                        $prompt = $prompt_2;
+                        next L_w1;
+                    }
+                    else
+                    {
+                        $prev_line =~ s/;(\s*)$//  # Note: remove the semicolon
+                            ;
+#                if ($multiline);
+                    }
+
+                    $self->Parseall ($prev_line);
+                    $prompt = "\n$inifile> ";
+                    $prev_line = undef;
+                    $multiline = 0;
 		} # end big while
 		close ($fh);
 	    } # end foreach
@@ -4118,10 +3979,6 @@ sub Interactive
     my $in_line;        # current input line
     my $prev_line;      # accumulated input of multi-line statement
     my $multiline = 0;  # =1 if require a semicolon to terminate statement
-
-    # build pattern to match commands that require a terminating semicolon
-    my $need_semi = join('|', qw(SELECT INSERT UPDATE DELETE EXPLAIN));
-    $need_semi    = '(?i)^(\s)*(' . $need_semi . ')';
 
     while ( defined ($in_line = $term->readline($prompt)))
     {
@@ -4494,8 +4351,8 @@ sub _init
                 shift @{$self->{param}};
                 $self->{select} = [];
                 push @{$self->{select}},
-                    $self->{gnz_h}->SelectPrepare(basic =>
-                                                  \@{$self->{param}});
+                    $self->{gnz_h}->CommonSelectPrepare(basic =>
+                                                        \@{$self->{param}});
 
                 # check if prepare failed
                 return 0
@@ -4506,7 +4363,7 @@ sub _init
                 shift @{$self->{param}};
                 $self->{select} = [];
                 push @{$self->{select}},
-                    $self->{gnz_h}->SQLSelectPrepare2(@{$self->{param}});
+                    $self->{gnz_h}->SQLSelectPrepare(@{$self->{param}});
 
                 # check if prepare failed
                 return 0
@@ -4791,6 +4648,12 @@ Genezzo::GenDBI.pm - an extensible database with SQL and DBI
 DBI-style interface, an interactive loop with an interpreter and some
 presentation code, plus some expression evaluation and query planning
 logic.  It needs to get split up.  
+
+=item SQLselprep_Algebra: move to XEval
+
+=item SQLAlter: need And purity check
+
+=item SQLUpdate: convert to new parser
 
 =back
 
