@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 6.42 2005/05/26 07:46:05 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 6.46 2005/06/17 08:42:12 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -15,7 +15,6 @@ require Exporter;
 
 use Carp;
 use Data::Dumper ;
-use Genezzo::Feeble;
 use Genezzo::Plan;
 use Genezzo::XEval;
 use Genezzo::Dict;
@@ -50,11 +49,11 @@ BEGIN {
 	
 }
 
-our $VERSION   = '0.41';
+our $VERSION   = '0.42';
 our $RELSTATUS = 'Alpha'; # release status
 # grab the code check-in date and convert to YYYYMMDD
 our $RELDATE   = 
-    do { my @r = (q$Date: 2005/05/26 07:46:05 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
+    do { my @r = (q$Date: 2005/06/17 08:42:12 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
 
 our $errstr; # DBI errstr
 
@@ -188,9 +187,6 @@ sub _init
     {
         $nargs{GZERR} = $args{GZERR};
     }
-    $self->{feeble}  = Genezzo::Feeble->new(%nargs); # build a feeble parser
-    return 0
-        unless (defined($self->{feeble}));
     $self->{plan}  = Genezzo::Plan->new(%nargs);    # build a real parser 
     return 0
         unless (defined($self->{plan}));
@@ -1513,6 +1509,13 @@ sub SQLSelectPrepare
 
     my $sqltxt = $self->{current_line};
 
+    return $self->SQLSelectPrepare2($sqltxt);
+}
+sub SQLSelectPrepare2
+{
+    my $self   = shift;    
+    my $sqltxt = shift;
+
     greet $sqltxt;
 
     my $parse_tree = $self->{plan}->Parse(statement => $sqltxt);
@@ -1655,312 +1658,6 @@ sub _SQLselprep_Algebra
             );
 }
 
-sub _OLD__SQLselprep
-{
-    my ($self, $sql_cmd) = @_;
-    my @colpairs;
-
-    # XXX: no joins supported yet!
-
-    unless (exists($sql_cmd->{from_list}->[0]->{val}))
-    {
-        greet $sql_cmd->{from_list};
-        return undef;
-    }
-
-    my $tablename = $sql_cmd->{from_list}->[0]->{val};
-
-    foreach my $i (@{$sql_cmd->{select_list}})
-    {
-        push @colpairs, [$i->{val}, $i->{name}];
-    }
-    my $where;
-    if (exists($sql_cmd->{where_list}))
-    {
-        $where = $sql_cmd->{where_list};
-#        greet $where;
-    }
-
-    return ($self->CommonSelectPrepare(tablename => $tablename, 
-                                       colpairs  => \@colpairs,
-                                       where     => $where));
-}
-
-sub SQLWhere
-{
-    my $self = shift;    
-    my $dictobj = $self->{dictobj};
-    my %args = (@_);
-
-    my $tablename = $args{tablename};
-    my $where = $args{where};
-
-#    greet $where;
-
-    # transform standard sql relational operators to Perl-style,
-    # distinguishing numeric and character comparisons
-    my $relop = 
-    {
-        '==' => { "n" => "==",  "c" => "eq"},
-        '='  => { "n" => "==",  "c" => "eq"},
-        '<>' => { "n" => "!=",  "c" => "ne"},
-        '!=' => { "n" => "!=",  "c" => "ne"},
-        '>'  => { "n" => ">",   "c" => "gt"},
-        '<'  => { "n" => "<",   "c" => "lt"},
-        '>=' => { "n" => ">=",  "c" => "ge"},
-        '<=' => { "n" => "<=",  "c" => "le"},
-
-        '<=>' => { "n" => "<=>",  "c" => "cmp"}
-    };
-
-    # XXX XXX: filter will complain about "uninitialized" strings
-
-    my $filterstring = '
-   $filter = sub {
-
-        no warnings qw(uninitialized); # shut off null string warnings
-
-        my ($tabdef, $rid, $outarr) = @_;
-        return 1
-            if (defined($outarr) &&
-                scalar(@{$outarr}) &&
-                ( ';
-
-
-    my $where_text = "";
-
-    my @filtary; # build an array of filter expressions
-
-    my $prevcoltype;
-
-    my $maxw = scalar((@{$where}));
-
-    my $badparse = 0;
-    my $doskip = -1;  # handle IS [NOT] NULL token lookahead
-
-    my $AndPurity = 1;    # WHERE clauses of ANDed predicates may
-    my @AndTokens;        # be suitable for index lookups, but ORs
-    my $OrBars = '\|\|';  # can be a problem.  Test for "And Purity".
-
-    my ($msg, %earg);
-
-    for my $ii (0..($maxw - 1))
-    {
-        if ($doskip >= 0)
-        {
-            if ($ii == $doskip)
-            {
-                $doskip = -1;
-            }
-            next;
-        }
-
-        my $val = $where->[$ii];
-        my $token = $val->{val};
-
-        unless ($val->{type} eq 'IDENTIFIER')
-        {
-            if ($val->{type} =~ m/RESERVED/) 
-            {
-                if ($token =~ m/^IS$/i)
-                {
-                    $doskip = $ii;
-                    $where_text .= "$token ";
-
-                    my $isnot = -1;
-
-                  L_isnull:
-                    while (1)
-                    {
-                        my $v2 = $where->[$doskip+1];
-
-                        # peek ahead to find [NOT] NULL --
-                        # fail if these tokens missing
-                        # of if no previous value to pop from filtary
-                        if (!defined($v2) || !scalar(@filtary))
-                        {
-                            $msg = "could not parse IS NULL\n";
-                            $badparse = 1;
-                            last L_isnull;
-                        }
-                        else
-                        {                        
-
-                            $where_text .= "$v2->{val} ";
-
-                            if ($v2->{val} =~ m/^NOT$/i)
-                            {
-                                $isnot *= -1;
-                                $doskip++;
-                                next L_isnull;
-                            }
-                            elsif ($v2->{val} =~ m/^NULL$/i)
-                            {
-                                $doskip++;
-                                my $gg = pop @filtary;
-                                my $bang = ($isnot < 0) ? '!' : '';
-                                push @filtary, 
-                                     $bang . '(defined(' . $gg . '))';
-
-                                $AndPurity = 0
-                                    unless ($isnot > 0);
-
-                                last L_isnull;
-                            }
-                            else
-                            {
-                                $msg = "could not parse IS NULL\n";
-                                $badparse = 1;
-                                last L_isnull;
-                            }
-                        } 
-                    } # end while isnull
-
-                    # go back and SKIP all the IS [NOT...] NULL tokens
-                    next;
-                } # end is
-
-            } # end reserved
-
-            if (defined($prevcoltype)
-                && exists($relop->{$token})
-                && exists($relop->{$token}->{$prevcoltype}))
-            {
-                my $relop1 = $relop->{$token}->{$prevcoltype};
-                
-                my $tok_expr = '(eq|==|<|>|lt|gt|le|ge|<=|>=)';
-                if ($relop1 =~ m/^$tok_expr$/)
-                {
-                    $AndTokens[$ii] = {op => $relop1};
-                }
-
-                push @filtary, $relop1;
-                $where_text .= "$token ";
-            }
-            else
-            {
-                if (($token =~ m/or/i) || ($token =~ m/$OrBars/))
-                {
-                    $AndPurity = 0; # found "ORs"
-                }
-                if ($ii)
-                {
-                    my $prev = $AndTokens[$ii-1];
-
-                    # check for a leading "column = " operator...
-                    if (defined($prev) &&
-                        exists($prev->{op}))
-                    {
-                        $AndTokens[$ii] = {literal => $token};
-                    }
-                }
-
-                push @filtary, $token;
-                $where_text .= "$token ";
-            }
-            if ($val->{type} =~ m/QUOTESTR/) # quoted string is char
-            {
-                $prevcoltype = "c";
-            }
-            if ($val->{type} =~ m/NUMERIC/)
-            {
-                $prevcoltype = "n";
-            }
-
-            next;
-        }
-
-        my ($colnum, $coltype)
-            = $dictobj->DictTableColExists (tname => $tablename,
-                                            colname => $token,
-                                            silent_notexists => 1);
-        if ($colnum)
-        {
-            $AndTokens[$ii] = {col => ($colnum - 1)};
-
-            push @filtary, '$outarr->[' . ($colnum - 1) . ']';
-            $prevcoltype = $coltype;
-            $where_text .= "$token ";
-        }
-        else
-        {
-            if ($token =~ m/^rid$/i) # rid pseudocolumn
-            {
-                push @filtary, '$rid';
-                $prevcoltype = "c";
-                $where_text .= "$token ";
-            }
-            else
-            {
-                if (($token =~ m/or/i) || ($token =~ m/$OrBars/))
-                {
-                    $AndPurity = 0; # found "ORs"
-                }
-
-                push @filtary, $token;
-                $where_text .= "$token ";
-            }
-        }
-    } # end for
-    
-    for my $f1 (@filtary)
-    {
-        $filterstring .= "$f1 ";
-    }
-
-    $filterstring .= "));};";
-
-#    greet $filterstring;
-#    greet "pure", $AndPurity, @AndTokens;
-    @AndTokens = ()
-        unless ($AndPurity);
-
-    my $filter;     # the anonymous subroutine which is the 
-                    # result of eval of filterstring
-
-    my $status;
-
-    if ($badparse)
-    {
-        %earg = (self => $self, msg => $msg,
-                 severity => 'warn');
-                    
-        &$GZERR(%earg)
-            if (defined($GZERR));
-    }
-    else
-    {
-        $status = eval " $filterstring ";
-    }
-
-    unless (defined($status))
-    {
-        $msg = "";
-#        warn $@ if $@;
-        $msg .= $@ 
-            if $@;
-        $msg .= "\nbad filter:\n";
-        $msg .= $filterstring . "\n";
-        $msg .= "\nWHERE clause:\tWHERE " . $where_text . "\n";
-        %earg = (self => $self, msg => $msg,
-                 severity => 'warn');
-                    
-        &$GZERR(%earg)
-            if (defined($GZERR));
-
-        return undef;
-    }
-#    greet $filter; 
-
-    my %hh = (idxfilter => \@AndTokens);
-    $hh{filter} = $filter
-        if (defined($filter));
-    $hh{where_text} = $where_text;
-    $hh{filter_text} = $filterstring;
-#    greet %hh;
-    return \%hh;
-} # end SQLWhere
-
 
 sub SQLCreate
 {
@@ -1968,88 +1665,108 @@ sub SQLCreate
     my $dictobj = $self->{dictobj};
     my $sqltxt = $self->{current_line};
 
-    my ($sql_cmd, $pretty, $badparse) =
-        $self->{feeble}->Parseall($sqltxt);
+    my $parse_tree = $self->{plan}->Parse(statement => $sqltxt);
+
+    greet $parse_tree;
+
+    unless (defined($parse_tree))
+    {
+        my $msg  = "Input: " . $sqltxt;
+        my %earg = (self => $self, msg => $msg, severity => 'warn');
+
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
+        return undef;
+    }
+
+    my $algebra = $self->{plan}->Algebra(parse_tree => $parse_tree);
+
+    my ($tc, $err_status) = 
+        $self->{plan}->TypeCheck(algebra   => $algebra,
+                                 statement => $sqltxt);
+
+    greet $tc, $err_status;
 
     return undef
-        if ($badparse);
+        if ($err_status);
 
-#    greet $sql_cmd;
-
-    # lists of equivalent types for char and numeric data
-    # XXX XXX: nchar?
-    my @chartype1 = qw(
-                       char character varchar varchar2 long
-                       );
-    push @chartype1, ("character varying", "char varying", "long varchar");
-    my @numtype1  = qw(
-                       numeric decimal dec integer int smallint 
-                       float real
-                       number
-                       );
-    push @numtype1, ("double precision");
-                       
-    my $char_regex = '(?i)^(' . (join '|', @chartype1) . ')$';
-    my $num_regex  = '(?i)^(' . (join '|', @numtype1)  . ')$';
-
-    if (exists($sql_cmd->{operation}))
+    unless (exists($tc->{sql_create})
+        && exists($tc->{sql_create}->{create_op}))
     {
-        if (($sql_cmd->{operation} =~ m/^table$/i)
-            && exists($sql_cmd->{cr_table_list}))
+        my $msg  = "Unknown CREATE operation: " . $sqltxt;
+        my %earg = (self => $self, msg => $msg, severity => 'warn');
+
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
+        return undef;
+    }
+
+    if ($tc->{sql_create}->{create_op} eq 'TABLE')
+    {
+        my $tablename = $tc->{sql_create}->{tc_newtable_fullname};
+        
+        greet $tablename;
+        
+        if (exists($tc->{sql_create}->{table_def})
+            && exists($tc->{sql_create}->{table_def}->{tab_column_list}))
         {
             my @outi;
-
-            return undef
-                unless (exists($sql_cmd->{cr_table_list}->{tablename}));
-
-            push @outi, $sql_cmd->{cr_table_list}->{tablename};
             
-            if (exists($sql_cmd->{cr_table_list}->{columns}))
+            push @outi, $tablename;
+            
+            my $clist = $tc->{sql_create}->{table_def}->{tab_column_list};
+            for my $coldef (@{$clist->[0]})
             {
-                for my $col (@{$sql_cmd->{cr_table_list}->{columns}})
+                my $colname = $coldef->{tc_newcolumn_name};
+                
+                unless (scalar(@{$coldef->{column_type}}))
                 {
-                    my $colname = $col->{name};
-                    my $coltype = $col->{type};
-                    
-                    # convert to bogus internal number/char types
-                    $coltype = "c"
-                        if ($coltype =~ m/$char_regex/);
+                    my $msg  = "Cannot CREATE TABLE ($tablename) -- " .
+                        "No type information for column ($colname)";
+                    my %earg = (self => $self, msg => $msg, 
+                                severity => 'warn');
 
-                    $coltype = "n"
-                        if ($coltype =~ m/$num_regex/);
+                    &$GZERR(%earg)
+                        if (defined($GZERR));
 
-                    push @outi, "$colname=$coltype";
+                    return undef;
                 }
 
+                my $coltype = $coldef->{column_type}->[0]->{base};
+                push @outi, "$colname=$coltype";
             }
             return $self->Kgnz_CT(@outi);
         }
-        elsif (($sql_cmd->{operation} =~ m/^index$/i)
-            && exists($sql_cmd->{cr_index_list}))
+    } # end create table
+
+    if ($tc->{sql_create}->{create_op} eq 'INDEX')
+    {
+        my $iname     = $tc->{sql_create}->{tc_newindex_fullname};
+        my $tablename = $tc->{sql_create}->{tc_table_fullname};
+        
+        greet $iname, $tablename;
+        
+        if (exists($tc->{sql_create}->{tc_column_list}))
         {
             my @outi;
-
-            return undef
-                unless (exists($sql_cmd->{cr_index_list}->{indexname}));
-            return undef
-                unless (exists($sql_cmd->{cr_index_list}->{tablename}));
-
-            push @outi, $sql_cmd->{cr_index_list}->{indexname};
-            push @outi, $sql_cmd->{cr_index_list}->{tablename};
             
-            if (exists($sql_cmd->{cr_index_list}->{columns}))
-            {
-                for my $col (@{$sql_cmd->{cr_index_list}->{columns}})
-                {
-                    my $colname = $col->{name};
-
-                    push @outi, $colname;
-                }
-            }
+            push @outi, $iname, $tablename, 
+            @{$tc->{sql_create}->{tc_column_list}};
 
             return $self->Kgnz_CIdx(@outi);
         }
+    } # end create index
 
+    {
+        my $msg  = "Unknown CREATE operation: " . $sqltxt;
+        my %earg = (self => $self, msg => $msg, severity => 'warn');
+
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
+        return undef;
     }
 
 } # end SQLCreate
@@ -2100,131 +1817,117 @@ sub SQLUpdate
     my $dictobj = $self->{dictobj};
     my $sqltxt = $self->{current_line};
 
-    my ($sql_cmd, $pretty, $badparse) =
-        $self->{feeble}->Parseall($sqltxt);
-
-    return undef
-        if ($badparse);
-
-#    greet $sql_cmd;
-
     my ($msg, %earg);
     my $severity = 'info';
 
-    my $tablename = $sql_cmd->{tablename};
+    my $tablename;
+    my @sel_prep;
 
-    return 0
-        unless $dictobj->DictTableExists (tname => $tablename);
+    my ($rownum, $rowcount) = (0, 0);
 
-#    my $colcnt = scalar keys 
-#        % { $dictobj->DictTableGetCols (tname => $tablename) };
+    my $parse_tree = $self->{plan}->Parse(statement => $sqltxt);
 
-    my @colary;
+    greet $parse_tree;
 
-    for my $ii (@{$sql_cmd->{update_list}})
+    unless (defined($parse_tree))
     {
-        my ($colname, $newval) = @{$ii};
+        $msg  = "Input: " . $sqltxt;
+        %earg = (self => $self, msg => $msg, severity => 'warn');
 
-        my $colnum = $dictobj->DictTableColExists (tname => $tablename,
-                                                   colname => $colname);
+        &$GZERR(%earg)
+            if (defined($GZERR));
 
-        if (defined($colary[$colnum]))
+        return undef;
+    }
+
+    my $algebra = $self->{plan}->Algebra(parse_tree => $parse_tree);
+
+    my ($tc, $err_status) = 
+        $self->{plan}->TypeCheck(algebra   => $algebra,
+                                 statement => $sqltxt);
+
+    greet $tc, $err_status;
+
+    return undef
+        if ($err_status);
+
+    my %update_col;
+
+    $tablename = $tc->{sql_update}->{tc_table_fullname};
+    my $where  = $tc->{sql_update}->{where_clause};
+
+    # walk the list of update expressions -- check for duplicates
+    for my $update_expr (@{$tc->{sql_update}->{update_set_exprlist}})
+    {
+        my $col1  = $update_expr->{update_columns}->{tc_column_name};
+        my $expr1 = $update_expr->{update_sources}->{vx_txt};
+
+        if (exists($update_col{$col1}))
         {
-            $msg = "duplicate update column ($colname), table ($tablename)\n";
-            %earg = (self => $self, msg => $msg,
-                     severity => 'warn');
-                    
+            $msg  = "Duplicate update column ($col1), table ($tablename)";
+            %earg = (self => $self, msg => $msg, severity => 'warn');
+
             &$GZERR(%earg)
                 if (defined($GZERR));
-
-            return 0;
+            
+            return undef;
+            # goto L_update_fini;
         }
+        $update_col{$col1} = $expr1;
+    }
+    greet %update_col;
 
-        # XXX XXX: need to handle the case where newval is a column, not
-        # an identifier
+    my $allcols = $dictobj->DictTableGetCols (tname => $tablename);
 
-        if ($newval =~ m/^NULL$/i)
+    # build a vector of all table columns, starting with rid.
+    # If the column had an update expression, replace it with that
+    # expression.
+    my @colvec;
+    $colvec[0] = "rid";
+
+    while (my ($kk, $vv) = each (%{$allcols}))
+    {
+        my ($colidx, $dtype) = @{$vv};
+
+        if (exists($update_col{$kk}))
         {
-            # Convert unquoted NULL value to an undef
-            $newval = undef;
+            # use the update expression
+            $colvec[$colidx] = $update_col{$kk};
         }
         else
         {
-            # strip double and single quotes
-            my @getquotes = ($newval =~ m/^\"(.*)\"$/);
-            if (scalar(@getquotes))
-            {
-                $newval = shift @getquotes;
-            }
-            else
-            {
-                # NOTE: Special treat for single-quoted strings, 
-                # e.g.: 'foo'.  Allow/require backslash as a quote
-                # character, so must use '\\' to enter a single
-                # backslash and '\'' (backslash quote) to embed a
-                # single-quote in a single-quoted string.
-
-                # if have leading and trailing single quote
-                @getquotes = ($newval =~ m/^\'(.*)\'$/);
-
-                if (scalar(@getquotes))
-                {
-#                    greet @getquotes;
-
-                    # strip lead/trail quotes so parse_line can work
-                    # its magic
-                    $newval = $getquotes[0]; 
-
-                    # use parse line to process quoted characters 
-
-                    # XXX XXX: some weirdness using \n for delimiter
-                    # -- seems to work since shouldn't have embedded
-                    # newlines in these strings, so we only
-                    # split the line into a single token
-                    @getquotes = &parse_line('\n', 0, $newval);
-#                    greet @getquotes;
-
-                    # backslashes have been processed
-                    $newval = shift @getquotes;
-                    for my $tk (@getquotes)
-                    {
-                        $newval .= $tk
-                            if (defined($tk));
-                    }
-                }
-            }
+            # use the current column value
+            $colvec[$colidx] = $kk;
         }
-
-        # save newvalue for this column
-        $colary[$colnum] = $newval;
-
-    } # end for
+    }
 
 
-    # build a select statement
-    my $sel_cmd = {};
-    $sel_cmd->{from_list} = [{val => $tablename} ];
+    # NOTE: would be nice to avoid parsing a SELECT statement after we
+    # parsed the UPDATE.  Should optimize this code.
 
-    # get every column for now - optimize later
-    $sel_cmd->{select_list} = [
-                               {val => "rid", name => "rid"}, 
-                               {val => "*", name => "*"}
-                               ];
-    $sel_cmd->{where_list} = $sql_cmd->{where_list}
-       if (exists($sql_cmd->{where_list}) &&
-           scalar(@{$sql_cmd->{where_list}}));
-    my @sel_prep = $self->_OLD__SQLselprep($sel_cmd);
-#    greet @sel_prep;
+    my $sel_query = "select " . join(', ', @colvec) . " from $tablename ";
+
+    if (defined($where) && scalar(@{$where}))
+    {
+        # add the WHERE clause if it exists
+        $sel_query .= " where " . $where->[0]->{sc_txt} ;
+    }
+
+    greet $sel_query;
+
+    # prepare the new SELECT
+    @sel_prep = $self->SQLSelectPrepare2($sel_query);
 
     return undef
+        # goto L_update_fini;
         unless (scalar(@sel_prep));
 
     my @selex_state = $self->SelectExecute(@sel_prep);
 
     return undef 
+        # goto L_update_fini;
         unless (scalar(@selex_state));
 
-    my ($rownum, $rowcount) = (0, 0);
     my ($key, @vals, @outi);
 
     # select out all the rows first (consistent read)
@@ -2237,15 +1940,6 @@ sub SQLUpdate
         last 
             unless (defined($rownum));
 
-#            greet $key, $rownum,  @vals;
-
-        for my $jj (0..(scalar(@vals) - 1))
-        {
-            $vals[$jj] = $colary[$jj]
-                if (defined($colary[$jj]));
-        }
-#        greet $key, $rownum,  @vals;
-        
         my $newref = [@vals];
         push @outi, $newref;
     } # end while 1
@@ -2271,6 +1965,9 @@ sub SQLUpdate
         $rowcount++;
 
     } # end for
+
+  L_update_fini:
+
     my $rowthing = ((1 == $rowcount) ? "row" : "rows");
     $msg = "updated $rowcount $rowthing in table $tablename.\n";
     %earg = (self => $self, msg => $msg,
@@ -2889,30 +2586,6 @@ sub CommonSelectPrepare
         $tablename = $args{tablename};
         $colpairs  = $args{colpairs};
 
-        if (defined($args{where}))
-        {
-
-            return @outi # make sure have a table
-                unless $dictobj->DictTableExists (tname => $tablename);
-
-            $filter =
-                $self->SQLWhere(tablename => $tablename,
-                                where => $args{where});
-
-            unless (defined($filter))
-            {
-                whisper "invalid where clause";
-
-                my $msg = "invalid where clause";
-                my %earg = (self => $self, msg => $msg,
-                            severity => 'warn');
-                    
-                &$GZERR(%earg)
-                    if (defined($GZERR));
-
-                return @outi;
-            }
-        }
         if (defined($args{where2}))
         {
             return @outi # make sure have a table
@@ -4653,7 +4326,10 @@ logic.  It needs to get split up.
 
 =item SQLAlter: need And purity check
 
-=item SQLUpdate: convert to new parser
+=item SQLUpdate: cleanup - avoid generating new SELECT.  Allow regexp update.
+
+=item SQLCreate: need to handle CREATE TABLE AS SELECT, table/column 
+      constraints, CREATE TABLESPACE, etc.
 
 =back
 

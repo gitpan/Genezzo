@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Plan/RCS/TypeCheck.pm,v 1.22 2005/05/26 07:46:36 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Plan/RCS/TypeCheck.pm,v 1.27 2005/06/17 08:41:42 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -17,7 +17,7 @@ use Carp;
 our $VERSION;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 1.22 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.27 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -143,6 +143,7 @@ sub TypeCheck
     {
         if (
                scalar(@{$self->{tc1}->{tc_err}->{nosuch_table}})
+            || scalar(@{$self->{tc1}->{tc_err}->{duplicate_table}})
             || scalar(@{$self->{tc3}->{tc_err}->{nosuch_column}})
             )
         {
@@ -184,6 +185,7 @@ sub TableCheck
 
     # save bad tables for error reporting...
     $tc1->{tc_err}->{nosuch_table} = [];
+    $tc1->{tc_err}->{duplicate_table} = [];
     $algebra = $self->_get_table_info($algebra, $args{dict});
 
     # next, cross reference table info with query blocks
@@ -279,73 +281,124 @@ sub _get_table_info # private
         # recursively convert all elements of hash, but treat
         # table name specially
 
+        if (exists($genTree->{table_name}))
+        {
+
+            # uniquely number each table reference
+            # Note: use for join order to select STAR expansion
+
+            $genTree->{tc_table_position} = $treeCtx->{tpos};
+            $treeCtx->{tpos}++;
+
+            my @full_name = _process_name_pieces(@{$genTree->{table_name}});
+
+            # build a "dot" separated string
+            my $full_name_str = join('.', @full_name);
+
+            $genTree->{tc_table_fullname} = $full_name_str;
+
+            # look it up in the dictionary
+            if (! ($dict->DictTableExists (
+                                           tname => $full_name_str,
+                                           silent_exists => 1,
+                                           silent_notexists => 0 
+                                           )
+                   )
+                )
+            {
+                push @{$treeCtx->{tc_err}->{nosuch_table}}, 
+                $full_name_str;
+#                       return undef; # XXX XXX XXX XXX
+            }
+            else
+            {
+                # XXX XXX: temporary?
+                # get hash by column name
+                $genTree->{tc_table_colhsh} = 
+                    $dict->DictTableGetCols (tname => $full_name_str);
+                my @colarr;
+                
+                (keys(%{$genTree->{tc_table_colhsh}}));
+                # build array by column position
+                while ( my ($chkk, $chvv) 
+                        = each ( %{$genTree->{tc_table_colhsh}})) 
+                {
+                    my %nh = (colname => $chkk, coltype => $chvv->[1]);
+                    $colarr[$chvv->[0]] = \%nh;
+                }
+                shift @colarr;
+                $genTree->{tc_table_colarr} = \@colarr;               
+            }
+                
+        } # end if tablename
+
+        if (exists($genTree->{new_table_name}))
+        {
+            my @full_name = _process_name_pieces(@{$genTree->{new_table_name}});
+
+            # build a "dot" separated string
+            my $full_name_str = join('.', @full_name);
+
+            $genTree->{tc_newtable_fullname} = $full_name_str;
+
+            # look it up in the dictionary
+            if ($dict->DictTableExists (
+                                        tname => $full_name_str,
+                                        silent_exists => 0,
+                                        silent_notexists => 1 
+                                        )
+                )
+            {
+                push @{$treeCtx->{tc_err}->{duplicate_table}}, 
+                $full_name_str;
+#                       return undef; # XXX XXX XXX XXX
+            }
+                
+        } # end if new table name
+
+        if (exists($genTree->{new_index_name}))
+        {
+            my @full_name = _process_name_pieces(@{$genTree->{new_index_name}});
+
+            # build a "dot" separated string
+            my $full_name_str = join('.', @full_name);
+
+            $genTree->{tc_newindex_fullname} = $full_name_str;
+
+            # look it up in the dictionary
+            if ($dict->DictTableExists (
+                                        tname => $full_name_str,
+                                        silent_exists => 0,
+                                        silent_notexists => 1 
+                                        )
+                )
+            {
+                # XXX XXX: should be "duplicate index"...
+                push @{$treeCtx->{tc_err}->{duplicate_table}}, 
+                $full_name_str;
+#                       return undef; # XXX XXX XXX XXX
+            }
+                
+        } # end if new index name
+
+        if (exists($genTree->{table_alias}) &&
+            (scalar(@{$genTree->{table_alias}})))
+        {
+            # don't build an alias unless we really have one
+            my @full_name = _process_name_pieces(@{$genTree->{table_alias}});
+
+            # build a "dot" separated string
+            my $full_name_str = join('.', @full_name);
+
+            $genTree->{tc_table_fullalias} = $full_name_str;
+        }
+
         while ( my ($kk, $vv) = each ( %{$genTree})) # big while
         {
             if ($kk !~ m/^(table_name|table_alias)$/)
             {
                 $genTree->{$kk} = $self->$subname($vv, $dict);
             }
-            else # table name or alias
-            {
-                my $isTableName = ($kk =~ m/^table_name$/);
-                if ($isTableName)
-                {
-                    # uniquely number each table reference
-                    # Note: use for join order to select STAR expansion
-
-                    $genTree->{tc_table_position} = $treeCtx->{tpos};
-                    $treeCtx->{tpos}++;
-                }
-
-                my @full_name = _process_name_pieces(@{$vv});
-
-                # build a "dot" separated string
-                my $full_name_str = join('.', @full_name);
-
-                if (!$isTableName)
-                {
-                    # don't build an alias unless we really have one
-                    $genTree->{tc_table_fullalias} = $full_name_str
-                        if (scalar(@{$vv}));
-                }
-                else # is table name
-                {
-                    $genTree->{tc_table_fullname} = $full_name_str;
-
-                    # look it up in the dictionary
-                    if (! ($dict->DictTableExists (
-                                                   tname => $full_name_str,
-                                                   silent_exists => 1,
-                                                   silent_notexists => 0 
-                                                   )
-                           )
-                        )
-                    {
-                        push @{$treeCtx->{tc_err}->{nosuch_table}}, 
-                             $full_name_str;
-#                       return undef; # XXX XXX XXX XXX
-                    }
-                    else
-                    {
-                        # XXX XXX: temporary?
-                        # get hash by column name
-                        $genTree->{tc_table_colhsh} = 
-                            $dict->DictTableGetCols (tname => $full_name_str);
-                        my @colarr;
-
-                        (keys(%{$genTree->{tc_table_colhsh}}));
-                        # build array by column position
-                        while ( my ($chkk, $chvv) 
-                                = each ( %{$genTree->{tc_table_colhsh}})) 
-                        {
-                            my %nh = (colname => $chkk, coltype => $chvv->[1]);
-                            $colarr[$chvv->[0]] = \%nh;
-                        }
-                        shift @colarr;
-                        $genTree->{tc_table_colarr} = \@colarr;               
-                    }
-                } # end is table name
-            } # end table name or alias
         } # end big while
     }
     return $genTree;
@@ -420,14 +473,20 @@ sub _check_table_info # private
             }
         }
 
+        # NOTE: build an alias if we don't have one. Do it outside the
+        # loop in order to avoid updating the hash as we traverse it.
+        if (exists($genTree->{tc_table_fullname}))
+        {
+            unless (exists($genTree->{tc_table_fullalias}))
+            {
+                my $tab_alias = $genTree->{tc_table_fullname};
+                
+                $genTree->{tc_table_fullalias} = $tab_alias;
+            }
+        }
+
         while ( my ($kk, $vv) = each ( %{$genTree})) # big while
         {
-
-            # XXX XXX XXX: may be an issue here on whether hash
-            # traversal sees alias before tablename -- sometimes get
-            # spurious warning on INSERT - duplicate table name
-            # XXX XXX XXX XXX XXX 
-
             if ($kk !~ m/^tc_table_fullname$/)
             {
                 $genTree->{$kk} = $self->$subname($vv, $dict);
@@ -442,17 +501,15 @@ sub _check_table_info # private
                 }
                 else
                 {
+                    # NOTE: should never get here - should always
+                    # define an alias outside this loop...
                     $tab_alias = $vv;
-                    # is this safe? update the hash we are traversing...
-                    $genTree->{tc_table_fullalias} = $tab_alias;
                 }
 
                 # store table info in the table list for the current
                 # query block
                 my $current_qb = $treeCtx->{qb_list}->[0];
                 my $tablist    = $treeCtx->{tablist}->[$current_qb]->{tables};
-
-
 
                 # use the alias, rather than the tablename -- this is
                 # ok since the alias points to the base table info.
@@ -558,11 +615,15 @@ sub ColumnCheck
     # a column alias on an aggregate operator like COUNT(*), which
     # can't be completely evaluated until the WHERE clause processes
     # the final row.)
+    #
     # ORDER BY is the last operation, so it can evaluate expressions
     # using the column aliases.  GROUP BY and HAVING behavior seems to
     # be a bit of a tossup.  We'll try to maintain some flexibility --
     # the tablist has separate entries column alias info and table
-    # definitions in each query block.
+    # definitions in each query block.  In case of ambiguity of column
+    # alias which matches an existing column name, use rule where
+    # column names take precedence over column aliases in GROUP
+    # BY/HAVING, *but* reverse precendence in ORDER BY.
     #
     # What is scope of column aliasing in select list itself?  left to
     # right (ie, col2 can utilize the col1 alias) or "simultaneous"?
@@ -803,13 +864,13 @@ sub _get_col_alias # private
                     push @{$genTree->{tc_column_list}}, $full_name_str;
                 }
             }
-            elsif ($kk !~ m/^(column_name|col_alias)$/)
+            elsif ($kk !~ m/^(new_column_name|column_name|col_alias)$/)
             {
                 $genTree->{$kk} = $self->$subname($vv, $dict);
             }
             else # column name or alias
             {
-                my $isColumnName = ($kk =~ m/^column_name$/);
+                my $isColumnName = ($kk =~ m/column_name$/);
 
                 my @full_name = _process_name_pieces(@{$vv});
 
@@ -826,7 +887,16 @@ sub _get_col_alias # private
                     # just build the names here -- lookup in dictionary later
                     $genTree->{tc_col_tablename} = $full_name_str
                         if (scalar(@full_name));
-                    $genTree->{tc_column_name}   = $column_name;
+
+                    if ($kk =~ m/^new_column_name$/)
+                    {
+                        $genTree->{tc_newcolumn_name} = $column_name;
+                    }
+                    else
+                    {
+                        $genTree->{tc_column_name}    = $column_name;
+                    }
+
                 }
                 else # column alias
                 { 
@@ -1245,6 +1315,27 @@ sub _fixup_comp_op
             }
         }
 
+        # XXX XXX XXX: Get text for update col = expression...
+        if (exists($genTree->{operator}))
+        {
+            if (($genTree->{operator} eq "=") &&
+                (exists($genTree->{p1})
+                 && exists($genTree->{p2})))
+            {
+                my $pos1 = $genTree->{p1};
+                my $pos2 = $genTree->{p2};
+
+                my $vx_txt =
+                    substr($treeCtx->{statement},
+                           $pos1,
+                           ($pos2 - $pos1) + 1
+                           );
+                
+                $genTree->{vx_txt} = $vx_txt;
+            }
+        }
+
+
         if (exists($genTree->{comp_op}))
         {
 #            print $genTree->{operator}, "\n";
@@ -1272,7 +1363,7 @@ sub _fixup_comp_op
                 $genTree->{operands}->[2] = {
                     string_literal => $perl_lit,
                     orig_reg_exp => $op2
-                    }
+                    };
             }
 
           L_for_ops:
@@ -1570,6 +1661,59 @@ sub _sql_where
 
         if (exists($genTree->{math_op}))
         {
+
+            # fixup the perl operators like 'comp_perlish'
+            if (($genTree->{math_op} eq 'perlish_substitution')
+                && (3 == scalar(@{$genTree->{operands}})))
+            {
+
+                my $op2 =
+                    $genTree->{operands}->[2];
+
+                # XXX XXX: op2 should be an array of 
+                # perl regex pieces -- reassemble it.  
+                # may need to do some work for non-standard
+                # quoting
+                
+#                my $perl_lit = join("", @{$op2});
+                my $perl_lit = "";
+                for my $toknum (0..(scalar(@{$op2})-1))
+                {
+
+                    # need to skip duplicate quote, e.g.
+                    # s/foo/bar/g becomes
+                    # ['s', '/', 'foo', '/', '/', 'bar', '/', 'g']
+                    # Note the duplicate quotes in position 3,4
+
+                    next if ($toknum == 3);
+                    $perl_lit .= $op2->[$toknum];
+                }
+
+                $genTree->{operands}->[2] = {
+                    string_literal => $perl_lit,
+                    # Note: fill in all the string literal info
+                    vx             => $perl_lit,
+                    tc_expr_type   => 'c',
+                    orig_reg_exp => $op2
+                    };
+
+                if ($op2->[0] !~ /^s$/)
+                {
+                    my $msg = "illegal expression ($perl_lit)\n" .
+                        "only substitution (s//) regexps are " .
+                        "allowed in SELECT list"; 
+                    
+                    my %earg = (self => $self, msg => $msg,
+                                severity => 'warn');
+                
+                    &$GZERR(%earg)
+                        if (defined($GZERR));
+                    
+                    return undef; 
+                }
+
+            }
+
             my $bigstr = '( ';
             for my $op1 (@{$genTree->{operands}})
             {
@@ -1596,6 +1740,14 @@ sub _sql_where
         if (exists($genTree->{bool_op}))
         {
             my $bigstr = '( ';
+
+            if ($genTree->{bool_op} =~ m/NOT/i)
+            {
+                # treat NOT a little special, since it's a prefix
+                # operator, not an infix op like AND/OR.  Should only
+                # have one operand.
+                $bigstr .= '!( ';
+            }
 
             my $op_cnt = 0;
             for my $op1 (@{$genTree->{operands}})
@@ -1641,6 +1793,12 @@ sub _sql_where
 
                 $op_cnt++;
             }
+            if ($genTree->{bool_op} =~ m/NOT/i)
+            {
+                # terminate the NOT expression
+                $bigstr .= ')';
+            }
+
             $bigstr .= ')';
             $genTree->{vx} = $bigstr;
         }

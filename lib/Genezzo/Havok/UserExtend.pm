@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/UserExtend.pm,v 1.11 2005/04/11 07:19:12 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/UserExtend.pm,v 1.12 2005/06/06 07:26:50 claude Exp claude $
 #
 # copyright (c) 2004, 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -93,6 +93,17 @@ sub HavokInit
                 next;
             }
 
+            # check if package has GZERR function, and redefine it to use
+            # our version (since our version might get redefined to point
+            # to parent routine).
+
+            my $gz_err_var = $xname . "::GZERR";
+            my $use_gzerr;
+
+            my $s1 = "\$use_gzerr = defined(\$$gz_err_var);";
+            eval "$s1";
+            greet $s1, $use_gzerr;
+
             no strict 'refs';
 
             my @inargs;
@@ -115,7 +126,16 @@ sub HavokInit
                 my $packf =  $xname . "::" . $fname;
 
                 my $func = "sub " . $mainf ;
-                $func .= "{ " . $packf . '(@_); }';
+                $func .= "{ " ;
+
+                if ($use_gzerr)
+                {
+                    greet "has gzerr!";
+                    $func .= "local \$$gz_err_var = \$Genezzo::Havok::UserExtend::GZERR; "; 
+                    greet $func;
+                }
+                
+                $func .= $packf . '(@_); }';
             
 #            whisper $func;
 
@@ -243,8 +263,8 @@ of functions to import to the default Genezzo namespace.  if xtype =
 
 =head2 Example:
 
-insert into user_extend values (1, "require", "Genezzo::Havok::Examples",  
-"isRedGreen", "SYSTEM", "2004-09-21T12:12");
+insert into user_extend values (1, 'require', 'Genezzo::Havok::Examples',  
+'isRedGreen', 'SYSTEM', '2004-09-21T12:12');
 
 The row causes UserExtend to "require Genezzo::Havok::Examples", and
 it imports "isRedGreen" into the default Genezzo namespace* (actually,

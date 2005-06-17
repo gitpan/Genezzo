@@ -1,5 +1,12 @@
 Revision history for Perl extension Genezzo
 
+0.42 Fri Jun 17 01:31:05 2005
+        - fix boolean NOT
+        - Chain GZERR routines for Havok, UserExtend and other modules
+        - Add genexp.pl to install
+        - New parser, execution for UPDATE, CREATE 
+        - retire Feeble parser
+
 0.41 Thu May 26 00:42:38 2005
         - allow TRUE, FALSE, and NULL in SELECT lists.
         - New parser, execution for ALTER TABLE, DELETE, INSERT.

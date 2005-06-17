@@ -20,7 +20,7 @@ WriteMakefile(
 #        'POSIX'            => '0.0'
     }, # e.g., Module::Name => 1.1
 
-   'EXE_FILES' => [ 'lib/Genezzo/gendba.pl' ], # install in /usr/bin
+   'EXE_FILES' => [ 'lib/Genezzo/gendba.pl', 'lib/Genezzo/genexp.pl' ], # install in /usr/bin
 );
 
 package MY;

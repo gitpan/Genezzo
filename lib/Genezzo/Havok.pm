@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Havok.pm,v 1.11 2005/01/30 09:37:04 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Havok.pm,v 1.12 2005/06/06 07:26:36 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -18,7 +18,7 @@ use Carp;
 our $VERSION;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 1.11 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.12 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -159,6 +159,22 @@ sub HavokInit
                 if (defined($GZERR));
 
             next;
+        }
+
+        # check if package has GZERR function, and redefine it to use
+        # our version (since our version might get redefined to point
+        # to parent routine).
+
+        my $gz_err_var = $modname . "::GZERR";
+        my $use_gzerr;
+
+        my $s1 = "\$use_gzerr = defined(\$$gz_err_var);";
+        eval "$s1";
+        greet $s1, $use_gzerr;
+        if ($use_gzerr)
+        {
+            greet "has gzerr!";
+            eval "\$$gz_err_var = \$GZERR; "; 
         }
 
         my %nargs;

@@ -41,10 +41,9 @@ lib/Genezzo/Dict.pm
 lib/Genezzo/Havok.pm
 lib/Genezzo/Havok/SysHook.pm
 lib/Genezzo/Havok/UserExtend.pm
+lib/Genezzo/Havok/Basic.pm
 lib/Genezzo/Havok/Examples.pm
 lib/Genezzo/TSHash.pm
-lib/Genezzo/Feeble.pm
-lib/Genezzo/Parse/FeebLex.pm
 lib/Genezzo/Parse/SQLGrammar.pl
 lib/Genezzo/Parse/SQL.pm
 lib/Genezzo/Plan.pm

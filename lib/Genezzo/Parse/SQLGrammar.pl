@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Parse/RCS/SQLGrammar.pl,v 1.25 2005/05/25 07:43:08 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Parse/RCS/SQLGrammar.pl,v 1.30 2005/06/17 08:40:57 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -266,18 +266,24 @@ $grammar .=  "/i \n\n";
 }    
 
        create_guts : TABLE_ table_name create_table_def
-{ $return = { table_name   => $item{table_name},
-              table_def    => $item{create_table_def}
+{ $return = { 
+              create_op       => "TABLE",
+              new_table_name  => $item{table_name},
+              table_def       => $item{create_table_def}
           }
 }    
                    | /INDEX/i  big_id ON table_name column_list
-{ $return = { index_name   => $item{big_id},
-              table_name   => $item{table_name},
-              column_list  => $item{column_list}
+{ $return = { 
+              create_op      => "INDEX",
+              new_index_name => $item{big_id},
+              table_name     => $item{table_name},
+              column_list    => $item{column_list}
           }
 }
-                   | /TABLESPACE/i  table_name
-{ $return = { tablespace_name   => $item{table_name} }}
+                   | /TABLESPACE/i  identifier
+{ $return = { 
+              create_op => "TABLESPACE",    
+              tablespace_name   => [$item{identifier}] }}
     
        ct_as_select: AS_ sql_query
 { $return = {sql_query      => $item{sql_query}}}
@@ -304,10 +310,10 @@ table_element_list: '(' <commit> table_elt(s /,/) ')'
 # column type is optional for create table as select
         table_elt : column_name column_type(?) 
                     column_default(?) col_cons_list(?)
-{$return = {column_name => $item{column_name},
-            column_type => $item{'column_type(?)'},
-            column_default => $item{'column_default(?)'},
-            col_cons_list => $item{'col_cons_list(?)'}}}
+{$return = {new_column_name => $item{column_name},
+            column_type     => $item{'column_type(?)'},
+            column_default  => $item{'column_default(?)'},
+            col_cons_list   => $item{'col_cons_list(?)'}}}
                   | table_constraint_def
 {$return = {table_constraint => $item{table_constraint_def}}}
 
@@ -621,10 +627,9 @@ column_constraint_def: constraint_name(?) col_cons
 # sql92 says only single column UPDATE SET expression, but elcaro 
 # allows more...
         update_colthing: column_list 
-{$return = $item[1]}
+{$return = {column_list => $item[1]}}
                        | column_name
-# XXX XXX XXX XXX ? why array?
-{$return = [$item[1]]}
+{$return = {column_name => $item[1]}}
         update_sources : value_expression
 {$return = $item{value_expression}}
                        | '(' expr_list ')'
@@ -634,9 +639,10 @@ column_constraint_def: constraint_name(?) col_cons
         update_oplist  : comp_or_perl
 {$return = $item{comp_or_perl}}
                        | '=' <commit> update_sources 
-{$return = {operator => $item[1],
-            operands => $item{update_sources}
-        }
+{
+    $return = {operator => $item[1],
+               operands => $item{update_sources}
+           }
 }
 
 #
@@ -1077,21 +1083,55 @@ column_constraint_def: constraint_name(?) col_cons
                   | '!'
 { $return = $item[1] }    
 
-        unary_expr  :  unary_op(?) num_primary
+        unary_expr  :  unary_op(?) num_primary1
 {  
     if (scalar(@{$item{'unary_op(?)'}}))
     {
         $return = {unary => $item{'unary_op(?)'},
                    tc_expr_type => 'n',
-                    val   => $item{num_primary}
+                    val   => $item{num_primary1}
                }
+    }
+    else
+    {
+        $return = $item{num_primary1};
+    }
+    $return;
+}                
+
+# e.g. select a=~ s/foo/bar from emp 
+# or
+# update t1 set a=~ s/foo/bar/ for an update expression
+perlish_substitution : '=~'  <perl_quotelike>
+{$return = {
+    math_op  => 'perlish_substitution',
+    operator => $item[1],
+    operands => [$item[1], $item[2]]
+    }
+}
+
+# wrapper for num_primary and num_perlish_substitution
+        num_primary1 : num_primary
+#        num_primary1 : num_perlish_substitution
+{ $return = $item[1] }
+
+# XXX XXX: problem is that substitute operator returns TRUE/FALSE in
+# scalar context, not the substituted string.
+num_perlish_substitution : num_primary perlish_substitution(?)
+{
+    if (scalar(@{$item{'perlish_substitution(?)'}}))
+    {
+        my $op1 = $item{'perlish_substitution(?)'}->[0];
+        # add the num_primary to the operand list for perlish substitution
+        unshift @{$op1->{operands}}, $item{num_primary};
+        $return = $op1;
     }
     else
     {
         $return = $item{num_primary};
     }
     $return;
-}                
+}
     
         num_primary : value_expr_primary
 { $return = $item{value_expr_primary}}
@@ -1199,7 +1239,7 @@ column_constraint_def: constraint_name(?) col_cons
 { my @bool_op  = @{$item[1]};
   if (exists($item{OR}))
   {
-      $return = {bool_op => 'OR',
+      $return = {bool_op   => 'OR',
                  operands  => \@bool_op
                  };
   }
@@ -1213,7 +1253,7 @@ column_constraint_def: constraint_name(?) col_cons
 { my @bool_op  = @{$item[1]};
   if (exists($item{AND}))
   {
-      $return = {bool_op => 'AND',
+      $return = {bool_op   => 'AND',
                  operands  => \@bool_op
                  };
   }
@@ -1227,8 +1267,11 @@ column_constraint_def: constraint_name(?) col_cons
 {
     if (scalar(@{$item{'NOT(?)'}}))
     {
-        $return = {NOT      => $item{'NOT(?)'},
-                    operands => $item{bool_test}
+# return an array of operands (even though there is only one)
+# to match AND, OR
+        $return = {bool_op   => 'NOT',
+                   NOT       => $item{'NOT(?)'},
+                   operands  => [$item{bool_test}]
                 };
     }
     else
@@ -1303,9 +1346,17 @@ column_constraint_def: constraint_name(?) col_cons
                     | '=~'
 { $return = $item[1] }    
         comp_or_perl: comp_op value_expression 
-{$return = {operator => $item{comp_op},
-            operands => $item{value_expression}
-        }
+{
+#
+# get start/stop position for value_expression
+#
+    my $p1 = $itempos[2]{offset}{from};
+    my $p2 = $itempos[2]{offset}{to};
+    
+    $return = {operator => $item{comp_op},
+               operands => $item{value_expression},
+               p1 => $p1, p2 => $p2
+           }
 }
 # e.g. foo !~ m/foo/ for a search predicate, or
 # update t1 set a=~ s/foo/bar/ for an update expression
