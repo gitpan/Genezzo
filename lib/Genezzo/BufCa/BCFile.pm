@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BCFile.pm,v 6.9 2005/02/08 06:34:49 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BCFile.pm,v 6.12 2005/07/08 09:30:12 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -118,7 +118,8 @@ sub FileReg
     whoami @_;
 
     my %required = (
-                    FileName => "no FileName !"
+                    FileName   => "no FileName !",
+                    FileNumber => "no FileNumber !"
                     );
     
     my %args = (
@@ -149,11 +150,16 @@ sub FileReg
             unless (scalar(@headerinfo));
         $th{hdrsize} = $headerinfo[0];
 
-        push (@{$fn_arr}, \%th);
+         my $fileno = $args{FileNumber};
+        
+#        greet $fileno;
 
         # XXX: NOTE: treat filename array as 1 based, vs 0 based 
         # -- use fn_arr[n-1]->name to get filename.
-        $fn_hsh->{$args{FileName}} = scalar(@{$fn_arr});
+        
+        $fn_hsh->{$args{FileName}} = $fileno;            
+        $fileno--;
+        $fn_arr->[$fileno] = \%th;
     }   
 
     return ($fn_hsh->{$args{FileName}})
@@ -174,7 +180,7 @@ sub _filereadblock
 
     # HOOK: PRE SYSREAD BLOCK
 
-    $fh->sysread ($$refbuf, $blocksize)
+    Genezzo::Util::gnz_read ($fh, $$refbuf, $blocksize)
         == $blocksize
             or die "bad read - file $fname : $fnum, block $bnum : $! \n";
 
@@ -258,7 +264,7 @@ sub _filewriteblock
 
     # HOOK: PRE SYSWRITE BLOCK
 
-    $fh->syswrite ($$refbuf,  $blocksize)
+    gnz_write ($fh, $$refbuf,  $blocksize)
         == $blocksize
     or die "bad write - file $fname : $fnum, block $bnum : $! \n";
 

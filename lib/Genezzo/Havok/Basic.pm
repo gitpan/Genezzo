@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/Basic.pm,v 1.1 2005/06/06 07:24:35 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/Basic.pm,v 1.2 2005/07/06 06:39:42 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -90,7 +90,7 @@ __END__
 
 =head1 NAME
 
-Genezzo::Havok::Baisc - some basic functions
+Genezzo::Havok::Basic - some basic functions
 
 =head1 SYNOPSIS
 

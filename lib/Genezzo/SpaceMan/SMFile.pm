@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/SpaceMan/RCS/SMFile.pm,v 6.4 2005/01/30 09:42:43 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/SpaceMan/RCS/SMFile.pm,v 6.5 2005/07/06 06:37:52 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -21,7 +21,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 6.4 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 6.5 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
     @EXPORT      = ( ); # qw(&NumVal);
@@ -47,12 +47,25 @@ sub new
     # buffer cache
     $self->{realbc} = shift;
 
+    $self->{filenumber} = shift;
+
     $self->{read_only} = 0; # TODO: set for read-only database
     
     $self->{bc} = {};
     my $bc = $self->{bc};
     $bc->{realbcfileno} = 
-        $self->{realbc}->FileReg(FileName => "$self->{filename}");
+        $self->{realbc}->FileReg(FileName => $self->{filename},
+                                 FileNumber => $self->{filenumber});
+
+    unless (defined($bc->{realbcfileno}))
+    {
+        whoami;
+        my $fn = $self->{filename};
+        whisper "failed to register $fn!!";
+        print   "\nfailed to register $fn!!\n";
+        return undef;
+    }
+
 
     # read the fileheader
     $bc->{fileheader} = {};

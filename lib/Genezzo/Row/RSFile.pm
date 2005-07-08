@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSFile.pm,v 6.5 2005/01/30 09:38:58 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSFile.pm,v 6.6 2005/07/08 09:32:26 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -53,6 +53,7 @@ sub _init
 
     # array of push hashes from make_new_chunk
     $self->{filename}  = $args{filename};
+    $self->{filenumber}  = $args{filenumber};
 
     $self->{numbytes}  = $args{numbytes};
     $self->{numblocks} = $args{numblocks};
@@ -67,7 +68,8 @@ sub _init
     $self->{smf} = Genezzo::SpaceMan::SMFile->new($args{filename},
                                                   $args{numbytes},
                                                   $args{numblocks},
-                                                  $args{bufcache});
+                                                  $args{bufcache},
+                                                  $args{filenumber});
 
     return 0
         unless (defined($self->{smf}));
@@ -90,7 +92,8 @@ sub _init
     $bc->{bufblockno} = ();  
     $bc->{bceref} = ();
     $bc->{realbcfileno} = 
-        $self->{realbc}->FileReg(FileName => "$self->{filename}");
+        $self->{realbc}->FileReg(FileName   => $self->{filename},
+                                 FileNumber => $self->{filenumber});
 
     # current insertion point - (not necessarily the current block)
     $self->{current_chunk_for_insert} = (); 

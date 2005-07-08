@@ -331,8 +331,8 @@ Genezzo::Havok::SysHook - load the SysHook table
  # don't say "use Genezzo::Havok::SysHook".  Update the
  # dictionary havok table:
 
-insert into havok values (3, "Genezzo::Havok::SysHook", "SYSTEM", 
-"2004-09-21T12:12", 0);
+insert into havok values (3, 'Genezzo::Havok::SysHook', 'SYSTEM', 
+'2004-09-21T12:12', 0);
 
 
 =head1 DESCRIPTION
@@ -384,9 +384,9 @@ of functions to import to the default Genezzo namespace.  if xtype =
 
 =head2 Example:
 
-insert into sys_hook values (1, "Genezzo::Dict", "dicthook1", "Howdy_Hook",
-"require", "Genezzo::Havok::Examples",  
-"Howdy", "SYSTEM", "2004-09-21T12:12");
+insert into sys_hook values (1, 'Genezzo::Dict', 'dicthook1', 'Howdy_Hook',
+'require', 'Genezzo::Havok::Examples',  
+'Howdy', 'SYSTEM', '2004-09-21T12:12');
 
 The row causes SysHook to "require Genezzo::Havok::Examples", and
 calls the "Howdy" function from the hook function "dicthook1" in the

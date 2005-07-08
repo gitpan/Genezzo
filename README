@@ -492,9 +492,11 @@ NEW FEATURES - Improved Parser
   Version 0.42 adds arbitrary expression support to UPDATE, and marks
   the complete switchover to the new parser.
 
+  Version 0.43 adds case-insensitive table and column names.
+
 INCOMPATIBLE CHANGES
 
-  Version 0.42 dictionary and block format is incompatible with
+  Version 0.43 dictionary and block format is incompatible with
   previous releases.  No upgrade path is supported.
 
 SEE ALSO

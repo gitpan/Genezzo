@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Util.pm,v 6.6 2004/12/26 00:15:11 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Util.pm,v 6.7 2005/07/08 09:26:41 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -20,13 +20,14 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 6.6 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 6.7 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
     @EXPORT      = qw(&whisper &whoami &greet 
                       &Validate &FlatSave &FlatLoad 
                       &HumanNum &NumVal &checkKeyVal
-                      &PackRowCheck &PackRow &UnPackRow &PackRow2);
+                      &PackRowCheck &PackRow &UnPackRow &PackRow2
+                      &getUseRaw &setUseRaw &gzn_read &gnz_write);
     %EXPORT_TAGS = ( );     # eg: TAG => [ qw!name1 name2! ],
 
     # your exported package globals go here,
@@ -35,7 +36,7 @@ BEGIN {
     @EXPORT_OK   = qw($QUIETWHISPER $WHISPERDEPTH $DEFBLOCKSIZE $USECARP 
                       $DEFDBSIZE $MINBLOCKSIZE $MAXBLOCKSIZE $MAXDBSIZE
                       $UNPACK_TEMPL_ARR $WHISPER_PRINT $UTIL_EPRINT 
-                      $WHISPERPREFIX);
+                      $WHISPERPREFIX $RAW_IO);
 
 }
 
@@ -122,6 +123,9 @@ BEGIN {
 our $QUIETWHISPER = 0; # XXX XXX XXX XXX
 our $WHISPERDEPTH = 1;
 our $WHISPERPREFIX = "whisper: ";
+
+our $RAW_IO          = 0;   # use "cooked" file systems by default
+our $ALIGN_BLOCKSIZE = 512; # header alignment for raw io
 
 our $DEFBLOCKSIZE = 4096;
 our $DEFDBSIZE    = 80 * $DEFBLOCKSIZE ; # 327680 was 163840
@@ -1271,7 +1275,7 @@ sub FileGetHeaderInfo
     sysseek ($fh, 0, 0 )
         or die "bad seek - file $fname : $! \n";
 
-    sysread ($fh, $buf, $maxHeadersize)
+    gnz_read ($fh, \$buf, $maxHeadersize)
         == $maxHeadersize
             or die "bad read - file $fname : $! \n";
 
@@ -1457,6 +1461,70 @@ sub GetIndexKeys
     return undef;
 
 } # end GetIndexKeys
+
+sub setUseRaw
+{
+    my $val = shift;
+
+    if ($val && !$RAW_IO)
+    {
+        $RAW_IO = 1;
+        my $raw_io_class = "Genezzo::RawIO";
+        if (eval "require $raw_io_class")
+        {
+            my $s1;
+            ($s1 = <<'EOF_S1') =~ s/^\#//gm;            
+#sub Genezzo::Util::gnz_read(*\$$)
+#{
+#    my ($filehandle, $scalar, $length) = @_;
+#
+#    return Genezzo::RawIO::gnz_raw_read($filehandle, $$scalar, $length);
+#}
+EOF_S1
+
+            my $s2;
+            ($s2 = <<'EOF_S2') =~ s/^\#//gm;            
+#sub Genezzo::Util::gnz_write(*$$)
+#{
+#    my ($filehandle, $scalar, $length) = @_;
+#
+#    return Genezzo::RawIO::gnz_raw_write($filehandle, $scalar, $length);
+#}
+EOF_S2
+            unless (eval $s1)
+            {
+                carp "$@";
+            }
+            unless (eval $s2)
+            {
+                carp "$@";
+            }
+        }
+        else
+        {
+            croak "failed to load - $raw_io_class\n$@";
+        }
+    }
+    return $RAW_IO;
+}
+sub getUseRaw
+{
+    return $RAW_IO;
+}
+
+sub gnz_read(*\$$)
+{
+    my ($filehandle, $scalar, $length) = @_;
+
+    return sysread($filehandle, $$scalar, $length);
+}
+
+sub gnz_write(*$$)
+{
+    my ($filehandle, $scalar, $length) = @_;
+
+    return syswrite($filehandle, $scalar, $length);
+}
 
 
 END { }       # module clean-up code here (global destructor)

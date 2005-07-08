@@ -1,5 +1,13 @@
 Revision history for Perl extension Genezzo
 
+0.43 Fri Jul  8 02:34:17 2005
+        - Enforce case-insensitivity in table, column names.
+        - Foundation work for multiple tablespaces.
+        - Update address of FSF (spotted by the 
+          sharp eyes of Darren Duncan!)
+        - Merge Eric Rollins' support for Raw IO.
+        - Fix Syshook documentation (thanks again, Eric!)
+
 0.42 Fri Jun 17 01:31:05 2005
         - fix boolean NOT
         - Chain GZERR routines for Havok, UserExtend and other modules

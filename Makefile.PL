@@ -8,8 +8,6 @@ WriteMakefile(
 #    'LICENSE'           => 'gpl',
     'VERSION_FROM'	=> 'lib/Genezzo/GenDBI.pm', # finds $VERSION
     'PREREQ_PM'		=> {
-
-#        'SQL::Statement' => '0.1011', # now use feeble
         'Text::ParseWords' => '0.0',
         'Term::ReadLine'   => '0.0',
         'File::Path'       => '0.0',
@@ -17,7 +15,6 @@ WriteMakefile(
         'IO::File'         => '0.0',
         'IO::Handle'       => '0.0',
         'Parse::RecDescent' => '1.94'
-#        'POSIX'            => '0.0'
     }, # e.g., Module::Name => 1.1
 
    'EXE_FILES' => [ 'lib/Genezzo/gendba.pl', 'lib/Genezzo/genexp.pl' ], # install in /usr/bin

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 6.22 2005/03/28 00:13:19 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 6.24 2005/07/08 09:29:00 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -19,7 +19,7 @@ use Genezzo::Havok;
 
 BEGIN {
     our $VERSION;
-    $VERSION = do { my @r = (q$Revision: 6.22 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 6.24 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -195,8 +195,28 @@ sub _init
     $self->{gnz_home}    = $args{gnz_home};
     $self->{dbfile}      = $args{name} . ".dbf";
 
-    my $fhts = # gnz_home table space
-        File::Spec->catdir($self->{gnz_home}, "ts");
+    # for raw filesystems we pretend /dev/raw is the home directory
+    # and raw1 is the file.
+
+    if($self->{gnz_home} eq "/dev/raw"){
+        setUseRaw(1);
+    }else{
+        setUseRaw(0);
+    }
+
+    if(getUseRaw()){
+        $self->{dbfile}      = "raw1";    # need to be able to change this
+    }else{
+        $self->{dbfile}      = $args{name} . ".dbf";
+    }
+
+    my $fhts;   # gnz_home table space
+
+    if(getUseRaw()){
+        $fhts = $self->{gnz_home};
+    }else{
+	$fhts = File::Spec->catdir($self->{gnz_home}, "ts");
+    }
 
     $self->{dbfile_full} =
         File::Spec->rel2abs(
@@ -551,9 +571,15 @@ sub DictDump
             my $getcol  = $corecolnum{"_tsfiles"};
             my $fsize   = $vv->[$getcol->{filesize}];
             my $blksize = $vv->[$getcol->{blocksize}];
+            my $filenum = $vv->[$getcol->{fileidx}];
 
-            my $fhts    = # gnz_home table space
-                File::Spec->catdir($self->{gnz_home}, "ts");
+            my $fhts;     # gnz_home table space
+
+	    if(getUseRaw()){
+		$fhts = $self->{gnz_home};
+	    }else{
+                $fhts = File::Spec->catdir($self->{gnz_home}, "ts");
+	    }
 
             my $fname   = 
                 File::Spec->rel2abs(
@@ -565,9 +591,10 @@ sub DictDump
             print "\n$fname\n";
 
             my $smf = Genezzo::SpaceMan::SMFile->new($fname,
-                                                  $fsize,
-                                                  $fsize/$blksize,
-                                                  $bc1);
+                                                     $fsize,
+                                                     $fsize/$blksize,
+                                                     $bc1,
+                                                     $filenum);
             $smf->dump()
                 if (defined($smf));
         } # end while
@@ -967,7 +994,7 @@ sub _DictDBInit
     my $deffile = $self->{dbfile};
     my $deffile_full = $self->{dbfile_full};
     # XXX: Add FORCE for recreate...
-    if (-e $deffile_full)
+    if (-e $deffile_full && !getUseRaw())
     {
         my $msg = "file $deffile already exists\n";
         my %earg = (self => $self, msg => $msg, 

@@ -335,7 +335,7 @@ rmtree($gnz_home, 1, 1);
     }
 
     $sth = 
-        $dbh->prepare("select rid ROWid, rownum as NuMbEr, col1 BAKER, col2 as CHUCK from test2");
+        $dbh->prepare("select rid \"ROWid\", rownum as \"NuMbEr\", col1 \"BAKER\", col2 as \"CHUCK\" from test2");
 
     print $sth->execute(), " rows \n";
 

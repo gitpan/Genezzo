@@ -22,6 +22,7 @@ t/Row1.t
 t/Util1.t
 lib/Genezzo/bigdb.sql
 lib/Genezzo/havok.sql
+lib/Genezzo/syshook.sql
 lib/Genezzo/dbi_example.pl
 lib/Genezzo/gendba.pl
 lib/Genezzo/genexp.pl
@@ -51,6 +52,7 @@ lib/Genezzo/Plan/MakeAlgebra.pm
 lib/Genezzo/Plan/TypeCheck.pm
 lib/Genezzo/GenDBI.pm
 lib/Genezzo/Util.pm
+lib/Genezzo/RawIO.pm
 lib/Genezzo/PushHash/PHArray.pm
 lib/Genezzo/PushHash/PHFixed.pm
 lib/Genezzo/PushHash/PHNoUpdate.pm

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSTab.pm,v 6.13 2005/01/30 09:38:58 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSTab.pm,v 6.14 2005/07/08 09:32:26 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -215,9 +215,7 @@ sub _make_new_chunk # override the hph method
     return (undef)
         unless (defined($fileinfo));
 
-    my $filename = shift @{$fileinfo};
-    my $filesize = shift @{$fileinfo};
-    my $fileblks = shift @{$fileinfo};
+    my ($filename, $filesize, $fileblks, $filenumber) = @{$fileinfo};
 
     my %realhash = ();
 
@@ -229,6 +227,7 @@ sub _make_new_chunk # override the hph method
                 filename  => $filename,
                 numbytes  => $filesize,
                 numblocks => $fileblks,
+                filenumber => $filenumber,
                 bufcache  => $self->{bc},
                 tso       => $self->{tso}
                 );
@@ -257,7 +256,8 @@ sub _make_new_chunk # override the hph method
 
     # get file number as defined by initial bc file registration
     my $absolute_fileno = 
-        $self->{bc}->FileReg(FileName => $filename);
+        $self->{bc}->FileReg(FileName => $filename, 
+                             FileNumber => $filenumber);
 
     $self->{get_filenum}->{($hcount+1)}      = $absolute_fileno;
     $self->{get_chunkno}->{$absolute_fileno} = ($hcount + 1);

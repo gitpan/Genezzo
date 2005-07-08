@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Tablespace.pm,v 6.14 2005/03/19 08:41:36 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Tablespace.pm,v 6.15 2005/07/08 09:27:57 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -12,6 +12,7 @@ use strict;
 use warnings;
 
 use Carp;
+use Genezzo::Util;
 use Genezzo::TSHash;
 use Genezzo::Row::RSIdx1;
 use Genezzo::Row::RSTab;
@@ -27,7 +28,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 6.14 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 6.15 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
 #    @EXPORT      = qw(&func1 &func2 &func4 &func5);
@@ -131,6 +132,14 @@ sub new
     return 0
         unless (Validate(\%args, \%required));
 
+    my $dbfile = $args{dbfile};
+
+    if(getUseRaw()){   # no way to tell if it was really specified...
+	if($dbfile eq "default"){
+	    $dbfile = "raw1";    # FIXME
+	}
+    }
+
     $self->{the_ts} = {};
     $self->{dict} = $args{dict}; 
     $self->{tsid} = $args{tsid};
@@ -140,8 +149,14 @@ sub new
     $self->{NAME} = $args{name};
 
     $self->{gnz_home} = $args{gnz_home};
-    my $ts_prefix =
-      File::Spec->catdir($args{gnz_home} , 'ts');
+    my $ts_prefix;
+
+    if(getUseRaw()){
+	$ts_prefix = $args{gnz_home};  
+    }else{
+	$ts_prefix = File::Spec->catdir($args{gnz_home} , 'ts');
+    }
+
     $self->{ts_prefix} = $ts_prefix;
 
     $self->{files} = {
@@ -157,10 +172,17 @@ sub new
     $self->{blocksize} = $args{blocksize};
     $self->{bc_size}   = $args{bc_size};
 
-    $self->{dbfile}    = 
-      File::Spec->catfile(
-                          $ts_prefix,
-                          $args{dbfile} . '.dbf');
+    if(getUseRaw()){
+	$self->{dbfile}    = 
+	    File::Spec->catfile(
+				$ts_prefix,
+				$dbfile);
+    }else{
+	$self->{dbfile}    = 
+	    File::Spec->catfile(
+				$ts_prefix,
+				$dbfile  . '.dbf');
+    }
 
     if ((exists($args{GZERR}))
         && (defined($args{GZERR}))
@@ -649,9 +671,9 @@ sub TSLoad ()
         $self->{files}->{used}    = [sort {$a <=> $b} @usearr];
         $self->{files}->{unused}  = [sort {$a <=> $b} @unusearr];
 
-#        greet $self->{files}->{filearr};
-#        greet $self->{files}->{used};
-#        greet $self->{files}->{unused};
+        greet "filearr", $self->{files}->{filearr};
+        greet "used", $self->{files}->{used};
+        greet "unused", $self->{files}->{unused};
 
         whisper "load tab array";
         my $alltab = $dict->DictTableGetTable(tname => "_tab1");
@@ -764,7 +786,8 @@ sub TSLoad ()
                 $filename = $filestuff->[0];
                 my $fileno;
 
-                $fileno = $ts->{bc}->FileReg(FileName => $filename)
+                $fileno = $ts->{bc}->FileReg(FileName   => $filename,
+                                             FileNumber => $ccnt)
                     if (defined($filename));
 
                 # XXX XXX: fileno should match filearr index entry...
@@ -939,7 +962,7 @@ sub TSExtendFile ()
 
     for (my $cnt = 0; $cnt < $numblks; $cnt++)
     {
-        my $stat = syswrite ($fileh, $packstr) ;
+        my $stat = gnz_write ($fileh, $packstr, $blocksize);
         unless (defined($stat))
         {
             die "write to file $tsfile failed: $! \n";
@@ -986,7 +1009,7 @@ sub TSAddFile ()
 
     my $numblks = $args{filesize} / $blocksize ;
 
-    if (-e $tsfile)
+    if (-e $tsfile && !getUseRaw())
     {
         my $msg = "file $tsfile already exists\n";
         my %earg = (self => $self, msg => $msg,
@@ -1018,25 +1041,39 @@ sub TSAddFile ()
         $hstr   .=     " S=" . $Genezzo::GenDBI::RELSTATUS; # S for status
         $hstr   .=     " D=" . $Genezzo::GenDBI::RELDATE;   # D for date
         $hstr   .=  " M1=00";  # file header mod status (base 36)
+
         # add some space to make at least 64 bytes.
         $hstr .= " " x (64 - length($hstr)) 
             if (length($hstr) < 64);
 
+        if (getUseRaw())
+        {
+            # header alignment for raw io            
+            my $min_al = $Genezzo::Util::ALIGN_BLOCKSIZE; 
+            
+            $min_al -= length(pack("xN", 0));
+
+            # add some space to make at least min_al bytes.
+            $hstr .= " " x ($min_al - length($hstr)) 
+                if (length($hstr) < $min_al);
+        }
+
         my $cksum = unpack("%32C*", $hstr) % 65535;
 
         # write a null terminated string followed by checksum
-
+        my $pack_hdr;
         if (0) # XXX XXX: can fix later
         {
-            syswrite ($outifile, pack("Z*N", $hstr, $cksum)) ;
+            $pack_hdr = pack("Z*N", $hstr, $cksum) ;
         }
         else
         {
             # Z template is fixed in 5.7
             # ascii string, null byte, checksum
-            my $hdr = syswrite ($outifile, pack("A*xN", $hstr, $cksum)) ;
-#            greet $hdr;
+            $pack_hdr = pack("A*xN", $hstr, $cksum) ;
         }
+        my $hdr = gnz_write ($outifile, $pack_hdr, length($pack_hdr));
+#      greet $hdr;
 
         unless ($self->TSExtendFile ($outifile, $blocksize, $numblks, 
                                      $tsfile))
@@ -1292,6 +1329,10 @@ sub TS_get_fileno ()
     return 0
         unless (Validate(\%args, \%required));
 
+    greet "filearr", $self->{files}->{filearr};
+    greet "used", $self->{files}->{used};
+    greet "unused", $self->{files}->{unused};
+
     # get the index of the last used file
     my $lastidx = scalar(@{$self->{files}->{used}});
 
@@ -1380,13 +1421,12 @@ sub TSFileInfo ()
         if (($fileidx > $maxidx) 
             || ($fileidx <= 0));
 
-    $fileidx--;
-
     # return a copy of the info so we don't munge the real values...
-    my $foo = $filearr->[$fileidx];
+    my $foo = $filearr->[$fileidx - 1]; # NOTE: subtract one to put
+                                        # file #1 in position zero
     unless (defined($foo))
     {
-        my $msg = "invalid array ref for $fileidx\n";
+        my $msg = "invalid array ref for file index $fileidx\n";
         my %earg = (self => $self, msg => $msg,
                     severity => 'warn');
         
@@ -1396,6 +1436,8 @@ sub TSFileInfo ()
         return undef;
     }
     my @retarr = @{$foo};
+
+    push @retarr, $fileidx;
         
     return (\@retarr);
     
