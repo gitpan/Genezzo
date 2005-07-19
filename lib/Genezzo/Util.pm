@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Util.pm,v 6.7 2005/07/08 09:26:41 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Util.pm,v 7.1 2005/07/19 07:49:03 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -20,7 +20,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 6.7 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.1 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
     @EXPORT      = qw(&whisper &whoami &greet 
@@ -125,7 +125,7 @@ our $WHISPERDEPTH = 1;
 our $WHISPERPREFIX = "whisper: ";
 
 our $RAW_IO          = 0;   # use "cooked" file systems by default
-our $ALIGN_BLOCKSIZE = 512; # header alignment for raw io
+our $ALIGN_BLOCKSIZE = 4096; # header alignment for raw io
 
 our $DEFBLOCKSIZE = 4096;
 our $DEFDBSIZE    = 80 * $DEFBLOCKSIZE ; # 327680 was 163840
@@ -1474,7 +1474,7 @@ sub setUseRaw
         {
             my $s1;
             ($s1 = <<'EOF_S1') =~ s/^\#//gm;            
-#sub Genezzo::Util::gnz_read(*\$$)
+#sub Genezzo::Util::gnz_read_impl(*\$$)
 #{
 #    my ($filehandle, $scalar, $length) = @_;
 #
@@ -1484,7 +1484,7 @@ EOF_S1
 
             my $s2;
             ($s2 = <<'EOF_S2') =~ s/^\#//gm;            
-#sub Genezzo::Util::gnz_write(*$$)
+#sub Genezzo::Util::gnz_write_impl(*$$)
 #{
 #    my ($filehandle, $scalar, $length) = @_;
 #
@@ -1512,20 +1512,33 @@ sub getUseRaw
     return $RAW_IO;
 }
 
-sub gnz_read(*\$$)
+sub gnz_read_impl(*\$$)
 {
     my ($filehandle, $scalar, $length) = @_;
 
     return sysread($filehandle, $$scalar, $length);
 }
 
-sub gnz_write(*$$)
+sub gnz_write_impl(*$$)
 {
     my ($filehandle, $scalar, $length) = @_;
 
     return syswrite($filehandle, $scalar, $length);
 }
 
+sub gnz_read(*\$$)
+{
+    my ($filehandle, $scalar, $length) = @_;
+
+    return gnz_read_impl($filehandle, $$scalar, $length);
+}
+
+sub gnz_write(*$$)
+{
+    my ($filehandle, $scalar, $length) = @_;
+
+    return gnz_write_impl($filehandle, $scalar, $length);
+}
 
 END { }       # module clean-up code here (global destructor)
 
@@ -1583,11 +1596,11 @@ Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
 
     You should have received a copy of the GNU General Public License
     along with this program; if not, write to the Free Software
-    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 Address bug reports and comments to: jcohen@genezzo.com
 
 For more information, please visit the Genezzo homepage 
-at http://www.genezzo.com
+at L<http://www.genezzo.com>
 
 =cut

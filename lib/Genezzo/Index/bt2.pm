@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Index/RCS/bt2.pm,v 6.2 2004/09/29 07:00:51 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Index/RCS/bt2.pm,v 7.1 2005/07/19 07:49:03 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -28,7 +28,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 6.2 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.1 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
     @EXPORT      = ();
@@ -2556,8 +2556,11 @@ Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
 
     You should have received a copy of the GNU General Public License
     along with this program; if not, write to the Free Software
-    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 Address bug reports and comments to: jcohen@genezzo.com
+
+For more information, please visit the Genezzo homepage 
+at L<http://www.genezzo.com>
 
 =cut

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/PushHash/RCS/HPHRowBlk.pm,v 6.4 2005/03/19 08:42:21 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/PushHash/RCS/HPHRowBlk.pm,v 7.1 2005/07/19 07:49:03 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -326,7 +326,7 @@ Copyright (c) 2003, 2004, 2005 Jeffrey I Cohen.  All rights reserved.
 
     You should have received a copy of the GNU General Public License
     along with this program; if not, write to the Free Software
-    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 Address bug reports and comments to: jcohen@genezzo.com
 

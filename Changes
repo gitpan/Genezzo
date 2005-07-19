@@ -1,5 +1,9 @@
 Revision history for Perl extension Genezzo
 
+0.44 Sun Jul 17 00:34:51 2005
+        - Eric's fixes for my merge of Raw IO
+        - Fix FSF address everywhere
+
 0.43 Fri Jul  8 02:34:17 2005
         - Enforce case-insensitivity in table, column names.
         - Foundation work for multiple tablespaces.

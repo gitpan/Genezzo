@@ -11,6 +11,8 @@ package Genezzo::RawIO;
 use Inline 'C';
 require Exporter;
 
+Inline->init; # help for "require RawIO"
+
 our @ISA = qw(Exporter);
 our @EXPORT = qw(gnz_raw_read gnz_raw_write);
 
@@ -41,56 +43,39 @@ __DATA__
 Genezzo::RawIO - Genezzo Raw IO
 
 =head1 SYNOPSIS
+
  Additional file read and write routines for Genezzo.
 
 =head1 DESCRIPTION
- sysread and syswrite are wrapped by genread and genwrite 
- so raw devices (via rawread and rawwrite) may optionally 
- be used.
 
-=head1 ARGUMENTS
+ sysread and syswrite are wrapped by gen_raw_read and gen_raw_write 
+ so raw devices can be used.
 
 =head1 FUNCTIONS
 
 =over 4
 
-=item setUseRaw BOOL
-
- Set to 1 to enable aligned I/O for raw devices.  Set to 0 
- to disable.
-
-=item getUseRaw
-
- Returns 1 if aligned I/O for raw devices is enabled.  Returns 0 
- if disabled.
-
-=item genread FILEHANDLE, SCALAR, LENGTH
+=item gen_raw_read FILEHANDLE, SCALAR, LENGTH
 
  Performs read identical to sysread, except uses aligned buffer 
- suitable for raw I/O if setUseRaw was previously called.
+ suitable for raw I/O.
 
-=item genwrite FILEHANDLE, SCALAR, LENGTH
+=item gen_raw_write FILEHANDLE, SCALAR, LENGTH
 
  Performs write identical to syswrite, except uses aligned buffer 
- suitable for raw I/O if setUseRaw was previously called.
+ suitable for raw I/O.
 
 =back
 
 =head2 EXPORT
 
- getUseRaw, setUseRaw, genread, genwrite
+ gen_raw_read, gen_raw_write
 
 =head1 LIMITATIONS
 
  Relies on Perl Inline::C module.  Code may gracefully compile to 
  empty stubs on non-raw (non-Linux) platforms, but this has not 
  been thoroughly tested.
-
-=head1 #TODO
-
-=over 4
-
-=back
 
 =head1 AUTHOR
 
@@ -114,9 +99,12 @@ Copyright (c) 2005 Eric Rollins.  All rights reserved.
 
     You should have received a copy of the GNU General Public License
     along with this program; if not, write to the Free Software
-    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 Address bug reports and comments to rollins@acm.org
+
+For more information, please visit the Genezzo homepage 
+at L<http://www.genezzo.com>
 
 =cut
 
