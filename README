@@ -147,7 +147,7 @@ LIMITATIONS
 EXAMPLES
         
   Some very basic SQL create/drop/describe table, select, insert, update
-  and delete syntax is supported, but unlike standard SQL, table and
+  and delete syntax is supported, and like standard SQL, table and
   column names are case-sensitive.  More complex SQL, such as joins,
   parses, but is ignored.  The only supported functions are count(*) and
   ecount(*), a non-blocking count estimation function.  The database
@@ -494,9 +494,12 @@ NEW FEATURES - Improved Parser
 
   Version 0.43 adds case-insensitive table and column names.
 
+NEW FEATURES - Raw Device support
+  Version 0.44 and 0.45 add support for raw io devices.          
+
 INCOMPATIBLE CHANGES
 
-  Version 0.43 dictionary and block format is incompatible with
+  Version 0.45 dictionary and block format is incompatible with
   previous releases.  No upgrade path is supported.
 
 SEE ALSO

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Tablespace.pm,v 7.1 2005/07/19 07:49:03 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Tablespace.pm,v 7.2 2005/07/24 04:17:14 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -28,7 +28,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 7.1 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.2 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
 #    @EXPORT      = qw(&func1 &func2 &func4 &func5);
@@ -569,7 +569,8 @@ sub TSLoad ()
             # XXX XXX XXX: Reset dictionary blocksize
 
             $self->{blocksize} = $hdrinfo[2];
-            $self->{dict}->{blocksize} = $hdrinfo[2]; # NOTE: reset dictionary
+            $self->{dict}->{blocksize}  = $hdrinfo[2]; # NOTE: reset dictionary
+            $self->{dict}->{headersize} = $hdrinfo[0]; # NOTE: reset dictionary
 
             close ($fh);
         }
@@ -577,7 +578,8 @@ sub TSLoad ()
         # Note: get the default db file size from dict so block zero
         # information is correct if building new file
         my $deffilesize = $self->{dict}->{dbsize};
-        my $numblocks   = $deffilesize/$self->{blocksize};
+        my $hdrsize     = $self->{dict}->{headersize};
+        my $numblocks   = ($deffilesize-$hdrsize)/$self->{blocksize};
 
         my $numused =
             push (@{$self->{files}->{filearr}}, 
@@ -993,7 +995,9 @@ sub TSAddFile ()
     my %args = (
                 @_);
 
-    return 0
+    my @file_stat;
+
+    return @file_stat
         unless (Validate(\%args, \%required));
 
     my $blocksize = $self->{blocksize} ;
@@ -1007,8 +1011,6 @@ sub TSAddFile ()
                                                 $args{filename}
                                                 ));
 
-    my $numblks = $args{filesize} / $blocksize ;
-
     if (-e $tsfile && !getUseRaw())
     {
         my $msg = "file $tsfile already exists\n";
@@ -1018,21 +1020,12 @@ sub TSAddFile ()
         &$GZERR(%earg)
             if (defined($GZERR));
 
-        return 0;
+        return @file_stat;
     }
 
+    my ($numblks, $len_hdr, $true_size);
     {
-        my $msg = "creating $tsfile...$numblks blocks \n";
-        my %earg = (self => $self, msg => $msg,
-                    severity => 'info');
-               
-        &$GZERR(%earg)
-            if (defined($GZERR));
-
-
-        my $outifile;
-        open ($outifile, "> $tsfile")
-            or die "Could not open $tsfile for writing : $! \n";
+        use POSIX ; #  need some rounding
 
         # NOTE: no spaces or "="s allowed in header tokens
 
@@ -1050,7 +1043,9 @@ sub TSAddFile ()
         {
             # header alignment for raw io            
             my $min_al = $Genezzo::Util::ALIGN_BLOCKSIZE; 
-            
+
+            # decrease available space by null terminator 
+            # and header checksum so total header is align blocksize
             $min_al -= length(pack("xN", 0));
 
             # add some space to make at least min_al bytes.
@@ -1072,6 +1067,27 @@ sub TSAddFile ()
             # ascii string, null byte, checksum
             $pack_hdr = pack("A*xN", $hstr, $cksum) ;
         }
+
+        # number of available blocks total file minus header, divided
+        # by blocksize
+        $len_hdr = length($pack_hdr);
+        $numblks = POSIX::floor(($args{filesize} - $len_hdr) / $blocksize) ;
+
+        # calculate the true file size
+        $true_size = $len_hdr + ($numblks * $blocksize);
+
+        my $msg = "creating $tsfile...$numblks blocks + ";
+        $msg   .= "$len_hdr bytes header\n";
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'info');
+               
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
+        my $outifile;
+        open ($outifile, "> $tsfile")
+            or die "Could not open $tsfile for writing : $! \n";
+
         my $hdr = gnz_write ($outifile, $pack_hdr, length($pack_hdr));
 #      greet $hdr;
 
@@ -1086,7 +1102,7 @@ sub TSAddFile ()
                 if (defined($GZERR));
 
             close ($outifile);
-            return 0;
+            return @file_stat;
         }
         
         close ($outifile);
@@ -1099,10 +1115,12 @@ sub TSAddFile ()
     my $dict = $self->{dict};
 
     my %nargs = (
-                 tsname    => $self->{NAME},
-                 filename  => $args{filename}, # Note: not the full filespec
-                 filesize  => $args{filesize},
-                 blocksize => $blocksize
+                 tsname     => $self->{NAME},
+                 filename   => $args{filename}, # Note: not the full filespec
+                 filesize   => $true_size,
+                 blocksize  => $blocksize,
+                 numblocks  => $numblks,
+                 headersize => $len_hdr
                  );
     
     if (exists($args{increase_by}))
@@ -1120,13 +1138,13 @@ sub TSAddFile ()
         &$GZERR(%earg)
             if (defined($GZERR));
 
-        return 0;
+        return @file_stat;
     }
 
     if (1) # XXX XXX - use fileidx as array offset
     {
         $self->{files}->{filearr}->[$fileidx - 1] =
-            [$tsfile, $args{filesize}, $numblks];
+            [$tsfile, $true_size, $numblks];
         # list of unused file array        
         push (@{$self->{files}->{unused}}, $fileidx); 
     }
@@ -1134,7 +1152,7 @@ sub TSAddFile ()
     { # old style, not using tsfiles...
         my $numused =
             push (@{$self->{files}->{filearr}}, 
-                  [$tsfile, $args{filesize}, $numblks]);
+                  [$tsfile, $true_size, $numblks]);
 
         greet "numused",$numused;
         greet "fileidx",$fileidx;
@@ -1143,8 +1161,9 @@ sub TSAddFile ()
               $numused); # list of unused file array
     }
 
-    return $fileidx;
-}
+    @file_stat = ($fileidx, $true_size, $len_hdr);
+    return @file_stat;
+} # end TSAddFile
 
 
 # force a table to use a db file -- useful for init, startup

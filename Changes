@@ -1,5 +1,13 @@
 Revision history for Perl extension Genezzo
 
+0.45 Sat Jul 23 22:26:29 2005
+        - More fixes for Raw IO:
+        - Util: fix FileGetHeaderInfo for Raw IO - increase buffer size
+          to handle large, aligned file headers.
+        - Include file header size in space calculations for file size
+          and number of blocks -- don't extend past specified file size.
+        - add description field to _pref1 dictionary table
+
 0.44 Sun Jul 17 00:34:51 2005
         - Eric's fixes for my merge of Raw IO
         - Fix FSF address everywhere

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 7.1 2005/07/19 07:49:03 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 7.3 2005/07/24 04:28:27 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -19,7 +19,7 @@ use Genezzo::Havok;
 
 BEGIN {
     our $VERSION;
-    $VERSION = do { my @r = (q$Revision: 7.1 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.3 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -93,8 +93,8 @@ BEGIN {
 
     $coretabs{"_pref1"} = 
         [
-         "prefkey=c", "prefvalue=c",
-         "creationdate=c",
+         "pref_key=c", "pref_value=c",
+         "creationdate=c", "pref_desc=c"
          ];
 
     $coretabs{"_tspace"} = 
@@ -111,7 +111,9 @@ BEGIN {
          "tsid=n", "creationdate=c", "fileidx=n", 
          "filename=c", "filesize=n", "blocksize=n",
          "numblocks=n", "used=c", 
-         "initial_size=n", "increase_by=c" 
+         "initial_size=n", 
+#         "headersize=n",
+         "increase_by=c", 
          ];
 
     $coretabs{"_tab1"} = 
@@ -572,6 +574,7 @@ sub DictDump
             my $fsize   = $vv->[$getcol->{filesize}];
             my $blksize = $vv->[$getcol->{blocksize}];
             my $filenum = $vv->[$getcol->{fileidx}];
+            my $numblks = $vv->[$getcol->{numblocks}];
 
             my $fhts;     # gnz_home table space
 
@@ -592,7 +595,7 @@ sub DictDump
 
             my $smf = Genezzo::SpaceMan::SMFile->new($fname,
                                                      $fsize,
-                                                     $fsize/$blksize,
+                                                     $numblks,
                                                      $bc1,
                                                      $filenum);
             $smf->dump()
@@ -752,7 +755,7 @@ sub _DictDBDefineTable
 #private
 sub _DictDefineCoreTabs
 {
-    my ($self, $tsname, $deffile, $deffilsize, $makepref1) = @_;
+    my ($self, $tsname, $deffile, $deffilsize, $makepref1, $hdrsize) = @_;
 
     # if makepref1 is set, build the preferences table, else use the
     # existing one in default.dbf
@@ -778,17 +781,18 @@ sub _DictDefineCoreTabs
 
         # ct _pref1 name=c value=c creationdate=c
         my $rowarr = [
-                      "prefkey",
-                      "prefvalue",
+                      "pref_key",
+                      "pref_value",
                       time_iso8601(),    # creationdate
+                      "init"
                       ];
 
         my $getcol = $corecolnum{"_pref1"};
         
         while (my ($kk, $vv) = each (%basicprefs))
         { 
-            $rowarr->[$getcol->{prefkey}]   = $kk;
-            $rowarr->[$getcol->{prefvalue}] = $vv;
+            $rowarr->[$getcol->{pref_key}]   = $kk;
+            $rowarr->[$getcol->{pref_value}] = $vv;
             unless (defined($realtie->HPush($rowarr)))
             {
                 my $msg = "Failed to create table $tablename";
@@ -847,6 +851,9 @@ sub _DictDefineCoreTabs
         my $tstable = $self->_get_table(tname => $tablename,
                                         object_id  => $coretid{$tablename},
                                         tablespace => $tsname);
+
+        $hdrsize = 0
+            unless (defined($hdrsize));
         
         # ct _tsfiles tsid=c creationdate=c fileidx=n 
         # filename=c filesize=n blocksize=n numblocks=n used=c 
@@ -857,7 +864,8 @@ sub _DictDefineCoreTabs
                       $deffile,     # default file name
                       $deffilsize,  # default file size
                       $blocksize,   # blocksize
-                      ($deffilsize / $blocksize), # number of blocks
+                      (($deffilsize - $hdrsize )
+                        / $blocksize), # number of blocks
                       "Y",          # Y if file in use
                       $deffilsize,  # initial file size
                       ];
@@ -1018,10 +1026,10 @@ sub _DictDBInit
         use POSIX ; #  need some rounding
 
         $self->{blocksize} = POSIX::floor($self->{blocksize});
+        $self->{dbsize}    = POSIX::floor($self->{dbsize});
 
-        # Note: number of blocks must be an integer -- round down
-        my $numblks = POSIX::floor($self->{dbsize}/$self->{blocksize});
-        $self->{dbsize} = $numblks * $self->{blocksize};
+        # Note: number of blocks must be an integer -- true dbsize
+        # gets calculated in TSAddfile
     }
 
     my $ts1 = Genezzo::Tablespace->new(name      => $tsname,
@@ -1035,11 +1043,18 @@ sub _DictDBInit
         tsref => $ts1,
     };
 
+    my @fstat = $ts1->TSAddFile(filename => $deffile,
+                                filesize => $self->{dbsize});
+
+    return 0
+        unless (scalar(@fstat));
+
+    my $fileidx         = $fstat[0];
+    $self->{dbsize}     = $fstat[1];
+    $self->{headersize} = $fstat[2]; 
+
     my $deffilsize = $self->{dbsize};
-    
-    $ts1->TSAddFile(filename => $deffile,
-                    filesize => $deffilsize);
-    
+
     $ts1->TSSave();
     
     # NOTE: clear out the tablespace info to force a
@@ -1048,7 +1063,8 @@ sub _DictDBInit
     delete $tshref->{$tsname};
 
     # define all the core tables, including pref1
-    return $self->_DictDefineCoreTabs($tsname, $deffile, $deffilsize, 1);
+    return $self->_DictDefineCoreTabs($tsname, $deffile, $deffilsize, 1, 
+                                      $self->{headersize});
 } # end dictdbinit
 
 sub DictSave 
@@ -1159,7 +1175,9 @@ sub doDictPreLoad
     $self->{preload} = 1;
     
     return 0 # define all the core tables *except* pref1
-        unless $self->_DictDefineCoreTabs($tsname, $deffile, $deffilsize, 0);
+        unless $self->_DictDefineCoreTabs($tsname, $deffile, 
+                                          $deffilsize, 0,
+                                          $self->{headersize});
     
     return 0 
         unless ($self->_loadDictMemStructs ());
@@ -1180,21 +1198,21 @@ sub doDictPreLoad
     while ( my ($kk, $vv) = each ( %{$hashi}))
     { 
         my $getcol  = $corecolnum{"_pref1"};
-        my $prefkey = $vv->[$getcol->{prefkey}];
-        my $prefval = $vv->[$getcol->{prefvalue}];
+        my $pref_key = $vv->[$getcol->{pref_key}];
+        my $pref_val = $vv->[$getcol->{pref_value}];
 
-        $self->{prefs}->{$prefkey} = $prefval;
+        $self->{prefs}->{$pref_key} = $pref_val;
 
-        if ($prefkey =~ m/bc_size/)
+        if ($pref_key =~ m/bc_size/)
         {
             my $tshref = $self->{tablespaces};
             my $tsname = 'SYSTEM';
             my $ts1 = $tshref->{$tsname}->{tsref};
-#            greet $prefval;
-            my $bufsz = $ts1->{the_ts}->{bc}->Resize($prefval);
-            if ($prefval ne $bufsz)
+#            greet $pref_val;
+            my $bufsz = $ts1->{the_ts}->{bc}->Resize($pref_val);
+            if ($pref_val ne $bufsz)
             {
-                my $msg = "reset buffer cache to $bufsz from $prefval";
+                my $msg = "reset buffer cache to $bufsz from $pref_val";
                 my %earg = (self => $self, msg => $msg, 
                             severity => 'info');
         
@@ -2198,7 +2216,9 @@ sub _DictTSAddFile
                     tsname     => "no tablespace !",
                     filename   => "no filename ! ",
                     filesize   => "no filesize ! ",
-                    blocksize  => "no blocksize !"
+                    blocksize  => "no blocksize !",
+                    numblocks  => "no num blocks !",
+                    headersize => "no header size !"
                     );
 
     my %args = (
@@ -2252,7 +2272,7 @@ sub _DictTSAddFile
                   $filename,
                   $filesize,
                   $blocksize,	
-                  ($filesize / $blocksize),
+                  $args{numblocks},
                   $used,
                   $filesize
                   ];
@@ -5059,6 +5079,12 @@ Checking for the existance of a table would be something like:
        This won't work if have deletions
 
 =item DictTableUseFile: update space management to use this function correctly
+
+=item DictDefineCoreTabs, tsfiles: need to save file headersize as a tsfile
+      column.
+
+=item deal with dict->{headersize} attribute in some rational way.  Currently
+      set via tablespace->TSAddFile...
 
 =back
 

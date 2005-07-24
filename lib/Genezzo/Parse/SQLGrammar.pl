@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Parse/RCS/SQLGrammar.pl,v 7.1 2005/07/19 07:49:03 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Parse/RCS/SQLGrammar.pl,v 7.2 2005/07/24 05:22:37 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -1554,8 +1554,13 @@ sub SQLPrecompile
 # # load the precompiled parser
 # my $parser   = Genezzo::Parse::SQL->new();
 #
-# # sql_000 is parser entry point
+# # sql_000 is parser entry point.
+# # The argument is a string which contains a SQL query
+# # (without a trailing semicolon).
+# # The output is nested hash structure of the abstract 
+# # syntax tree.
 # my $sql_tree = $parser->sql_000($some_sql_statement);
+#
 # # dump out the parse tree
 # print Data::Dumper->Dumper([$sql_tree],['sql_tree']);
 #
@@ -1567,6 +1572,9 @@ sub SQLPrecompile
 #  human eyes.  
 #
 #  Still reading this?  You must be a glutton for punishment.
+#
+#  This parser handles a fair bit of SQL92, but the error handling
+#  is somewhat lacking.
 #
 #=head1 ARGUMENTS
 #
