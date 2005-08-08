@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 7.2 2005/07/24 04:30:37 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 7.3 2005/08/08 03:07:20 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -49,11 +49,11 @@ BEGIN {
 	
 }
 
-our $VERSION   = '0.45';
+our $VERSION   = '0.46';
 our $RELSTATUS = 'Alpha'; # release status
 # grab the code check-in date and convert to YYYYMMDD
 our $RELDATE   = 
-    do { my @r = (q$Date: 2005/07/24 04:30:37 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
+    do { my @r = (q$Date: 2005/08/08 03:07:20 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
 
 our $errstr; # DBI errstr
 
@@ -1039,6 +1039,23 @@ sub Kgnz_Spool
 }
 
 sub Kgnz_Commit
+{
+    my $self = shift;
+
+    return $self->Kgnz_Sync(@_);
+
+# Note: develop separate path for Commit versus Sync for transactional
+# support, e.g. something like "DictCommit"
+#    my $dictobj = $self->{dictobj};
+#    my %args = (
+#		@_);
+#
+##    greet @_ ; 
+#
+#    return ($dictobj->DictSave(dbh_ctx => $self->{dbh_ctx}));
+}
+
+sub Kgnz_Sync
 {
     my $self = shift;
     my $dictobj = $self->{dictobj};
@@ -3060,7 +3077,8 @@ qw(
 
    rem    Kgnz_Rem
 
-   commit    Kgnz_Commit
+   commit   Kgnz_Commit
+   sync     Kgnz_Sync
    rollback Kgnz_Rollback
 
    desc     Kgnz_Describe
@@ -3256,6 +3274,8 @@ shutdown : shutdown an instance.  Provides read-only access to "pref1"
 spool : write output to a file.  Syntax - spool <filename>
 
 startup : Loads dictionary, provides read/write access to tables.
+
+sync : flush changes to disk (*without* committing transaction like "commit")
 
 u : update a table.  
     Syntax - u <table-name> <rid> <column-value> [<column-value>...]

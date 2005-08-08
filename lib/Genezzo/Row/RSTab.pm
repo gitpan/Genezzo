@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSTab.pm,v 7.1 2005/07/19 07:49:03 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSTab.pm,v 7.2 2005/08/08 03:04:57 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -153,6 +153,12 @@ sub _init
             unless (defined(_make_new_chunk($self, $i)));
     }
 
+    # the "small row" threshold is only a small fraction of the
+    # default block size in order to avoid wasting space.  For
+    # example, if the current block has 500 bytes of freespace, and
+    # the packed row is 1000 bytes, it would be more efficient to
+    # split the row over two blocks versus leaving 500 bytes free and
+    # allocating a new block.  
     $self->{small_row} = 200; # use HSuck on rows > small_row bytes
 
     return 1;
@@ -934,8 +940,30 @@ sub _localStore
     my ($self, $place, $value) = @_;
 
     my $toobig  = 0;
+    my $oldsize = 0;
+    my @estat   = $self->_exists2($place); # HPHRowBlk method
+
+    if (   (scalar(@estat) > 2) 
+        && Genezzo::Block::RDBlock::_isheadrow($estat[0])
+        && Genezzo::Block::RDBlock::_istailrow($estat[0])
+           )
+    {
+        # if the row already exists as a single, contiguous buffer,
+        # set maxsize for PackRowCheck to determine if can update in
+        # place.
+        $oldsize = $estat[2];
+    }
     my $maxsize = 2 * $self->{small_row}; 
+
+    $maxsize = $oldsize
+        if ($oldsize > $maxsize);
+
     my $packstr = PackRowCheck($value, $maxsize);
+    unless ($oldsize)
+    {
+        # keep maxsize a bit small unless space is already allocated
+        $maxsize = $self->{small_row}; 
+    }
 
     if (defined($packstr))
     {
@@ -961,7 +989,7 @@ sub _localStore
     # _exists2 is merely a hint.
 
     # estat = ($rowstat, $rowposn, $rowlen)
-    my @estat = $self->_exists2($place); # HPHRowBlk method
+    @estat = $self->_exists2($place); # HPHRowBlk method
 
     if (   (scalar(@estat) < 3) # no such row or bad rid (so fail on STORE)
         # or the row fits in a block   
@@ -969,11 +997,12 @@ sub _localStore
            (   (scalar(@estat) > 2) 
             && Genezzo::Block::RDBlock::_isheadrow($estat[0])
             && Genezzo::Block::RDBlock::_istailrow($estat[0])
+            && $estat[2] >= $maxsize # see if still fits   
            )
         )
     {
         if (!($toobig)
-            && (length($packstr) < $self->{small_row})) # avoid long rows
+            && (length($packstr) <= $maxsize)) # avoid long rows
         {
 #            greet "should fit";
             my $stat = $self->SUPER::STORE($place, $packstr);

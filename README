@@ -106,22 +106,48 @@ SQL SUPPORT -- see LIMITATIONS
   CREATE INDEX:
     CREATE INDEX iname on tablename (colname [, colname ...]);
 
-  ALTER TABLE ADD CONSTRAINT:
+  ALTER TABLE ADD CONSTRAINT: supports primary and unique key and
+    check constraints.  NOT NULL and foreign keys are not currently
+    supported, though you can implement NOT NULL as 
+    CHECK (colname IS NOT NULL).  The CHECK expression is equivalent
+    to a WHERE clause.  A table can have multiple CHECK constraints,
+    but currently only one key constraint.
+
+    ALTER TABLE tablename 
+          ADD [CONSTRAINT constraint_name] 
+              PRIMARY KEY (colname [, colname ...]);
+    ALTER TABLE tablename 
+          ADD [CONSTRAINT constraint_name] 
+              UNIQUE (colname [, colname ...]);
+    ALTER TABLE tablename 
+          ADD [CONSTRAINT constraint_name] 
+              CHECK (conditional_expression);
 
   ADDFILE: Not really a SQL command, but an extension to grow the 
            datafiles.  See "addfile help".
 
   DROP: drop a table or index.
-  COMMIT: write changes to disk
-  ROLLBACK: discard all uncommitted changes
+  COMMIT: write changes to disk.
+  SYNC: write changes to disk like "commit", but don't end a transaction.
+  ROLLBACK: discard all uncommitted changes.
 
   DESCRIBE: 
     DESCRIBE tablename
 
   EXPLAIN PLAN: dump parsing and plan information for any SQL command,
                 including CREATE and ALTER TABLE.  Does not require a
-                plan table.  Can perform partial explanations for 
+                "plan table".  Can perform partial explanations for 
                 invalid statements, such as missing tables/columns, etc.
+                Example - "explain plan for select * from t1;"
+                or even complex sql like:
+                Explain plan for
+                  select * from t1 
+                           where c1 in (select avg(c2) from t2)
+                           having avg(c3) > ((select min(c4)
+                                             from (select c5 from t3
+                                                   union    
+                                                   select c6 from t4)
+                                             ) + 5) * 7 / min(c7)     ;
 
   STARTUP/SHUTDOWN: 
 
@@ -148,15 +174,15 @@ EXAMPLES
         
   Some very basic SQL create/drop/describe table, select, insert, update
   and delete syntax is supported, and like standard SQL, table and
-  column names are case-sensitive.  More complex SQL, such as joins,
-  parses, but is ignored.  The only supported functions are count(*) and
-  ecount(*), a non-blocking count estimation function.  The database
-  also supports commit to force changes to disk, but no rollback.  NOTE:
-  Data definition (such as create table or ct) must be manually
-  committed to keep the database in a consistent state.  Uncommitted
-  inserts and updates will only be block-consistent -- there is no
-  guarantee that the data will get flushed to disk, and no guarantee
-  whether the changes will or will not take effect.
+  column names are case-insensitive unless quoted.  More complex SQL,
+  such as joins, parses, but is ignored.  The only supported functions
+  are count(*) and ecount(*), a non-blocking count estimation function.
+  The database also supports commit to force changes to disk, and a crude
+  rollback.  NOTE: Data definition (such as create table or ct) must be
+  manually committed to keep the database in a consistent state.
+  Uncommitted inserts and updates will only be block-consistent -- there
+  is no guarantee that the data will get flushed to disk, and no
+  guarantee whether the changes will or will not take effect.
 
     rem  Some simple SELECTs
     select * from _col1;
@@ -258,7 +284,9 @@ NEW FEATURES - Indexed Tables
 
   Version 0.13 introduces an indexed-table type.  An indexed table
   treats the first column in the table definition as a unique, not-null
-  primary key.  
+  primary key.  Note that an "Indexed Table" is distinct from an
+  ordinary table with a separate index, where you can assign a separate
+  index object to a particular column or group of columns.
 
     gendba 9> ct EMP index id=n name=c
     Create Table : EMP 
@@ -376,26 +404,30 @@ NEW FEATURES - ALTER TABLE ADD CONSTRAINT
   The check-text is any basic where clause predicate.  Example:
 
     gendba 3> create table testcon (col1 c, col2 n);
+    table testcon created 
+    
     gendba 4> alter table testcon add constraint cn1 
-               check ((col2 > 5) && col1 =~ m/(a|b|c)/x )
-
+              check ((col2 > 5) AND col1 =~ m/(a|b|c)/)
+    Added constraint cn1 to table testcon
+    
     gendba 5> insert into testcon values ('a', 7);
     inserted 1 row into table testcon.
-
+    
     gendba 6> insert into testcon values ('b', 8);
     inserted 1 row into table testcon.
-
+    
     gendba 7> insert into testcon values ('d', 8);
-    violated constraint cn1
-    whisper: undo insert!!
-    Failed to insert row 1 in table testcon at lib/Genezzo/gendba.pl line 244
+    WARNING: violated constraint cn1
+    must satisfy (col2 > 5) AND col1 =~ m/(a|b|c)/
+    WARNING: Failed to insert row 1 in table testcon
+    inserted 0 rows into table testcon.
+    
+    gendba 8> insert into testcon values ('a', 1);
+    WARNING: violated constraint cn1
+    must satisfy (col2 > 5) AND col1 =~ m/(a|b|c)/
+    WARNING: Failed to insert row 1 in table testcon
     inserted 0 rows into table testcon.
 
-    gendba 8> insert into testcon values ('a', 1);
-    violated constraint cn1
-    whisper: undo insert!!
-    Failed to insert row 1 in table testcon at lib/Genezzo/gendba.pl line 244
-    inserted 0 rows into table testcon.
 
   Version 0.22 supports 
     ALTER TABLE ADD CONSTRAINT <name> UNIQUE (<column-list>)
@@ -499,7 +531,7 @@ NEW FEATURES - Raw Device support
 
 INCOMPATIBLE CHANGES
 
-  Version 0.45 dictionary and block format is incompatible with
+  Version 0.46 dictionary and block format is incompatible with
   previous releases.  No upgrade path is supported.
 
 SEE ALSO
