@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/SysHook.pm,v 7.1 2005/07/19 07:49:03 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/SysHook.pm,v 7.3 2005/08/25 09:14:46 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -19,9 +19,11 @@ our $VERSION;
 
 our $Got_Hooks;       # set to 1 after all hooks get loaded
 our %SysHookOriginal; # save original value of all hooks for posterity
+our %ReqObjList;      # Object-Oriented Require
+our %ReqObjMethod;    # Object-Oriented Meth
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 7.1 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.3 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     $Got_Hooks = 0;
 }
@@ -194,7 +196,7 @@ sub HavokInit
 
         }
 
-        if ($xtype =~ m/^require$/i)
+        if ($xtype =~ m/^(oo_require|require)$/i)
         {
             my $req_str = "require $xname";
 
@@ -230,6 +232,34 @@ sub HavokInit
                 push @inargs, $xargs;
             }
 
+            if ($xtype =~ m/^(oo_require)$/i)
+            {
+                # Object-Oriented Require
+                unless (exists($ReqObjList{"$xname"}))
+                {
+                    whisper "init object for package $xname";
+
+                    my $obj;
+                    my $initstr = '$obj = ' . $xname ;
+                    $initstr   .= "->" . 'SysHookInit($dict)';
+                    whisper "$initstr";
+                    eval " $initstr " ;
+                    if ($@)
+                    {
+                        my %earg = (#self => $self,
+                                    msg => "$@\nbad pkg init : $initstr");
+
+                        &$GZERR(%earg)
+                            if (defined($GZERR));
+                    }
+
+                    # create an entry even if the init fails
+                    $ReqObjList{"$xname"} = $obj;                        
+                }
+                
+            }
+
+            my $obj1;
 
             for my $fname (@inargs)
             {
@@ -239,9 +269,33 @@ sub HavokInit
                 my $packf =  $xname . "::" . $fname;
 
                 my $func = "sub " . $mainf ;
-                $func .= "{ return " . $packf . '(@_); }';
-            
-#            whisper $func;
+                if (($xtype =~ m/^(oo_require)$/i) &&
+                    exists($ReqObjList{"$xname"}) &&
+                    defined($ReqObjList{"$xname"}))
+                {
+                    $obj1 = $ReqObjList{"$xname"};
+                    #$ReqObjMethod{$packf} = sub { $obj1->$packf(@_) };
+                    #$func .= '{ return $ReqObjMethod{' . $packf . '}->(@_); }';
+#                    $func .= '{ my $mref = sub { $obj1->$packf(@_) };';
+#                    $func .= ' return $mref->(@_); }';
+
+                    # lots of work to avoid 'Variable "$mref" may be
+                    # unavailable...'
+
+                    $func .= '{ my $mref = ' .
+                        'sub { $Genezzo::Havok::SysHook::ReqObjList{"' 
+                        . $xname .'"}->' . $packf . '(@_) };';
+                    $func .= ' return $mref->(@_); }';
+
+#                    $mref = sub { $obj1->$packf(@_) };
+#                    $func .= '{ return $mref->(@_); }';
+                }
+                else
+                {
+                    $func .= "{ return " . $packf . '(@_); }';
+                }            
+
+            whisper $func;
 
 #            eval {$func } ;
                 eval " $func " ;

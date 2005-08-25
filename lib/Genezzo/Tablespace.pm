@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Tablespace.pm,v 7.2 2005/07/24 04:17:14 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Tablespace.pm,v 7.3 2005/08/25 09:11:19 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -28,7 +28,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 7.2 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.3 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
 #    @EXPORT      = qw(&func1 &func2 &func4 &func5);
@@ -987,12 +987,13 @@ sub TSAddFile ()
     my $ts = $self->{the_ts};
     my $ts_prefix = $self->{ts_prefix};
 
+    my %optional = (align_hdr => 1);
     my %required = (
                     filename => "no file name !",
                     filesize => "file size not specified !"
                     );
 
-    my %args = (
+    my %args = (%optional,
                 @_);
 
     my @file_stat;
@@ -1035,18 +1036,38 @@ sub TSAddFile ()
         $hstr   .=     " D=" . $Genezzo::GenDBI::RELDATE;   # D for date
         $hstr   .=  " M1=00";  # file header mod status (base 36)
 
+        if ((exists($args{defs}))
+            && (defined($args{defs})))
+        {
+            while (my ($kk, $vv) = each (%{$args{defs}}))
+            {
+                # ignore duplicates of standard set of tokens
+                next if ($kk =~ m/^(V|bsz|S|D|M1)$/);
+                # URL-style substitution to handle spaces, weird chars
+                $kk =~ s/([^a-zA-Z0-9])/uc(sprintf("%%%02lx",  ord $1))/eg;
+                $vv =~ s/([^a-zA-Z0-9])/uc(sprintf("%%%02lx",  ord $1))/eg;
+                $hstr .= " " . $kk ."=" . $vv;
+            }
+        }
+
         # add some space to make at least 64 bytes.
         $hstr .= " " x (64 - length($hstr)) 
             if (length($hstr) < 64);
 
-        if (getUseRaw())
+        if (getUseRaw() || $args{align_hdr})
         {
             # header alignment for raw io            
             my $min_al = $Genezzo::Util::ALIGN_BLOCKSIZE; 
+            my $little_bit = length(pack("xN", 0));
+
+            while (length($hstr) > ($min_al - $little_bit))
+            {
+                $min_al += $Genezzo::Util::ALIGN_BLOCKSIZE; 
+            }
 
             # decrease available space by null terminator 
             # and header checksum so total header is align blocksize
-            $min_al -= length(pack("xN", 0));
+            $min_al -= $little_bit;
 
             # add some space to make at least min_al bytes.
             $hstr .= " " x ($min_al - length($hstr)) 

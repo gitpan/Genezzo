@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 7.3 2005/08/08 03:07:20 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 7.4 2005/08/25 09:11:56 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -49,11 +49,11 @@ BEGIN {
 	
 }
 
-our $VERSION   = '0.46';
+our $VERSION   = '0.47';
 our $RELSTATUS = 'Alpha'; # release status
 # grab the code check-in date and convert to YYYYMMDD
 our $RELDATE   = 
-    do { my @r = (q$Date: 2005/08/08 03:07:20 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
+    do { my @r = (q$Date: 2005/08/25 09:11:56 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
 
 our $errstr; # DBI errstr
 
@@ -246,9 +246,13 @@ sub _init
         
         if (scalar(keys(%defs2)))
         {
+            my $getHelp = 0;
+
             my $msg = "unknown definitions for database initialization:\n";
             while (my ($kk, $vv) = each (%defs2))
             {
+                $getHelp = 1
+                    if ($kk =~ m/^help$/i);
                 $msg .=  "\t" .  $kk .  "=" . $vv ."\n";
             }
             $msg .= "\nlegal values are:\n";
@@ -259,14 +263,24 @@ sub _init
             }          
             $msg .= "\n";  
 
-            my %earg = ( msg => $msg, severity => 'fatal');
+            my %earg = ( msg => $msg, severity => 'info');
 
             &$GZERR(%earg)
                 if (defined($GZERR));
 
-            return 0;
+            return 0
+                if ($getHelp);
+
+            $dictargs{unknown_defs} = \%defs2;
         }
 
+    }
+
+    if ((exists($args{fhdefs}))
+        && (defined($args{fhdefs}))
+        )
+    {
+        $dictargs{fhdefs} = $args{fhdefs};
     }
 
     if (exists($args{GZERR})) # pass the error reporting routine

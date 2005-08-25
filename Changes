@@ -1,5 +1,11 @@
 Revision history for Perl extension Genezzo
 
+0.47 Thu Aug 25 02:03:21 2005
+        - Object-Oriented SysHook
+        - arbitrary user preferences (via -define) and fileheader info
+          (via -fileheader_define).
+        - align fileheader on blocksize boundary
+
 0.46 Sun Aug  7 20:10:17 2005
         - more efficient update of rows that exceed small row threshold.
         - add sync (flush changes to disk without committing a transaction).

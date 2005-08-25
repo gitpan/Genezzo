@@ -529,9 +529,18 @@ NEW FEATURES - Improved Parser
 NEW FEATURES - Raw Device support
   Version 0.44 and 0.45 add support for raw io devices.          
 
+NEW FEATURES - Additional User-supplied Preferences and File Header Info
+  In Version 0.47, users can supply arbitrary command-line definitions
+  for the dictionary preference table or fileheader info using
+  -define and -fileheader_define, respectively.
+
+NEW FEATURES - Object-Oriented SysHooks
+  In Version 0.47, a single package can load multiple functions as 
+  a set of class methods, versus package methods.
+
 INCOMPATIBLE CHANGES
 
-  Version 0.46 dictionary and block format is incompatible with
+  Version 0.47 dictionary and block format is incompatible with
   previous releases.  No upgrade path is supported.
 
 SEE ALSO

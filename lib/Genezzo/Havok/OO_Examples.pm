@@ -1,15 +1,12 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/Examples.pm,v 7.3 2005/08/25 09:08:26 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/OO_Examples.pm,v 1.2 2005/08/25 09:15:27 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
-package Genezzo::Havok::Examples;
+package Genezzo::Havok::OO_Examples;
 require Exporter;
-
-@ISA = qw(Exporter);
-@EXPORT = qw(&isRedGreen);
 
 use Genezzo::Util;
 
@@ -18,33 +15,51 @@ use warnings;
 
 use Carp;
 
-# select * from mytable where Genezzo::Havok::Examples::isRedGreen(col1)
-# select * from mytable where isRedGreen(col1)
-
-# Example for UserExtend function: test if a string matches 
-# the regexp "red or green"
-sub isRedGreen
+sub new 
 {
-    return undef
-        unless scalar(@_);
+    whoami;
+    my $invocant = shift;
+    my $class = ref($invocant) || $invocant ; 
+    my $self = { };
 
-    return ($_[0] =~ m/^(red|green)$/i);
+    $self->{dict} = shift @_;
+    $self->{count} = 0;
+
+    greet $self->{dict}->{prefs};
+    
+    return bless $self, $class;
+
 }
 
-# Example for SysHook function
+sub SysHookInit
+{
+    goto &new
+
+}
+
+
 our $Howdy_Hook;
 sub Howdy
 {
+    my $self = shift;
+    my $cc = $self->{count};
+    $cc++;
+    $self->{count} = $cc;
+    my $dict = $self->{dict};
     my %args = @_;
 
     if (exists($args{self}))
     {
-        my $self = $args{self};
-        if (defined($self) && exists($self->{GZERR}))
+        my $self2 = $args{self};
+        if (defined($self2) && exists($self2->{GZERR}))
         {
-            my $err_cb = $self->{GZERR};
-            &$err_cb(self => $self, severity => 'info',
-                     msg => "Howdy!!");
+            my $d2 = Data::Dumper->Dump([$dict->{prefs}]);
+
+            $d2 .= "\ncount = $cc\n";
+
+            my $err_cb = $self2->{GZERR};
+            &$err_cb(self => $self2, severity => 'info',
+                     msg => "Howdy!! $d2");
         }
     }
 
@@ -64,16 +79,25 @@ sub Howdy
 our $Ciao_Hook;
 sub Ciao
 {
+    my $self = shift;
+    my $cc = $self->{count};
+    $cc++;
+    $self->{count} = $cc;
+    my $dict = $self->{dict};
     my %args = @_;
 
     if (exists($args{self}))
     {
-        my $self = $args{self};
-        if (defined($self) && exists($self->{GZERR}))
+        my $self2 = $args{self};
+        if (defined($self2) && exists($self2->{GZERR}))
         {
-            my $err_cb = $self->{GZERR};
-            &$err_cb(self => $self, severity => 'info',
-                     msg => "Ciao!!");
+            my $d2 = Data::Dumper->Dump([$dict->{prefs}]);
+
+            $d2 .= "\ncount = $cc\n";
+
+            my $err_cb = $self2->{GZERR};
+            &$err_cb(self => $self2, severity => 'info',
+                     msg => "Ciao!! $d2");
         }
     }
 
@@ -102,9 +126,22 @@ __END__
 
 =head1 NAME
 
-Genezzo::Havok::Examples - some example havok functions
+Genezzo::Havok::OO_Examples - some example havok functions
 
 =head1 SYNOPSIS
+
+
+REM ct sys_hook xid=n pkg=c hook=c replace=c xtype=c xname=c args=c owner=c creationdate=c version=c
+REM i havok 3 Genezzo::Havok::SysHook SYSTEM 2005-07-23T22:30:00 0 7.01
+
+REM HAVOK_OO_EXAMPLE
+i sys_hook 1 Genezzo::Dict dicthook1 Howdy_Hook oo_require Genezzo::Havok::OO_Examples Howdy SYSTEM 2005-07-23T22:30:00 0
+i sys_hook 2 Genezzo::Dict dicthook1 Ciao_Hook  oo_require Genezzo::Havok::OO_Examples Ciao SYSTEM 2005-07-23T22:30:00 0
+
+commit
+shutdown
+startup
+
 
 =head1 DESCRIPTION
 
@@ -116,7 +153,7 @@ Havok test module
 
 =over 4
 
-=item  isRedGreen - test if argument is red or green
+=item  Howdy, Ciao
 
 =back
 

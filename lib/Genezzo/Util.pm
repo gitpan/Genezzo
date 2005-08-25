@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Util.pm,v 7.2 2005/07/24 04:12:06 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Util.pm,v 7.3 2005/08/25 09:10:10 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -20,7 +20,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 7.2 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.3 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
     @EXPORT      = qw(&whisper &whoami &greet 
@@ -1294,6 +1294,9 @@ sub FileGetHeaderInfo
 
 #        greet @ggg;
 
+        die "no null terminator!"
+            unless (scalar(@ggg) > 1);
+
         $val[0] = $ggg[0];
         $val[1] = unpack("N", $ggg[1]);
 #        greet @val;
@@ -1320,7 +1323,13 @@ sub FileGetHeaderInfo
         my @kv = split(/=/, $t1);
 #        print $kv[0]," ",$kv[1],"\n";
 
-        $h1{$kv[0]} = $kv[1]; # hash of all key values
+        my $kk = $kv[0];
+        my $vv = $kv[1];
+        # URL-style substitution to handle spaces, weird chars
+        $kk =~ s/\%([A-Fa-f0-9]{2})/pack('C', hex($1))/seg;
+        $vv =~ s/\%([A-Fa-f0-9]{2})/pack('C', hex($1))/seg;
+
+        $h1{$kk} = $vv; # hash of all key values
     }
 
     $version   = $h1{V};
@@ -1556,6 +1565,10 @@ Genezzo::Util - Utility functions
 =head1 TODO
 
 =over 4
+
+=item FileGetHeaderInfo: need to handle case of header which exceeds a 
+single block.  Probably should keep increasing the buffer size until
+find null terminator (within reason).
 
 =item packrow: store metadata in col0 vs trailing col with next ptr
 

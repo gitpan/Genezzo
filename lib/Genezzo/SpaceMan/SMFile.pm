@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/SpaceMan/RCS/SMFile.pm,v 7.2 2005/07/24 05:23:35 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/SpaceMan/RCS/SMFile.pm,v 7.3 2005/08/25 09:14:22 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -21,7 +21,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 7.2 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.3 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
     @EXPORT      = ( ); # qw(&NumVal);
@@ -184,7 +184,7 @@ sub PackSpaceList
     my ($self, $tablename, $object_id, $desc) = @_;
 
 #    whoami;
-        local $Genezzo::Util::QUIETWHISPER = 0; # XXX: unquiet the whispering
+#        local $Genezzo::Util::QUIETWHISPER = 0; # XXX: unquiet the whispering
 
     unless (defined($object_id))
     {
@@ -525,7 +525,7 @@ sub nextfreeblock
     return undef
         unless (Validate(\%args, \%required));
 
-    local $Genezzo::Util::QUIETWHISPER = 1; # XXX: quiet the whispering
+#    local $Genezzo::Util::QUIETWHISPER = 1; # XXX: quiet the whispering
     
     my $gotnewextent = 0; # true if get new extent
 

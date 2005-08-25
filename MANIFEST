@@ -44,6 +44,7 @@ lib/Genezzo/Havok/SysHook.pm
 lib/Genezzo/Havok/UserExtend.pm
 lib/Genezzo/Havok/Basic.pm
 lib/Genezzo/Havok/Examples.pm
+lib/Genezzo/Havok/OO_Examples.pm
 lib/Genezzo/TSHash.pm
 lib/Genezzo/Parse/SQLGrammar.pl
 lib/Genezzo/Parse/SQL.pm

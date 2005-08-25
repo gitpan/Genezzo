@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 7.3 2005/07/24 04:28:27 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 7.4 2005/08/25 09:12:56 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -19,7 +19,7 @@ use Genezzo::Havok;
 
 BEGIN {
     our $VERSION;
-    $VERSION = do { my @r = (q$Revision: 7.3 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.4 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -196,6 +196,20 @@ sub _init
 
     $self->{gnz_home}    = $args{gnz_home};
     $self->{dbfile}      = $args{name} . ".dbf";
+
+
+    if ((exists($args{unknown_defs}))
+        && (defined($args{unknown_defs})))
+    {
+        # unknown command line definitions
+        $self->{unknown_defs} = $args{unknown_defs};
+    }
+    if ((exists($args{fhdefs}))
+        && (defined($args{fhdefs})))
+    {
+        # file header definitions
+        $self->{fhdefs} = $args{fhdefs};
+    }
 
     # for raw filesystems we pretend /dev/raw is the home directory
     # and raw1 is the file.
@@ -804,6 +818,26 @@ sub _DictDefineCoreTabs
                 return 0;
             }
         }
+        if (exists($self->{unknown_defs}))
+        {
+            $rowarr->[$getcol->{pref_desc}]   = "init - unknown";
+            while (my ($kk, $vv) = each (%{$self->{unknown_defs}}))
+            { 
+                $rowarr->[$getcol->{pref_key}]   = $kk;
+                $rowarr->[$getcol->{pref_value}] = $vv;
+                unless (defined($realtie->HPush($rowarr)))
+                {
+                    my $msg = "Failed to create table $tablename";
+                    my %earg = (self => $self, msg => $msg, 
+                                severity => 'fatal');
+                
+                    &$GZERR(%earg)
+                        if (defined($GZERR));
+
+                    return 0;
+                }
+            }
+        }
     }
 
     # create _tspace
@@ -1043,8 +1077,16 @@ sub _DictDBInit
         tsref => $ts1,
     };
 
-    my @fstat = $ts1->TSAddFile(filename => $deffile,
-                                filesize => $self->{dbsize});
+    my %af_args = (filename => $deffile,
+                   filesize => $self->{dbsize});
+
+    if (exists($self->{fhdefs}))
+    {
+        # optional file header definitions
+        $af_args{defs} = $self->{fhdefs};
+    }
+
+    my @fstat = $ts1->TSAddFile(%af_args);
 
     return 0
         unless (scalar(@fstat));

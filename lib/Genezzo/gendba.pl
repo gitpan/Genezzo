@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/gendba.pl,v 7.1 2005/07/19 07:49:03 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/gendba.pl,v 7.2 2005/08/25 09:13:27 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -26,6 +26,9 @@ Options:
     -gnz_home        supply a directory for the gnz_home
     -shutdown        do not startup
     -define key=val  define a configuration parameter
+
+    -fileheader_define key=val  define a file-specific configuration 
+                                parameter (not useful in general)
 
 =head1 OPTIONS
 
@@ -65,6 +68,12 @@ Options:
     disables the havok extensibility subsystem on database
     startup. Use "gendba.pl -define help=help" 
     for more information.
+
+=item B<-fileheader_define> key=value
+    
+    Define a file-specific configuration parameter when the database 
+    is created.  For specialized extensions which cannot use the dictionary
+    preference table.
 
 =back
 
@@ -269,6 +278,7 @@ our $GZERR = sub {
     my $glob_shutdown; 
     my $glob_id;
     my $glob_defs;
+    my $glob_fhdefs;
 
 sub setinit
 {
@@ -276,6 +286,7 @@ sub setinit
     $glob_gnz_home = shift;
     $glob_shutdown = shift;
     $glob_defs     = shift;
+    $glob_fhdefs     = shift;
 }
 
 BEGIN {
@@ -284,13 +295,15 @@ BEGIN {
     my $init = 0;
     my $shutdown = 0;
     my $gnz_home = '';
-    my %defs = ();      # list of --define key=value
+    my %defs     = ();    # list of --define key=value
+    my %fhdefs   = ();    # list of --fileheader_define key=value
 
     GetOptions(
                'help|?' => \$help, man => \$man, init => \$init,
                shutdown => \$shutdown,
                'gnz_home=s' => \$gnz_home,
-               'define=s'   => \%defs)
+               'define=s'   => \%defs,
+               'fileheader_define=s'   => \%fhdefs)
         or pod2usage(2);
 
     $glob_id = "Genezzo Version $Genezzo::GenDBI::VERSION - $Genezzo::GenDBI::RELSTATUS $Genezzo::GenDBI::RELDATE\n\n"; 
@@ -298,7 +311,7 @@ BEGIN {
     pod2usage(-msg => $glob_id, -exitstatus => 1) if $help;
     pod2usage(-msg => $glob_id, -exitstatus => 0, -verbose => 2) if $man;
 
-    setinit($init, $gnz_home, $shutdown, \%defs);
+    setinit($init, $gnz_home, $shutdown, \%defs, \%fhdefs);
 
     print "loading...\n" ;
 }
@@ -307,6 +320,7 @@ my $fb = Genezzo::GenDBI->new(exe => $0,
                               gnz_home => $glob_gnz_home, 
                               dbinit => $glob_init,
                               defs   => $glob_defs,
+                              fhdefs => $glob_fhdefs,
                               GZERR  => $GZERR
                          );
 
