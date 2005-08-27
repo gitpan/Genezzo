@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 7.4 2005/08/25 09:12:56 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 7.5 2005/08/27 06:37:02 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -19,7 +19,7 @@ use Genezzo::Havok;
 
 BEGIN {
     our $VERSION;
-    $VERSION = do { my @r = (q$Revision: 7.4 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.5 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -198,18 +198,32 @@ sub _init
     $self->{dbfile}      = $args{name} . ".dbf";
 
 
+    # Get all command line definitions
     if ((exists($args{unknown_defs}))
         && (defined($args{unknown_defs})))
     {
         # unknown command line definitions
         $self->{unknown_defs} = $args{unknown_defs};
     }
+    else 
+    {
+        $self->{unknown_defs} = {};
+    }
+    # Get all command line file header definitions
     if ((exists($args{fhdefs}))
         && (defined($args{fhdefs})))
     {
         # file header definitions
         $self->{fhdefs} = $args{fhdefs};
     }
+    else
+    {
+        $self->{fhdefs} = {};
+    }
+    # get all actual file header info
+    $self->{fileheaderinfo} = {}; # set when load SYSTEM tablespace
+    # get dictionary preference table info
+    $self->{prefs} = {};
 
     # for raw filesystems we pretend /dev/raw is the home directory
     # and raw1 is the file.
@@ -535,6 +549,9 @@ sub DictDump
     elsif ($params[0] =~ m/^PREF/i) # dump prefs
     {
         print Dumper($self->{prefs});
+        print Dumper($self->{fileheaderinfo});
+        print Dumper($self->{unknown_defs});
+        print Dumper($self->{fhdefs});
     }
     elsif ($params[0] =~ m/^BC/i) # dump buffer cache
     {

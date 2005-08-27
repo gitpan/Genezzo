@@ -1,5 +1,8 @@
 Revision history for Perl extension Genezzo
 
+0.48 Fri Aug 26 23:33:21 2005
+        - Consolidate all dictionary defs/prefs, see "dump prefs"
+
 0.47 Thu Aug 25 02:03:21 2005
         - Object-Oriented SysHook
         - arbitrary user preferences (via -define) and fileheader info

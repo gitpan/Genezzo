@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Util.pm,v 7.3 2005/08/25 09:10:10 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Util.pm,v 7.4 2005/08/27 06:35:36 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -20,7 +20,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 7.3 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.4 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
     @EXPORT      = qw(&whisper &whoami &greet 
@@ -1266,13 +1266,16 @@ sub UnPackRow
 sub FileGetHeaderInfo
 {
 #    whoami;
-    my ($fh, $fname) = @_;
+    my ($fh, $fname, $fh_offset) = @_;
 
     my $buf;
     my $maxHeadersize = $ALIGN_BLOCKSIZE; # was 2048;
     my $hdrsize = 0;
 
-    sysseek ($fh, 0, 0 )
+    $fh_offset = 0 # seek starts at beginning of file
+        unless (defined($fh_offset));
+
+    sysseek ($fh, $fh_offset, 0 )
         or die "bad seek - file $fname : $! \n";
 
     gnz_read ($fh, \$buf, $maxHeadersize)
@@ -1340,6 +1343,8 @@ sub FileGetHeaderInfo
     $hdrsize = 64                   # boost to minimum of 64
         if ($hdrsize < 64);
 #    print "hdr: ", $hdrsize, "\n";
+
+  # $hdrsize += $fh_offset; # need overall offset to block zero for BCFile...
 
     return ($hdrsize, $version, $blocksize, \%h1);
 }
