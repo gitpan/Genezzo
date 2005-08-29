@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Util.pm,v 7.4 2005/08/27 06:35:36 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Util.pm,v 7.6 2005/08/29 05:27:48 claude Exp claude $
 #
-# copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 package Genezzo::Util;  # assumes Some/Module.pm
@@ -20,7 +20,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 7.4 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.6 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
     @EXPORT      = qw(&whisper &whoami &greet 
@@ -1266,11 +1266,27 @@ sub UnPackRow
 sub FileGetHeaderInfo
 {
 #    whoami;
-    my ($fh, $fname, $fh_offset) = @_;
+    my %optional = (
+                    fh_offset => 0
+                    );
+    my %required = (
+                    filehandle => "no filehandle!",
+                    filename   => "no filename!"
+                    );
+
+    my %args = (%optional,
+                @_);
+
+    die unless (exists($args{filehandle}));
+    die unless (exists($args{filename}));
+                    
+    my $fh        = $args{filehandle};
+    my $fname     = $args{filename};
+    my $fh_offset = $args{fh_offset};
 
     my $buf;
     my $maxHeadersize = $ALIGN_BLOCKSIZE; # was 2048;
-    my $hdrsize = 0;
+    my $hdrsize       = 0;
 
     $fh_offset = 0 # seek starts at beginning of file
         unless (defined($fh_offset));
@@ -1347,6 +1363,108 @@ sub FileGetHeaderInfo
   # $hdrsize += $fh_offset; # need overall offset to block zero for BCFile...
 
     return ($hdrsize, $version, $blocksize, \%h1);
+}
+
+sub FileSetHeaderInfo
+{
+#    whoami;
+    my %optional = (
+                    fh_offset => 0
+                    );
+    my %required = (
+                    filehandle => "no filehandle!",
+                    filename   => "no filename!",
+                    newkey     => "no key!",
+                    newval     => "no val!"
+                    );
+
+    my %args = (%optional,
+                @_);
+
+    die unless (exists($args{filehandle}));
+    die unless (exists($args{filename}));
+    die unless (exists($args{newkey}));
+    die unless (exists($args{newval}));
+                    
+    my $fh        = $args{filehandle};
+    my $fname     = $args{filename};
+    my $fh_offset = $args{fh_offset};
+
+    my ($hdrsize, $version, $blocksize, $h1) =
+        FileGetHeaderInfo(filehandle => $fh, 
+                          filename   => $fname,
+                          fh_offset  => $fh_offset);
+
+    my $buf;
+
+    sysseek ($fh, $fh_offset, 0 )
+        or die "bad seek - file $fname : $! \n";
+
+    gnz_read ($fh, \$buf, $hdrsize)
+        == $hdrsize
+            or die "bad read - file $fname : $! \n";
+
+    my @val;
+
+    if (0) # wait until Z template is fixed in 5.7
+    {
+        @val = unpack("Z*N", $buf);
+
+#        greet @val;
+    }
+    else
+    {      # find the null terminator, grab the string and checksum
+#        greet $buf;
+        my @ggg =  split(/\0/, $buf, 2);
+
+#        greet @ggg;
+
+        die "no null terminator!"
+            unless (scalar(@ggg) > 1);
+
+        $val[0] = $ggg[0];
+        $val[1] = unpack("N", $ggg[1]);
+#        greet @val;
+    }
+
+    my $hstr  = shift @val;
+    my $cksum = shift @val;
+
+    my $kk = $args{newkey};
+    my $vv = $args{newval};
+    # URL-style substitution to handle spaces, weird chars
+    $kk =~ s/([^a-zA-Z0-9])/uc(sprintf("%%%02lx",  ord $1))/eg;
+    $vv =~ s/([^a-zA-Z0-9])/uc(sprintf("%%%02lx",  ord $1))/eg;
+    my $kvpair = " " . $kk ."=" . $vv . " ";
+    my $spacelist = " " x length($kvpair);
+
+    $hstr =~ s/$spacelist/$kvpair/;
+
+    return undef
+        unless ($hstr =~ m/$kvpair/);
+
+    $cksum = unpack("%32C*", $hstr) % 65535;
+
+    # write a null terminated string followed by checksum
+    my $pack_hdr;
+    if (0) # XXX XXX: can fix later
+    {
+        $pack_hdr = pack("Z*N", $hstr, $cksum) ;
+    }
+    else
+    {
+        # Z template is fixed in 5.7
+        # ascii string, null byte, checksum
+        $pack_hdr = pack("A*xN", $hstr, $cksum) ;
+    }
+
+    sysseek ($fh, $fh_offset, 0 )
+        or die "bad seek - file $fname : $! \n";
+
+    my $hdr = gnz_write ($fh, $pack_hdr, length($pack_hdr));
+
+    return $pack_hdr;
+
 }
 
 sub GetIndexKeys
@@ -1571,6 +1689,9 @@ Genezzo::Util - Utility functions
 
 =over 4
 
+=item Should bundle all data file utility functions, such as FileGetHeaderInfo,
+SetHeaderInfo, etc, under separate Util::DataFile module
+
 =item FileGetHeaderInfo: need to handle case of header which exceeds a 
 single block.  Probably should keep increasing the buffer size until
 find null terminator (within reason).
@@ -1579,10 +1700,6 @@ find null terminator (within reason).
 
 =item packrow: check pack format for a zero len row of zero cols. 
 Does it need a nullvec?
-
-=item unpackrow: extend to support a prebuilt template when unpacking
-      many rows with the same number of columns.  Could probably store
-      in an array.  if (defined($a[$numcols])...
 
 =item packrow/unpackrow: in Perl 5.8 could use the nifty repeating
       templates to our advantage.
@@ -1600,7 +1717,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 
 L<perl(1)>.
 
-Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2003, 2004, 2005 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

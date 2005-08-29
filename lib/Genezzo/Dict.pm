@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 7.5 2005/08/27 06:37:02 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 7.6 2005/08/29 05:09:28 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -19,7 +19,7 @@ use Genezzo::Havok;
 
 BEGIN {
     our $VERSION;
-    $VERSION = do { my @r = (q$Revision: 7.5 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.6 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -2110,6 +2110,7 @@ sub DictTableAllTab
 # DictTableUseFile                                                         #
 # DictFileInfo                                                             #
 # DictGrowTablespace                                                       #
+# DictSetFileInfo                                                          #
 #                                                                          #
 ##++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++##
 
@@ -2587,7 +2588,95 @@ sub DictGrowTablespace
     $nargs{tsname} = $tsname;
     greet %nargs;
     return ($self->DictAddFile(%nargs));
-}
+} # end DictGrowTablespace
+
+sub DictSetFileInfo
+{
+    my $self = shift;
+
+    whoami;
+
+    if ($self->{dictinit})
+    {
+        whisper "initializing - can't set file info...";
+        return 0;
+    }
+
+    unless ($self->{started})
+    {
+        my %earg = (self => $self, msg => "dict not started\n",
+                    severity => 'warn');
+            
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
+        return 0;
+    }
+    my %optional = (tsname => "SYSTEM");
+    my %required = (
+                    newkey     => "no key!",
+                    newval     => "no val!"
+                    );
+    my %args = (
+                %optional,
+		@_);
+
+    return 0
+        unless (Validate(\%args, \%required));
+
+    my $tsname = $args{tsname};
+    my $newkey = $args{newkey};
+    my $newval = $args{newval};
+    
+    my $filename;
+
+    if (exists($args{FileName}))
+    {
+        $filename = $args{FileName};
+    }
+    else
+    {
+        # use default dbf file
+
+        my $fhts;   # gnz_home table space
+        
+        if(getUseRaw()){
+            $fhts = $self->{gnz_home};
+        }else{
+            $fhts = File::Spec->catdir($self->{gnz_home}, "ts");
+        }
+
+        $filename = File::Spec->catdir($fhts, $self->{dbfile});
+    }
+    return undef
+        unless (
+                exists($self->{tablespaces}->{$tsname})
+                && exists($self->{tablespaces}->{$tsname}->{tsref}));
+
+    my $tsref = $self->{tablespaces}->{$tsname}->{tsref};
+    
+    return undef
+        unless (exists($tsref->{the_ts})
+                && exists($tsref->{the_ts}->{bc}));
+
+    my $bc1 = $tsref->{the_ts}->{bc};
+
+    my $file_info = $bc1->BCFileInfoByName(FileName => $filename);
+    return undef
+        unless (defined($file_info));
+
+    my $foo = $bc1->FileSetHeaderInfoByName(FileName => $filename,
+                                            newkey   => $newkey, 
+                                            newval   => $newval);
+
+    if (defined($foo))
+    {
+        # XXX XXX: should reload fileheader_info if updated SYSTEM
+        # default datafile
+    }
+    return $foo;
+
+} # end DictSetFileInfo
 
 ##------------------------------------------------------------------------##
 #                                                                          #

@@ -17,6 +17,7 @@ t/Havok1.t
 t/Index1.t
 t/Index2.t
 t/Index3.t
+t/Prefs1.t
 t/PushHash1.t
 t/Row1.t
 t/Util1.t

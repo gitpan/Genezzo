@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BCFile.pm,v 7.1 2005/07/19 07:49:03 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BCFile.pm,v 7.2 2005/08/29 05:07:08 claude Exp claude $
 #
-# copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 use strict;
@@ -88,10 +88,14 @@ sub Dump
     my $self = shift;
     my $hitlist = $self->{ __PACKAGE__ . ":HITLIST"  };    
 
+    my $fn_arr = $self->{ __PACKAGE__ . ":FN_ARRAY" };
+    my $fn_hsh = $self->{ __PACKAGE__ . ":FN_HASH" };
+
     my %hashi = (bc => $self->{bc}->Dump(),
                  cache_hits   => $self->{cache_hits},
                  cache_misses => $self->{cache_misses},
-                 hitlist      => scalar keys %{$hitlist}
+                 hitlist      => scalar keys %{$hitlist},
+#                 fileinfo     => $fn_arr
                  );
 
     return \%hashi;
@@ -143,7 +147,9 @@ sub FileReg
         $th{fh} = new IO::File "+<$th{name}"
             or die "Could not open $th{name} for writing : $! \n";
 
-        @headerinfo = Genezzo::Util::FileGetHeaderInfo($th{fh}, $th{name});
+        @headerinfo = 
+            Genezzo::Util::FileGetHeaderInfo(filehandle => $th{fh}, 
+                                             filename   => $th{name});
 
 #        greet @headerinfo;
         return undef
@@ -165,6 +171,74 @@ sub FileReg
     return ($fn_hsh->{$args{FileName}})
 }
 
+sub BCFileInfoByName
+{
+    my $self = shift;
+
+    whoami @_;
+
+    my %required = (
+                    FileName   => "no FileName !"
+                    );
+    
+    my %args = (
+                @_);
+
+    return undef
+        unless (Validate(\%args, \%required));
+
+    my $fn_arr = $self->{ __PACKAGE__ . ":FN_ARRAY" };
+    my $fn_hsh = $self->{ __PACKAGE__ . ":FN_HASH" };
+
+    return undef
+        unless (exists($fn_hsh->{$args{FileName}}));
+
+    # XXX: NOTE: treat filename array as 1 based, vs 0 based 
+    # -- use fn_arr[n-1]->name to get filename.
+
+    my $fileno = $fn_hsh->{$args{FileName}};
+
+    $fileno--;
+    return ($fn_arr->[$fileno]);
+}
+
+sub FileSetHeaderInfoByName
+{
+    my $self = shift;
+
+    whoami @_;
+
+    my %required = (
+                    FileName   => "no FileName !",
+                    newkey     => "no key!",
+                    newval     => "no val!"
+                    );
+    
+    my %args = (
+                @_);
+
+    return undef
+        unless (Validate(\%args, \%required));
+
+    my $filename = $args{FileName};
+    my $newkey   = $args{newkey};
+    my $newval   = $args{newval};
+
+    my $file_info = $self->BCFileInfoByName(FileName => $filename);
+
+    return undef
+        unless (defined($file_info));
+
+    my $fh = $file_info->{fh};
+
+    return Genezzo::Util::FileSetHeaderInfo(
+                                            filehandle => $fh,
+                                            filename   => $filename,
+                                            newkey     => $newkey,
+                                            newval     => $newval
+                                            );
+    
+}
 
 sub _filereadblock
 {
@@ -658,6 +732,12 @@ END { }       # module clean-up code here (global destructor)
  default).  Returns a new buffer cache of the specified number of
  blocks of size blocksize.
 
+=item BCFileInfoByName
+ Return the file state information.
+
+=item FileSetHeaderInfoByName
+ Update the datafile header.
+
 =item FileReg
 
  Register a file with the cache -- returns a file number.  Reregistering
@@ -724,7 +804,7 @@ Currently requires 2 blocks per open file.
 
 perl(1).
 
-Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2003, 2004, 2005 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
