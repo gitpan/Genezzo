@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/SpaceMan/RCS/SMFile.pm,v 7.3 2005/08/25 09:14:22 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/SpaceMan/RCS/SMFile.pm,v 7.4 2005/09/07 08:26:09 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -21,7 +21,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 7.3 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.4 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
     @EXPORT      = ( ); # qw(&NumVal);
@@ -342,6 +342,11 @@ sub _tiefh
     my $bce = ${$fileheader->{bceref}};
 #    greet $bce;
 
+    # BCE to RDBlock - please respond
+    my $mailbag = Genezzo::Util::AddMail(To => 'Genezzo::Block::RDBlock',
+                                         From => $bce,
+                                         Msg => 'RSVP');
+
     # build a separate tie for the file header
     my %filetiebufa;
     
@@ -350,7 +355,8 @@ sub _tiefh
         tie %filetiebufa, 'Genezzo::Row::RSBlock', 
         (refbufstr => $bce->{bigbuf}, 
          blocksize => $bce->{blocksize},
-         blocknum  => $blocknum
+         blocknum  => $blocknum,
+         MailBag   => $mailbag
          );
     
     $fileheader->{RefTie} = \%filetiebufa;

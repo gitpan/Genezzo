@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Block/RCS/RDBlock.pm,v 7.1 2005/07/19 07:49:03 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Block/RCS/RDBlock.pm,v 7.3 2005/09/07 08:33:20 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -196,7 +196,33 @@ sub TIEHASH
         }
     }
 
-    return bless $self, $class;
+    my $new_self = bless $self, $class;
+
+    # check if we have any mail
+    if (exists($args{MailBag}))
+    {
+        my $msglist = Genezzo::Util::CheckMail(MailBag => $args{MailBag},
+                                               Address => __PACKAGE__);
+        if (defined($msglist)
+            && scalar(@{$msglist}))
+        {
+            for my $msg (@{$msglist}) # check all msgs
+            {
+                # RSVP to sender
+
+                if (exists($msg->{Msg})
+                    && exists($msg->{From})
+                    && $msg->{Msg} eq 'RSVP')
+                {
+                    my $sender = $msg->{From};
+                    $sender->RSVP(name  => __PACKAGE__,
+                                  value => $new_self);
+                }
+            } # end fo
+        }
+    } # end if mailbag
+
+    return $new_self
 
 } # end new
 

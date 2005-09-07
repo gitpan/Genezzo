@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BufCaElt.pm,v 7.1 2005/07/19 07:49:03 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BufCaElt.pm,v 7.4 2005/09/07 08:50:59 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -23,7 +23,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 7.1 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.4 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
 #    @EXPORT      = qw(&func1 &func2 &func4 &func5);
@@ -95,7 +95,13 @@ sub _init
     $buf = "\0" x $self->{blocksize};
     $self->{bigbuf} = \$buf;
 
-    $self->{info}   = {};
+    $self->{info}    = {}; # DEPRECATE: switch to Contrib
+
+    # Contrib is the counterpart to the CPAN Genezzo::Contrib
+    # namespace.  Add hash keys according to your package name, e.g.
+    #   $self->{Contrib}->{Clustered} = 'foo' 
+    # for Genezzo::Contrib::Clustered
+    $self->{Contrib} = {}; # UNUSED until "info" is removed
 
     $self->{pin}    = 0;
     $self->{dirty}  = 0;
@@ -130,7 +136,7 @@ sub _postinit
     # if the underlying tied buffer gets overwritten
     my $foo = sub { $self->_dirty(1); };
     $self->{tbuf}->_StoreCB($foo);
-    $self->{tbuf}->SetBCE($self);
+    $self->{tbuf}->SetBCE($self); # DEPRECATE
 
 }
 
@@ -160,6 +166,13 @@ sub _dirty
     my $self = shift;
     $self->{dirty} = shift if @_ ;
 
+    # HOOK: 
+    # use sys_hook to define 
+    if (defined(&_BCE_dirtyhook))
+    {
+        _BCE_dirtyhook($self, @_);
+    }
+
     return $self->{dirty};
 
 } 
@@ -173,11 +186,48 @@ sub _fileread
 
 } 
 
+# DEPRECATE
 sub GetInfo
 {
     my $self = shift;
     return $self->{info};
 }
+
+sub GetContrib
+{
+    my $self = shift;
+    return $self->{info};
+}
+
+sub RSVP
+{
+    my $self   = shift;
+
+#    print "foo\n";
+
+    my %args = @_;
+
+    unless (exists($args{name}) &&
+            exists($args{value}))
+    {
+        return undef;
+    }
+
+    greet $args{name};
+#    print $args{name},"\n";
+
+    unless (exists($self->{info}->{mailbox}))
+    {
+        $self->{info}->{mailbox} = {};
+    }
+
+    $self->{info}->{mailbox}->{$args{name}} = $args{value};
+
+    whoami;
+
+    return $self->{info};
+}
+
 
 END { }       # module clean-up code here (global destructor)
 
@@ -211,6 +261,10 @@ each block.
        this hash to store the filenum/blocknum info associated with
        the current BufCaElt.
 
+=item  GetContrib - return a reference to the info hash.  BCFile uses
+       this hash to store the filenum/blocknum info associated with
+       the current BufCaElt.
+
 =item  _dirty - set/clear the "dirty" bit.  Used to indicate if buffer
        has been modified.
 
@@ -234,6 +288,10 @@ various
 =head1 TODO
 
 =over 4
+
+=item Deprecate GetInfo, convert to GetContrib.
+
+=item Switch syshook methods to use _BCE_dirtyhook
 
 =item get fileno, blockno info
 

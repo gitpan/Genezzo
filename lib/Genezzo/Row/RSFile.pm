@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSFile.pm,v 7.1 2005/07/19 07:49:03 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSFile.pm,v 7.3 2005/09/07 08:27:12 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -302,13 +302,21 @@ sub _make_new_chunk # override the hph method
 #    $smf->flush();
 #    greet $bce;
 
+    # BCE to RDBlock - please respond
+    my $mailbag = Genezzo::Util::AddMail(To => 'Genezzo::Block::RDBlock',
+                                         From => $bce,
+                                         Msg => 'RSVP');
+
     my %tiebufa;
     # tie array to buffer
     $self->{rowd} = 
         tie %tiebufa, $ROW_DIR_BLOCK_CLASS,
         (RDBlock_Class => $self->{RDBlock_Class},
-         refbufstr => $bce->{bigbuf}, blocknum => $blockno, 
-         blocksize => $bce->{blocksize}); # XXX XXX : get blocksize from bce!!
+         blocknum  => $blockno, 
+         refbufstr => $bce->{bigbuf}, 
+         blocksize => $bce->{blocksize},
+         MailBag   => $mailbag
+         ); # XXX XXX : get blocksize from bce!!
     
     $self->{reftiebufa} = \%tiebufa;
     
@@ -456,6 +464,11 @@ sub _get_a_chunk # override the hph method
 
     my $bce = ${$bc->{bceref}};
 
+    # BCE to RDBlock - please respond
+    my $mailbag = Genezzo::Util::AddMail(To => 'Genezzo::Block::RDBlock',
+                                         From => $bce,
+                                         Msg => 'RSVP');
+
     my %tiebufa;
     # tie array to buffer
     $self->{rowd} = 
@@ -463,7 +476,9 @@ sub _get_a_chunk # override the hph method
          (RDBlock_Class => $self->{RDBlock_Class},
           refbufstr => $bce->{bigbuf},
           blocksize => $bce->{blocksize}, # XXX XXX : get blocksize from bce!!
-          blocknum  => $blocknum);
+          blocknum  => $blocknum,
+          MailBag   => $mailbag
+          );
 
     $bc->{bufblockno} = $blocknum;    
     $self->{reftiebufa} = \%tiebufa;

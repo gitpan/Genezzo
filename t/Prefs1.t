@@ -8,7 +8,7 @@
 # Change 1..1 below to 1..last_test_to_print .
 # (It may become useful if the test is moved to ./t subdirectory.)
 
-BEGIN { $| = 1; print "1..12\n"; }
+BEGIN { $| = 1; print "1..23\n"; }
 END {print "not ok 1\n" unless $loaded;}
 use Genezzo::GenDBI;
 $loaded = 1;
@@ -171,6 +171,19 @@ my %other_defs = ('foo' => 'bar',
     }
     ok();
 
+    my $foo = $dictobj->DictSetFileInfo(newkey => "look at this",
+                                        newval => "teeny");
+
+    $fhdefs{"look at this"} = "teeny";
+
+    if ($fb->Parseall("commit"))
+    {
+        ok();
+    }
+    else
+    {
+        not_ok ("could not commit");
+    }
 
     if ($fb->Parseall("shutdown"))
     {
@@ -184,6 +197,128 @@ my %other_defs = ('foo' => 'bar',
 
 }
 
+{
+    use Genezzo::Util;
+
+    my $fb = Genezzo::GenDBI->new(exe => $0, 
+                             gnz_home => $gnz_home, 
+                             dbinit => $dbinit);
+
+    unless (defined($fb))
+    {
+        not_ok ("could not find database");
+        exit 1;
+    }
+    ok();
+    $dbinit = 0;
+
+    if ($fb->Parseall("startup"))
+    {       
+        ok();
+    }
+    else
+    {
+        not_ok ("could not startup");
+    }
+
+    my $dictobj = $fb->{dictobj};
+    while (my ($kk, $vv) = each (%fhdefs))
+    {
+        print "$kk: $vv\n";
+
+        not_ok ("could not find $kk")
+            unless (exists($dictobj->{fileheaderinfo}->{$kk}));
+        my $pval = $dictobj->{fileheaderinfo}->{$kk};
+        not_ok ("$kk: mismatch - $pval not equal $vv")
+            unless ($vv eq $pval);
+    }
+    ok();
+
+    my $foo = $dictobj->DictSetFileInfo(newkey => "look at this",
+                                        newval => "monster super size me very big");
+
+    $fhdefs{"look at this"} = "monster super size me very big";
+
+    if ($fb->Parseall("commit"))
+    {
+        ok();
+    }
+    else
+    {
+        not_ok ("could not commit");
+    }
+
+    if ($fb->Parseall("shutdown"))
+    {
+        ok();
+    }
+    else
+    {
+        not_ok ("could not shutdown");
+    }
+
+
+}
+
+
+{
+    use Genezzo::Util;
+
+    my $fb = Genezzo::GenDBI->new(exe => $0, 
+                             gnz_home => $gnz_home, 
+                             dbinit => $dbinit);
+
+    unless (defined($fb))
+    {
+        not_ok ("could not find database");
+        exit 1;
+    }
+    ok();
+    $dbinit = 0;
+
+    if ($fb->Parseall("startup"))
+    {       
+        ok();
+    }
+    else
+    {
+        not_ok ("could not startup");
+    }
+
+    my $dictobj = $fb->{dictobj};
+    while (my ($kk, $vv) = each (%fhdefs))
+    {
+        print "$kk: $vv\n";
+
+        not_ok ("could not find $kk")
+            unless (exists($dictobj->{fileheaderinfo}->{$kk}));
+        my $pval = $dictobj->{fileheaderinfo}->{$kk};
+        not_ok ("$kk: mismatch - $pval not equal $vv")
+            unless ($vv eq $pval);
+    }
+    ok();
+
+
+    if ($fb->Parseall("commit"))
+    {
+        ok();
+    }
+    else
+    {
+        not_ok ("could not commit");
+    }
+
+    if ($fb->Parseall("shutdown"))
+    {
+        ok();
+    }
+    else
+    {
+        not_ok ("could not shutdown");
+    }
+
+
+}
 
 
 sub ok

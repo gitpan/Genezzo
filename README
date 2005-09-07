@@ -542,6 +542,7 @@ INCOMPATIBLE CHANGES
 
   Version 0.48 dictionary and block format is incompatible with
   previous releases.  No upgrade path is supported.
+  Version 0.48 thru 0.50 are compatible.
 
 SEE ALSO
 

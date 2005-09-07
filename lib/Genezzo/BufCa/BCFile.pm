@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BCFile.pm,v 7.2 2005/08/29 05:07:08 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BCFile.pm,v 7.3 2005/09/07 08:28:34 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -296,9 +296,36 @@ sub _filereadblock
              
 }
 
+#sub _init_filewriteblock
+#{
+#    my ($self, $fname, $fnum, $fh, $bnum, $refbuf, $hdrsize, $bce) = @_;
+#
+#    return 1 
+#        unless (defined($bce));
+#
+#    whoami;
+#
+#    if (1) 
+#    {
+#        my $foo = $bce->GetInfo();
+#        
+#        return 1
+#            unless (defined($foo));
+#
+#        if (exists($foo->{mailbox})
+#            && exists($foo->{mailbox}->{'Genezzo::Block::RDBlock'}))
+#        {
+#            my $rdblock = $foo->{mailbox}->{'Genezzo::Block::RDBlock'};
+#            greet $rdblock->_set_meta_row("BCE", ["BCE","howdy"]);
+#        }
+#    }
+#    return 1;
+#}
+
 sub _filewriteblock
 {
-    my ($self, $fname, $fnum, $fh, $bnum, $refbuf, $hdrsize) = @_;
+    my $self = shift;
+    my ($fname, $fnum, $fh, $bnum, $refbuf, $hdrsize, $bce) = @_;
 
     return 0
         if ($self->{read_only});
@@ -309,6 +336,12 @@ sub _filewriteblock
         or die "bad seek - file $fname : $fnum, block $bnum : $! \n";
 
     # HOOK: init filewriteblock
+    # use sys_hook to define 
+    if (defined(&_init_filewriteblock))
+    {
+        return 0
+            unless (_init_filewriteblock($self, @_));
+    }
 
     # XXX: build a basic header with the file number, block number,
     # etc 
@@ -439,7 +472,8 @@ sub ReadBlock
                                                    $ofh, 
                                                    $obnum, 
                                                    $bce->{bigbuf},
-                                                   $ofhdrsz
+                                                   $ofhdrsz,
+                                                   $bce
                                                    )
                             );
             }
@@ -524,7 +558,7 @@ sub WriteBlock
         return (0)
             unless (
                     $self->_filewriteblock($fname, $fnum, $fh, $bnum, 
-                                           $bce->{bigbuf}, $fhdrsz)
+                                           $bce->{bigbuf}, $fhdrsz, $bce)
                     );
     }
     $bce->_dirty(0);
@@ -568,7 +602,7 @@ sub Flush
             return (0)
                 unless (
                         $self->_filewriteblock($fname, $fnum, $fh, $bnum, 
-                                               $bce->{bigbuf}, $fhdrsz)
+                                               $bce->{bigbuf}, $fhdrsz, $bce)
                         );
         }
         $bce->_dirty(0);

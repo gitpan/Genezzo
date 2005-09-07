@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/DirtyScalar.pm,v 7.1 2005/07/19 07:49:03 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/DirtyScalar.pm,v 7.2 2005/09/07 08:50:59 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -38,6 +38,7 @@ sub STORE {
     
     if (defined($_[0]->{storecb}))
     {
+# DEPRECATE
 #        greet $_[0]->{bce}->GetInfo()
 #            if (exists($_[0]->{bce}));
 
@@ -60,6 +61,7 @@ sub _StoreCB
     return $self->{storecb};
 }
 
+# DEPRECATE
 # set the buffer cache element associated with this tie
 sub SetBCE
 {
@@ -104,9 +106,13 @@ BufCaElt uses DirtyScalar to detect when a data block is modified.
 
 various
 
-=head1 #TODO
+=head1 TODO
 
 =over 4
+
+=item Deprecate SetBCE: can shift responsibility and functionality to
+      storeCB which will contain a hook, versus directly overloading STORE
+      here.
 
 =back
 

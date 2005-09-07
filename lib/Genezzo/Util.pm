@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Util.pm,v 7.6 2005/08/29 05:27:48 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Util.pm,v 7.7 2005/09/07 08:24:50 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -20,7 +20,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 7.6 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.7 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
     @EXPORT      = qw(&whisper &whoami &greet 
@@ -1395,6 +1395,8 @@ sub FileSetHeaderInfo
                           filename   => $fname,
                           fh_offset  => $fh_offset);
 
+#    print "\n$hdrsize\n";
+
     my $buf;
 
     sysseek ($fh, $fh_offset, 0 )
@@ -1435,13 +1437,63 @@ sub FileSetHeaderInfo
     # URL-style substitution to handle spaces, weird chars
     $kk =~ s/([^a-zA-Z0-9])/uc(sprintf("%%%02lx",  ord $1))/eg;
     $vv =~ s/([^a-zA-Z0-9])/uc(sprintf("%%%02lx",  ord $1))/eg;
-    my $kvpair = " " . $kk ."=" . $vv . " ";
-    my $spacelist = " " x length($kvpair);
 
-    $hstr =~ s/$spacelist/$kvpair/;
+    if (exists($h1->{$args{newkey}}))
+    {
+        # update an existing pair
+        my $oldval = $h1->{$args{newkey}};
+        $oldval =~ s/([^a-zA-Z0-9])/uc(sprintf("%%%02lx",  ord $1))/eg;
 
-    return undef
-        unless ($hstr =~ m/$kvpair/);
+        my $oldpair = " " . $kk ."=" . $oldval . " ";
+        my $kvpair = " " . $kk ."=" . $vv . " ";
+
+        my $len_dif = length($oldpair) - length($kvpair);
+        
+        if ($len_dif >= 0) 
+        {
+            # old pair is longer
+
+            if ($len_dif)
+            {
+                # add extra space if necessary
+                $hstr .= " " x $len_dif ;
+            }
+        }
+        else
+        {
+            # new pair is longer
+            
+            $len_dif *= -1; # normalize
+
+            # check if have enough trailing space for new val
+            my $spacelist = " " x ($len_dif + 1);
+
+            return undef
+                unless ($hstr =~ m/$spacelist/);
+
+            # truncate the spaces to preserve header length
+            my $one_space = " ";
+            $hstr =~ s/$spacelist/$one_space/;
+
+        }
+        # finally, update the values
+        $hstr =~ s/$oldpair/$kvpair/;
+
+        return undef
+            unless ($hstr =~ m/$kvpair/);
+
+    }
+    else
+    {
+        # replace trailing spaces with new pair
+        my $kvpair = " " . $kk ."=" . $vv . " ";
+        my $spacelist = " " x length($kvpair);
+
+        $hstr =~ s/$spacelist/$kvpair/;
+
+        return undef
+            unless ($hstr =~ m/$kvpair/);
+    }
 
     $cksum = unpack("%32C*", $hstr) % 65535;
 
@@ -1670,6 +1722,82 @@ sub gnz_write(*$$)
     my ($filehandle, $scalar, $length) = @_;
 
     return gnz_write_impl($filehandle, $scalar, $length);
+}
+
+
+# add a message to the mailbag (create the mailbag if necessary)
+#
+# To: a package name
+# From: an object
+# Msg:  a message
+#
+# behavior is rather open.  one message is 'RSVP', where the
+# destination should call the FROM object's RSVP method, supplying
+# its package name and the destination object
+sub AddMail
+{
+    my %required = (
+                    To => "no destination!",
+                    From => "no source!",
+                    Msg  => "no message!"
+                    );
+    my %optional = (
+                    MailBag => []
+                    );
+
+    my %args = (
+#                %optional,
+		@_);
+
+    return undef
+        unless (Validate(\%args, \%required));
+
+#    whoami;
+
+    my $mailbag = $args{MailBag};
+
+    my $newmsg = {};
+    $newmsg->{To} = $args{To};
+    $newmsg->{From} = $args{From};
+    $newmsg->{Msg} = $args{Msg};
+
+    push @{$mailbag}, $newmsg;
+
+    return $mailbag;
+}
+
+# get our messages from the Mailbag.  All mail whose TO address
+# matches the supplied ADDRESS is copied onto a separate message list
+sub CheckMail
+{
+    my %required = (
+                    MailBag => "no mailbag!",
+                    Address => "no address!"
+                    );
+#    my %optional = (
+#                    );
+
+    my %args = (
+#                %optional,
+		@_);
+
+    return undef
+        unless (Validate(\%args, \%required));
+
+    my $new_mailbag = [];
+
+#    whoami;
+
+    for my $msg (@{$args{MailBag}})
+    {
+        if ($msg->{To} eq $args{Address})
+        {
+            push @{$new_mailbag}, $msg;
+        }
+    }
+    
+    return $new_mailbag;
+
 }
 
 END { }       # module clean-up code here (global destructor)
