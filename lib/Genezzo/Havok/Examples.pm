@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/Examples.pm,v 7.3 2005/08/25 09:08:26 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/Examples.pm,v 7.4 2005/09/18 07:50:09 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -90,6 +90,76 @@ sub Ciao
 
     return 1;
 }
+
+
+# For GSysHook testing: register this function on the
+# BCFILE::_init_filewriteblock hook and use the RDBlock methods to
+# update a block before it is written to disk.  This function performs
+# a search and replace of all strings in all rows in the block which
+# match "__MAGIC_BLOCK_NUM__".  A more practical hook might involve
+# updating transaction information using _set_meta_row.
+sub magic_writeblock
+{
+    my ($self, $fname, $fnum, $fh, $bnum, $refbuf, $hdrsize, $bce) = @_;
+
+    return 1 
+        unless (defined($bce));
+
+    whoami;
+
+    if (1) 
+    {
+        my $foo = $bce->GetInfo();
+        
+        return 1
+            unless (defined($foo));
+
+        if (exists($foo->{mailbox})
+            && exists($foo->{mailbox}->{'Genezzo::Block::RDBlock'}))
+        {
+            my $rdblock = $foo->{mailbox}->{'Genezzo::Block::RDBlock'};
+            
+            my $kk = $rdblock->FIRSTKEY();
+
+            # update all the rows in a block and replace the string
+            # __MAGIC_BLOCK_NUM__ with the actual block number before
+            # writing to disk
+
+            while (defined($kk))
+            {
+                my $vv = $rdblock->FETCH($kk);
+                if (defined($vv))
+                {
+                    my @row = UnPackRow($vv, 
+                                        $Genezzo::Util::UNPACK_TEMPL_ARR); 
+                    
+                    my $got_one;
+
+                    $got_one = 0;
+
+                    my @foo = @row;
+                    for my $ii (0..(scalar(@row)-1))
+                    {
+                        if ($foo[$ii] =~ m/__MAGIC_BLOCK_NUM__/)
+                        {
+                            $row[$ii] =~ s/__MAGIC_BLOCK_NUM__/$bnum/g;
+                            $got_one = 1;
+                        }
+                    }
+                    if ($got_one)
+                    {
+                        $rdblock->STORE($kk, PackRow(\@row));
+                    }
+                }
+                
+                $kk = $rdblock->NEXTKEY($kk);
+            }
+
+        }
+    }
+    return 1;
+}
+
 
 END { }       # module clean-up code here (global destructor)
 

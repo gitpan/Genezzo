@@ -1,5 +1,9 @@
 Revision history for Perl extension Genezzo
 
+0.51 Sun Sep 18 00:44:17 2005
+        - dictionary recursive sql support
+        - CREATE TABLESPACE, add TABLESPACE support to CREATE TABLE/INDEX
+
 0.50 Wed Sep  7 01:36:18 2005
         - add correspondence between BufCaElt and RDBlock via the
           MailBag

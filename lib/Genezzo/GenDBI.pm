@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 7.7 2005/09/07 08:32:27 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 7.9 2005/09/18 07:49:19 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -49,11 +49,11 @@ BEGIN {
 	
 }
 
-our $VERSION   = '0.50';
+our $VERSION   = '0.51';
 our $RELSTATUS = 'Alpha'; # release status
 # grab the code check-in date and convert to YYYYMMDD
 our $RELDATE   = 
-    do { my @r = (q$Date: 2005/09/07 08:32:27 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
+    do { my @r = (q$Date: 2005/09/18 07:49:19 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
 
 our $errstr; # DBI errstr
 
@@ -295,6 +295,8 @@ sub _init
     return 0
         unless (defined($self->{dictobj}));
 
+    $self->{init_db} = $init_db;
+
     # pass dictionary information to the planner
     $self->{plan}->Dict($self->{dictobj});
     # pass dictionary information to the evaluator
@@ -429,8 +431,12 @@ sub connect # DBI
     return undef
         unless (_init($self,%nargs));
 
+    my $foo = bless $self, $class;
 
-    return bless $self, $class;
+    return undef
+        unless (Genezzo::GenDBI->build_dict_dbh($foo));
+
+    return $foo;
 
 } # end connect
 
@@ -467,9 +473,41 @@ sub new
     return undef
         unless (_init($self,%args));
 
-    return bless $self, $class;
+    my $foo = bless $self, $class;
+
+    return undef
+        unless (Genezzo::GenDBI->build_dict_dbh($foo));
+
+    return $foo;
 
 } # end new
+
+sub build_dict_dbh
+{
+    my $invocant = shift;
+    my $class = ref($invocant) || $invocant ; 
+    my $self = { };
+
+    my $old_self = shift @_;
+
+    if (exists($old_self->{GZERR}))
+    {
+        $self->{GZERR} = $old_self->{GZERR};
+    }
+    $self->{gnz_home} = $old_self->{gnz_home};
+    $self->{plan} = $old_self->{plan};
+    $self->{xeval} = $old_self->{xeval};
+    $self->{dbh_ctx} = {}; # database handle context
+    $self->{dictobj} = $old_self->{dictobj};
+    
+    my $foo = bless $self, $class;
+
+    my $stat = $self->{dictobj}->SetDBH($foo, $self->{init_db});
+
+    $self->{init_db} = 0;
+    return $stat;
+
+} # end build_dict_dbh
 
 sub Kgnz_Rem
 {
@@ -710,12 +748,35 @@ sub Kgnz_Describe
 sub Kgnz_CIdx
 {
     my $self = shift;
+    my %optional = (
+                    tablespace => "SYSTEM"
+                    );
+
   L_ParseCreate:
     {
 	last if (@_ < 3);
 
 	my $indexname = shift @_ ;
-	my $tablename = shift @_ ;
+
+	my @params = @_ ;
+
+        my %args;
+        if (ref($params[0]) eq 'HASH')
+        {
+            my $p1 = shift @params;
+#            $msg .= "\n" . Dumper([$p1]) . "\n";
+
+            %args = (%optional, 
+                     %{$p1});
+
+        }
+        else
+        {
+            %args = (%optional);
+        }
+
+
+	my $tablename = shift @params ;
 
         my $msg = "Create Index : $indexname on $tablename \n";
 
@@ -723,8 +784,6 @@ sub Kgnz_CIdx
         
         &$GZERR(%earg)
             if (defined($GZERR));
-
-	my @params = @_ ;
 
         unless (scalar(@params))
         {
@@ -740,8 +799,47 @@ sub Kgnz_CIdx
         return ($dictobj->DictIndexCreate (tname      => $tablename,
                                            index_name => $indexname,
                                            cols       => \@params,
-                                           tablespace => "SYSTEM",
+                                           tablespace => $args{tablespace},
                                            itype      => "nonunique",
+                                           dbh_ctx    => $self->{dbh_ctx}
+                                           ));
+
+    }
+    return 0;
+} # end Kgnz_CIdx
+
+sub Kgnz_CreateTS
+{
+    my $self = shift;
+
+  L_ParseCreate:
+    {
+#	last if (@_ < 3);
+
+	my $tsname = shift @_ ;
+
+        my $msg = "Create Tablespace $tsname \n";
+
+        my %earg = (self => $self, msg => $msg, severity => 'info');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
+	my @params = @_ ;
+
+        if (0) #       unless (scalar(@params))
+        {
+            $msg = "" ; #"invalid column list for table $tablename\n";
+            %earg = (self => $self, msg => $msg, severity => 'warn');
+        
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
+            return 0;
+        }
+        my $dictobj = $self->{dictobj};
+        return ($dictobj->DictTSpaceCreate (
+                                           tablespace => $tsname,
                                            dbh_ctx    => $self->{dbh_ctx}
                                            ));
 
@@ -752,6 +850,10 @@ sub Kgnz_CIdx
 sub Kgnz_CT
 {
     my $self = shift;
+    my %optional = (
+                    tablespace => "SYSTEM",
+                    tabtype    => "TABLE"
+                    );
   L_ParseCreate:
     {
 	last if (@_ < 1);
@@ -775,7 +877,7 @@ sub Kgnz_CT
         
         my $colidx = 0;
 
-        my $tabtype = "TABLE";
+        my $tabtype = $optional{tabtype};
 
         my $msg = "Create Table : $tablename \n";
 
@@ -786,11 +888,32 @@ sub Kgnz_CT
             $tabtype = "IDXTAB";
             shift @params
         }
+
+        my %args;
+        if (ref($params[0]) eq 'HASH')
+        {
+            my $p1 = shift @params;
+#            $msg .= "\n" . Dumper([$p1]) . "\n";
+
+            %args = (%optional, 
+                     %{$p1});
+
+            if (exists($p1->{tabtype}))
+            {
+                $tabtype = $p1->{tabtype};
+            }
+        }
+        else
+        {
+            %args = (%optional);
+        }
+
         my %earg = (self => $self, msg => $msg,
                     severity => 'info');
                     
         &$GZERR(%earg)
             if (defined($GZERR));
+
 
       L_coldataloop:
         foreach my $token (@params)
@@ -815,7 +938,7 @@ sub Kgnz_CT
         
 #            greet %coldatatype;
 
-        my %args =
+        my %nargs =
             (op1 => "create",
              op2 => "table",
              createtabargs => 
@@ -825,12 +948,12 @@ sub Kgnz_CT
                  {
                      coldefarr => \@coldefarr
                  },
-                 dbstore    => "flat1",
-                 tablespace => "SYSTEM",
-                 object_type  => $tabtype
-             }
+                 dbstore     => "flat1",
+                 tablespace  => $args{tablespace},
+                 object_type => $tabtype
+              }
              );
-        return $self->Kgnz_Create(%args);
+        return $self->Kgnz_Create(%nargs);
 
     }
     return 0;
@@ -904,6 +1027,7 @@ sub Kgnz_Create
 	my $tablename = $tabargs->{tabname} ;
 	my $tabdefn   = $tabargs->{tabdef} ;
         my $tabtype   = $tabargs->{object_type} || "TABLE";
+        my $tspace    = $tabargs->{tablespace};
 
         unless ($dictobj->DictTableExists (tname => $tablename,
                                            silent_exists => 0,
@@ -981,7 +1105,7 @@ sub Kgnz_Create
             
             return ($dictobj->DictTableCreate (tname       => $tablename,
                                                tabdef      => \%coldatatype,
-                                               tablespace  => "SYSTEM",
+                                               tablespace  => $tspace,
                                                object_type => $tabtype,
                                                dbh_ctx     => $self->{dbh_ctx}
                                                ));
@@ -1717,7 +1841,7 @@ sub SQLCreate
         $self->{plan}->TypeCheck(algebra   => $algebra,
                                  statement => $sqltxt);
 
-    greet $tc, $err_status;
+    greet "SQLCREATE:", $tc, $err_status;
 
     return undef
         if ($err_status);
@@ -1746,7 +1870,26 @@ sub SQLCreate
             my @outi;
             
             push @outi, $tablename;
-            
+
+            my $nargs = {};     # pass arguments in a sneaky way...
+            push @outi, $nargs;
+
+            if (exists($tc->{sql_create}->{table_def}->{storage_clause}))
+            {
+                my $st_clause = 
+                    $tc->{sql_create}->{table_def}->{storage_clause};
+
+                for my $item (@{$st_clause})
+                {
+                    if (exists($item->{store_op}) &&
+                        ($item->{store_op} =~ m/tablespace/i))
+                    {
+                        $nargs->{tablespace} = 
+                            $item->{tc_tablespace_fullname};
+                    }
+                }
+            }
+
             my $clist = $tc->{sql_create}->{table_def}->{tab_column_list};
             for my $coldef (@{$clist->[0]})
             {
@@ -1776,17 +1919,51 @@ sub SQLCreate
     {
         my $iname     = $tc->{sql_create}->{tc_newindex_fullname};
         my $tablename = $tc->{sql_create}->{tc_table_fullname};
+
+        my @outi;
+        my $nargs = {};     # pass arguments in a sneaky way...
+
+        push @outi, $iname, $nargs, $tablename;
+        
+        if (exists($tc->{sql_create}->{storage_clause}))
+        {
+            my $st_clause = 
+                $tc->{sql_create}->{storage_clause};
+            
+            for my $item (@{$st_clause})
+            {
+                if (exists($item->{store_op}) &&
+                    ($item->{store_op} =~ m/tablespace/i))
+                {
+                    $nargs->{tablespace} = 
+                        $item->{tc_tablespace_fullname};
+                }
+            }
+        } # end if storage clause
         
         greet $iname, $tablename;
         
         if (exists($tc->{sql_create}->{tc_column_list}))
         {
-            my @outi;
-            
-            push @outi, $iname, $tablename, 
-            @{$tc->{sql_create}->{tc_column_list}};
+            push @outi, @{$tc->{sql_create}->{tc_column_list}};
 
             return $self->Kgnz_CIdx(@outi);
+        }
+    } # end create index
+
+    if ($tc->{sql_create}->{create_op} eq 'TABLESPACE')
+    {
+        my $tsname = $tc->{sql_create}->{tc_newtablespace_fullname};
+        
+        greet $tsname;
+        
+        if (1)
+        {
+            my @outi;
+            
+            push @outi,  $tsname;
+
+            return $self->Kgnz_CreateTS(@outi);
         }
     } # end create index
 
@@ -3236,6 +3413,15 @@ ci : create index.  Syntax - ci <index name> <table name> <column name>.
 commit : flush changes to disk
 
 create : SQL Create
+         CREATE TABLE 
+            tablename (column_name column_type [, column_name column_type]...)
+            [TABLESPACE tsname] [AS SELECT...]
+
+         CREATE TABLESPACE tsname
+
+         CREATE INDEX indexname 
+            ON tablename (column_name [, column_name]...)
+               [TABLESPACE tsname]
 
 ct : create table.  Syntax - 
     ct <tablename> <column name>=<column type> [<column name>=<column type>...]
@@ -4364,6 +4550,8 @@ Genezzo::GenDBI.pm - an extensible database with SQL and DBI
 
 =over 4
 
+=item TABLESPACE: alter, drop, online, offline, more testing...
+
 =item This module is a bit of a catch-all, since it contains a
 DBI-style interface, an interactive loop with an interpreter and some
 presentation code, plus some expression evaluation and query planning
@@ -4376,7 +4564,7 @@ logic.  It needs to get split up.
 =item SQLUpdate: cleanup - avoid generating new SELECT.  Allow regexp update.
 
 =item SQLCreate: need to handle CREATE TABLE AS SELECT, table/column 
-      constraints, CREATE TABLESPACE, etc.
+      constraints, etc.
 
 =back
 

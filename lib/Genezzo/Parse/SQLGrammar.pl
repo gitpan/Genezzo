@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Parse/RCS/SQLGrammar.pl,v 7.2 2005/07/24 05:22:37 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Parse/RCS/SQLGrammar.pl,v 7.4 2005/09/18 07:52:09 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -272,18 +272,20 @@ $grammar .=  "/i \n\n";
               table_def       => $item{create_table_def}
           }
 }    
-                   | /INDEX/i  big_id ON table_name column_list
+                   | /INDEX/i  big_id ON table_name column_list 
+                     storage_clause(?)
 { $return = { 
               create_op      => "INDEX",
               new_index_name => $item{big_id},
               table_name     => $item{table_name},
-              column_list    => $item{column_list}
+              column_list    => $item{column_list},
+              storage_clause   => $item{'storage_clause(?)'}
           }
 }
                    | /TABLESPACE/i  identifier
 { $return = { 
               create_op => "TABLESPACE",    
-              tablespace_name   => [$item{identifier}] }}
+              new_tablespace_name   => [$item{identifier}] }}
     
        ct_as_select: AS_ sql_query
 { $return = {sql_query      => $item{sql_query}}}
@@ -292,12 +294,20 @@ $grammar .=  "/i \n\n";
 # table element list is optional for create table as select
 # XXX XXX: need some sort of storage clause before ctas
    create_table_def: table_constraint_def(?) 
-                     table_element_list(?) ct_as_select(?)
+                     table_element_list(?) 
+                     storage_clause(?)
+                     ct_as_select(?)
 { $return = {tab_column_list  => $item{'table_element_list(?)'},
              table_query      => $item{'ct_as_select(?)'},
-             table_constraint => $item{'table_constraint_def(?)'}
+             table_constraint => $item{'table_constraint_def(?)'},
+             storage_clause   => $item{'storage_clause(?)'}
          }
 }
+
+storage_clause: /TABLESPACE/i  identifier
+{ $return = { 
+              store_op        => "TABLESPACE",    
+              tablespace_name => [$item{identifier}] }}
 
 table_element_list: '(' <commit> table_elt(s /,/) ')'                    
 # skip parens

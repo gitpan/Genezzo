@@ -13,6 +13,8 @@ t/DBI1.t
 t/Gnzo1.t
 t/Gnzo2.t
 t/Gnzo3.t
+t/GSysHook1.t
+t/GSysHook2.t
 t/Havok1.t
 t/Index1.t
 t/Index2.t

@@ -12,7 +12,7 @@ WriteMakefile(
         'Term::ReadLine'   => '0.0',
         'File::Path'       => '0.0',
         'File::Spec'       => '0.0',
-        'IO::File'         => '0.0',
+#        'IO::File'         => '0.0',
         'IO::Handle'       => '0.0',
         'Parse::RecDescent' => '1.94'
     }, # e.g., Module::Name => 1.1

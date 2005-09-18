@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Plan/RCS/TypeCheck.pm,v 7.2 2005/08/08 03:06:22 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Plan/RCS/TypeCheck.pm,v 7.4 2005/09/15 08:51:44 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -17,7 +17,7 @@ use Carp;
 our $VERSION;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 7.2 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.4 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -116,24 +116,31 @@ sub TypeCheck
 
     my $err_status;
 
+    # build a special "statement handle" to hold error and context info
+    my $tc_sth = {};
+
     $algebra = $self->TableCheck(algebra => $algebra,
-                                 dict    => $args{dict}
+                                 dict    => $args{dict},
+                                 tc_sth  => $tc_sth
                                  );
 
     return ($algebra, 1)
         unless (defined($algebra)); # if error
 
-    unless (scalar(@{$self->{tc1}->{tc_err}->{nosuch_table}}))
+    greet $tc_sth->{tc1}->{tc_err};
+
+    unless (scalar(@{$tc_sth->{tc1}->{tc_err}->{nosuch_table}}))
     {
         $algebra = $self->ColumnCheck(algebra   => $algebra,
                                       dict      => $args{dict},
-                                      statement => $args{statement}
+                                      statement => $args{statement},
+                                      tc_sth    => $tc_sth
                                       );
     }
 
-    unless (exists($self->{tc1}) &&
-            exists($self->{tc2}) &&
-            exists($self->{tc3}))
+    unless (exists($tc_sth->{tc1}) &&
+            exists($tc_sth->{tc2}) &&
+            exists($tc_sth->{tc3}))
     {
         greet "incomplete tc";
         $err_status = 1;
@@ -142,9 +149,9 @@ sub TypeCheck
     if (!defined($err_status))
     {
         if (
-               scalar(@{$self->{tc1}->{tc_err}->{nosuch_table}})
-            || scalar(@{$self->{tc1}->{tc_err}->{duplicate_table}})
-            || scalar(@{$self->{tc3}->{tc_err}->{nosuch_column}})
+               scalar(@{$tc_sth->{tc1}->{tc_err}->{nosuch_table}})
+            || scalar(@{$tc_sth->{tc1}->{tc_err}->{duplicate_table}})
+            || scalar(@{$tc_sth->{tc3}->{tc_err}->{nosuch_column}})
             )
         {
             greet "tc errors";
@@ -152,7 +159,9 @@ sub TypeCheck
         }
     }
     
-
+    # NOTE: attach the "statement handle" to the algebra -- it contains
+    # useful information for code generation
+    $algebra->{tc_sth} = $tc_sth;
     return ($algebra, $err_status);
 }
 
@@ -162,7 +171,8 @@ sub TableCheck
     
     my %required = (
                     algebra => "no algebra !",
-                    dict    => "no dictionary !"
+                    dict    => "no dictionary !",
+                    tc_sth  => "no statement handle !"
                     );
     
     my %args = ( # %optional,
@@ -178,7 +188,8 @@ sub TableCheck
     # first, fetch table info from dictionary
 
     my $tc1 = {}; # type check tree context for tree walker
-    $self->{tc1} = $tc1;
+    my $tc_sth = $args{tc_sth};
+    $tc_sth->{tc1} = $tc1;
 
     # local tree walk state
     $tc1->{tpos} = 0; # mark each table
@@ -186,12 +197,12 @@ sub TableCheck
     # save bad tables for error reporting...
     $tc1->{tc_err}->{nosuch_table} = [];
     $tc1->{tc_err}->{duplicate_table} = [];
-    $algebra = $self->_get_table_info($algebra, $args{dict});
+    $algebra = $self->_get_table_info($algebra, $args{dict}, $tc_sth);
 
     # next, cross reference table info with query blocks
 
     my $tc2 = {}; # type check tree context for tree walker
-    $self->{tc2} = $tc2;
+    $tc_sth->{tc2} = $tc2;
 
     # local tree walk state
     $tc2->{qb_list} = []; # build an arr starting with current query block num
@@ -199,7 +210,7 @@ sub TableCheck
 
     # save table definition/query block info for later type check phases...
     $tc2->{tablist} = []; # arr by qb num of table information
-    $algebra = $self->_check_table_info($algebra, $args{dict});
+    $algebra = $self->_check_table_info($algebra, $args{dict}, $tc_sth);
 
     if (0)
     {
@@ -265,9 +276,9 @@ sub _get_table_info # private
 
     my $self = shift;
     # generic tree of hashes/arrays
-    my ($genTree, $dict) = @_;
+    my ($genTree, $dict, $tc_sth) = @_;
 
-    my $treeCtx = $self->{tc1};
+    my $treeCtx = $tc_sth->{tc1};
 
     # recursively convert all elements of array
     if (ref($genTree) eq 'ARRAY')
@@ -276,7 +287,7 @@ sub _get_table_info # private
         $maxi--;
         for my $i (0..$maxi)
         {
-            $genTree->[$i] = $self->$subname($genTree->[$i], $dict);
+            $genTree->[$i] = $self->$subname($genTree->[$i], $dict, $tc_sth);
         }
 
     }
@@ -312,7 +323,7 @@ sub _get_table_info # private
                 )
             {
                 push @{$treeCtx->{tc_err}->{nosuch_table}}, 
-                $full_name_str;
+                ["table", $full_name_str];
 #                       return undef; # XXX XXX XXX XXX
             }
             else
@@ -355,7 +366,7 @@ sub _get_table_info # private
                 )
             {
                 push @{$treeCtx->{tc_err}->{duplicate_table}}, 
-                $full_name_str;
+                ["table", $full_name_str];
 #                       return undef; # XXX XXX XXX XXX
             }
                 
@@ -380,11 +391,68 @@ sub _get_table_info # private
             {
                 # XXX XXX: should be "duplicate index"...
                 push @{$treeCtx->{tc_err}->{duplicate_table}}, 
-                $full_name_str;
+                ["index", $full_name_str];
 #                       return undef; # XXX XXX XXX XXX
             }
                 
         } # end if new index name
+
+        if (exists($genTree->{tablespace_name}))
+        {
+            my @full_name = _process_name_pieces(@{$genTree->{tablespace_name}});
+
+            # build a "dot" separated string
+            my $full_name_str = join('.', @full_name);
+
+            $genTree->{tc_tablespace_fullname} = $full_name_str;
+
+            # look it up in the dictionary
+            if (! ($dict->DictObjectExists (
+                                            object_type => "tablespace",
+                                            object_name => $full_name_str,
+                                            silent_exists => 1,
+                                            silent_notexists => 0 
+                                            )
+                   )
+                )
+            {
+                push @{$treeCtx->{tc_err}->{nosuch_table}}, 
+                ["tablespace", $full_name_str];
+#                       return undef; # XXX XXX XXX XXX
+            }
+        }
+
+        if (exists($genTree->{new_tablespace_name}))
+        {
+            my @full_name = _process_name_pieces(@{$genTree->{new_tablespace_name}});
+
+            # build a "dot" separated string
+            my $full_name_str = join('.', @full_name);
+
+            $genTree->{tc_newtablespace_fullname} = $full_name_str;
+
+            # look it up in the dictionary
+            if ($dict->DictObjectExists (
+                                         object_type      => "tablespace",
+                                         object_name      => $full_name_str,
+                                         silent_exists    => 0,
+                                         silent_notexists => 1 
+                                         )
+                )
+            {
+                push @{$treeCtx->{tc_err}->{duplicate_table}}, 
+                ["tablespace", $full_name_str];
+
+                greet $treeCtx->{tc_err}->{duplicate_table};
+
+#                       return undef; # XXX XXX XXX XXX
+            }
+            else
+            {
+                greet "no dup found";
+            }
+                
+        } # end if new tablespace name
 
         if (exists($genTree->{table_alias}) &&
             (scalar(@{$genTree->{table_alias}})))
@@ -402,7 +470,7 @@ sub _get_table_info # private
         {
             if ($kk !~ m/^(table_name|table_alias)$/)
             {
-                $genTree->{$kk} = $self->$subname($vv, $dict);
+                $genTree->{$kk} = $self->$subname($vv, $dict, $tc_sth);
             }
         } # end big while
     }
@@ -426,9 +494,9 @@ sub _check_table_info # private
 
     my $self = shift;
     # generic tree of hashes/arrays
-    my ($genTree, $dict) = @_;
+    my ($genTree, $dict, $tc_sth) = @_;
 
-    my $treeCtx = $self->{tc2};
+    my $treeCtx = $tc_sth->{tc2};
 
     # recursively convert all elements of array
     if (ref($genTree) eq 'ARRAY')
@@ -437,7 +505,7 @@ sub _check_table_info # private
         $maxi--;
         for my $i (0..$maxi)
         {
-            $genTree->[$i] = $self->$subname($genTree->[$i], $dict);
+            $genTree->[$i] = $self->$subname($genTree->[$i], $dict, $tc_sth);
         }
     }
     if (ref($genTree) eq 'HASH')
@@ -494,7 +562,7 @@ sub _check_table_info # private
         {
             if ($kk !~ m/^tc_table_fullname$/)
             {
-                $genTree->{$kk} = $self->$subname($vv, $dict);
+                $genTree->{$kk} = $self->$subname($vv, $dict, $tc_sth);
             }
             else # table name 
             {
@@ -555,7 +623,8 @@ sub ColumnCheck
     my %required = (
                     algebra   => "no algebra !",
                     statement => "no sql statement !",
-                    dict      => "no dictionary !"
+                    dict      => "no dictionary !",
+                    tc_sth    => "no statement handle !"
                     );
     
     my %args = ( # %optional,
@@ -568,7 +637,8 @@ sub ColumnCheck
     my $algebra = $args{algebra};
 
     my $tc3 = {}; # type check tree context for tree walker
-    $self->{tc3} = $tc3;
+    my $tc_sth = $args{tc_sth};    
+    $tc_sth->{tc3} = $tc3;
 
     # local tree walk state
     $tc3->{qb_list} = []; # build an arr starting with current query block num
@@ -578,29 +648,29 @@ sub ColumnCheck
     $tc3->{tc_err}->{duplicate_alias} = {};
     $tc3->{tc_err}->{nosuch_column}   = [];
     # use the table information from table typecheck phase
-    $tc3->{tablist} = $self->{tc2}->{tablist};
+    $tc3->{tablist} = $tc_sth->{tc2}->{tablist};
 
     # convert "select * "  to "select <column_list> "
-    $algebra = $self->_get_star_cols($algebra, $args{dict});
+    $algebra = $self->_get_star_cols($algebra, $args{dict}, $tc_sth);
 
     # setup select list column aliases and column headers
-    $algebra = $self->_get_col_alias($algebra, $args{dict});
+    $algebra = $self->_get_col_alias($algebra, $args{dict}, $tc_sth);
 
     # map columns to FROM clause tables
-    $algebra = $self->_get_col_info($algebra, $args{dict});
+    $algebra = $self->_get_col_info($algebra, $args{dict}, $tc_sth);
 
     # use type information to map sql comparison operations to their
     # perl equivalents
 
-    $algebra = $self->_fixup_comp_op($algebra, $args{dict});
+    $algebra = $self->_fixup_comp_op($algebra, $args{dict}, $tc_sth);
 
     $tc3->{AndPurity} = 1; # false if find OR's
 
-    $algebra = $self->_sql_where($algebra, $args{dict});
+    $algebra = $self->_sql_where($algebra, $args{dict}, $tc_sth);
 
     if (0) # XXX XXX XXX XXX
     {
-        my $tc2 = $self->{tc2};
+        my $tc2 = $tc_sth->{tc2};
 
         local $Data::Dumper::Indent   = 1;
         local $Data::Dumper::Sortkeys = 1;
@@ -658,9 +728,9 @@ sub _get_star_cols
 
     my $self = shift;
     # generic tree of hashes/arrays
-    my ($genTree, $dict) = @_;
+    my ($genTree, $dict, $tc_sth) = @_;
 
-    my $treeCtx = $self->{tc3};
+    my $treeCtx = $tc_sth->{tc3};
 
     # recursively convert all elements of array
     if (ref($genTree) eq 'ARRAY')
@@ -669,7 +739,7 @@ sub _get_star_cols
         $maxi--;
         for my $i (0..$maxi)
         {
-            $genTree->[$i] = $self->$subname($genTree->[$i], $dict);
+            $genTree->[$i] = $self->$subname($genTree->[$i], $dict, $tc_sth);
         }
 
     }
@@ -695,7 +765,7 @@ sub _get_star_cols
             while ( my ($kk, $vv) = each ( %{$genTree})) # big while
             {
                 # convert subtree first...
-                $genTree->{$kk} = $self->$subname($vv, $dict);
+                $genTree->{$kk} = $self->$subname($vv, $dict, $tc_sth);
             }
 
             if ($qb_setup)
@@ -822,9 +892,9 @@ sub _get_col_alias # private
 
     my $self = shift;
     # generic tree of hashes/arrays
-    my ($genTree, $dict) = @_;
+    my ($genTree, $dict, $tc_sth) = @_;
 
-    my $treeCtx = $self->{tc3};
+    my $treeCtx = $tc_sth->{tc3};
 
     # recursively convert all elements of array
     if (ref($genTree) eq 'ARRAY')
@@ -833,7 +903,7 @@ sub _get_col_alias # private
         $maxi--;
         for my $i (0..$maxi)
         {
-            $genTree->[$i] = $self->$subname($genTree->[$i], $dict);
+            $genTree->[$i] = $self->$subname($genTree->[$i], $dict, $tc_sth);
         }
 
     }
@@ -871,7 +941,7 @@ sub _get_col_alias # private
             }
             elsif ($kk !~ m/^(new_column_name|column_name|col_alias)$/)
             {
-                $genTree->{$kk} = $self->$subname($vv, $dict);
+                $genTree->{$kk} = $self->$subname($vv, $dict, $tc_sth);
             }
             else # column name or alias
             {
@@ -1028,9 +1098,9 @@ sub _get_col_info # private
 
     my $self = shift;
     # generic tree of hashes/arrays
-    my ($genTree, $dict) = @_;
+    my ($genTree, $dict, $tc_sth) = @_;
 
-    my $treeCtx = $self->{tc3};
+    my $treeCtx = $tc_sth->{tc3};
 
     # recursively convert all elements of array
     if (ref($genTree) eq 'ARRAY')
@@ -1039,7 +1109,7 @@ sub _get_col_info # private
         $maxi--;
         for my $i (0..$maxi)
         {
-            $genTree->[$i] = $self->$subname($genTree->[$i], $dict);
+            $genTree->[$i] = $self->$subname($genTree->[$i], $dict, $tc_sth);
         }
 
     }
@@ -1066,7 +1136,7 @@ sub _get_col_info # private
         {
             if ($kk !~ m/^(tc_column_name)$/)
             {
-                $genTree->{$kk} = $self->$subname($vv, $dict);
+                $genTree->{$kk} = $self->$subname($vv, $dict, $tc_sth);
             }
             else # column name 
             {
@@ -1238,9 +1308,9 @@ sub _fixup_comp_op
 
     my $self = shift;
     # generic tree of hashes/arrays
-    my ($genTree, $dict) = @_;
+    my ($genTree, $dict, $tc_sth) = @_;
 
-    my $treeCtx = $self->{tc3};
+    my $treeCtx = $tc_sth->{tc3};
 
     # recursively convert all elements of array
     if (ref($genTree) eq 'ARRAY')
@@ -1249,7 +1319,7 @@ sub _fixup_comp_op
         $maxi--;
         for my $i (0..$maxi)
         {
-            $genTree->[$i] = $self->$subname($genTree->[$i], $dict);
+            $genTree->[$i] = $self->$subname($genTree->[$i], $dict, $tc_sth);
         }
 
     }
@@ -1275,7 +1345,7 @@ sub _fixup_comp_op
             while ( my ($kk, $vv) = each ( %{$genTree})) # big while
             {
                 # convert subtree first...
-                $genTree->{$kk} = $self->$subname($vv, $dict);
+                $genTree->{$kk} = $self->$subname($vv, $dict, $tc_sth);
             }
 
             if ($qb_setup)
@@ -1447,9 +1517,9 @@ sub _sql_where
 
     my $self = shift;
     # generic tree of hashes/arrays
-    my ($genTree, $dict) = @_;
+    my ($genTree, $dict, $tc_sth) = @_;
 
-    my $treeCtx = $self->{tc3};
+    my $treeCtx = $tc_sth->{tc3};
 
     # recursively convert all elements of array
     if (ref($genTree) eq 'ARRAY')
@@ -1458,7 +1528,7 @@ sub _sql_where
         $maxi--;
         for my $i (0..$maxi)
         {
-            $genTree->[$i] = $self->$subname($genTree->[$i], $dict);
+            $genTree->[$i] = $self->$subname($genTree->[$i], $dict, $tc_sth);
         }
 
     }
@@ -1484,7 +1554,7 @@ sub _sql_where
             while ( my ($kk, $vv) = each ( %{$genTree})) # big while
             {
                 # convert subtree first...
-                $genTree->{$kk} = $self->$subname($vv, $dict);
+                $genTree->{$kk} = $self->$subname($vv, $dict, $tc_sth);
             }
 
             if ($qb_setup)
@@ -1903,7 +1973,7 @@ sub GetFromWhereEtc
     
     my %required = (
                     algebra   => "no algebra !",
-                    dict      => "no dictionary !"
+                    dict      => "no dictionary !",
                     );
 
     my %optional = (top_cmd => "SELECT");
@@ -1918,7 +1988,14 @@ sub GetFromWhereEtc
     my $algebra = $args{algebra};
 
     my $tc4 = {}; # type check tree context for tree walker
-    $self->{tc4} = $tc4;
+    # NOTE: we stashed the statement handle in the top of the 
+    # algebra when we did typechecking earlier
+    my $tc_sth = $algebra->{tc_sth};
+    $tc_sth->{tc4} = $tc4;
+
+    # NOTE: clear out the "statement handle" since it's not part of
+    # the algebra and we don't want to walk it
+    $algebra->{tc_sth} = undef;
 
     # local tree walk state
     $tc4->{top_qb_num} = 1;     # top query block number is 1
@@ -1931,18 +2008,18 @@ sub GetFromWhereEtc
 
     $tc4->{qb_list} = []; # build an arr starting with current query block num
     $tc4->{index_keys} = []             # only build index keys 
-        if ($self->{tc3}->{AndPurity}); # if pure AND search condition
+        if ($tc_sth->{tc3}->{AndPurity}); # if pure AND search condition
 
     greet $tc4;
 
-    $algebra = $self->_get_from_where($algebra, $args{dict});
+    $algebra = $self->_get_from_where($algebra, $args{dict}, $tc_sth);
 
     my $from       = $tc4->{from};
     my $sel_list   = $tc4->{select_list};
     my $where      = $tc4->{where};
 
     # XXX XXX XXX: need to localize AndPurity per WHERE clause/search cond
-    my $and_purity = $self->{tc3}->{AndPurity};
+    my $and_purity = $tc_sth->{tc3}->{AndPurity};
 
     $tc4->{where}->[0]->{sc_and_purity} = $and_purity;
     if ($and_purity)
@@ -1950,6 +2027,9 @@ sub GetFromWhereEtc
         $tc4->{where}->[0]->{sc_index_keys} = $tc4->{index_keys};
     }
     # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
+
+    # NOTE: replace the "statement handle" 
+    $algebra->{tc_sth} = $tc_sth;
 
     return ($algebra, $from, $sel_list, $where);
 }
@@ -1966,9 +2046,9 @@ sub _get_from_where
 
     my $self = shift;
     # generic tree of hashes/arrays
-    my ($genTree, $dict) = @_;
+    my ($genTree, $dict, $tc_sth) = @_;
 
-    my $treeCtx = $self->{tc4};
+    my $treeCtx = $tc_sth->{tc4};
 
     # recursively convert all elements of array
     if (ref($genTree) eq 'ARRAY')
@@ -1977,7 +2057,7 @@ sub _get_from_where
         $maxi--;
         for my $i (0..$maxi)
         {
-            $genTree->[$i] = $self->$subname($genTree->[$i], $dict);
+            $genTree->[$i] = $self->$subname($genTree->[$i], $dict, $tc_sth);
         }
 
     }
@@ -2032,7 +2112,7 @@ sub _get_from_where
                 push @{$treeCtx->{index_keys}}, @{$vv};
             }
             # convert subtree first...
-            $genTree->{$kk} = $self->$subname($vv, $dict);
+            $genTree->{$kk} = $self->$subname($vv, $dict, $tc_sth);
         }
 
         if ($qb_setup)
@@ -2044,317 +2124,6 @@ sub _get_from_where
     }
     return $genTree;
 }
-
-
-# XXX XXX: OBSOLETE ?
-sub convert_valex
-{
-    my ($expr, $VX, $txt) = @_;
-    my @narg;
-    push @narg, $expr, $VX, $txt;
-
-    # recursively convert all elements of array
-#    print "ll: ",ref($expr),"\n";
-
-    if (!ref($expr))
-    {
-        # the VX of a scalar is itself...
-        $narg[1] = $expr;
-    }
-    if (ref($expr) eq 'ARRAY')
-    {
-#        print "a1\n";
-        my $maxi = scalar(@{$expr});
-        $maxi--;
-        for my $i (0..$maxi)
-        {
-            $narg[0] = $expr->[$i];
-            my @foo = convert_valex(@narg);
-            $expr->[$i] = $foo[0];
-        }
-        $narg[0] = $expr;
-    }
-    if (ref($expr) eq 'HASH')
-    {
-#        print "h1\n";
-
-        if (exists($expr->{search_cond}))
-        {
-            for my $search_item (@{$expr->{search_cond}})
-            {
-#                for my $search_item (@{$ss1})
-#                {
-                    print "s1: ",Data::Dumper->Dump([$search_item],['search_item']), "\n";
-                    $narg[0] = $search_item;
-                    my @foo = convert_valex(@narg);
-                    $search_item->{CX} = $foo[1];
-
-#                    if (exists($search_item->{'comparison_predicate'}))
-#                    {
-#                        $narg[0] = $search_item->{'comparison_predicate'};
-#                        my @foo = convert_valex(@narg);
-#                        $search_item->{CX} = $foo[1];
-#                    }
-#                }
-            }
-        }
-
-        if (exists($expr->{select_list}))
-        {
-#            print "foo";
-
-            for my $sel_item (@{$expr->{select_list}})
-            {
-#            print "bar";
-#                greet $sel_item;
-
-                if (exists($sel_item->{value_expression}))
-                {
-#                    my %vxcopy;
-#                    eval (Data::Dumper->Dump([$sel_item->{value_expression}],
-#                                            [qw(*vxcopy)]));
-
-                    $narg[0] = $sel_item->{value_expression};
-                    my @foo = convert_valex(@narg);
-                    $sel_item->{VX} = $foo[1];
-                    $sel_item->{col_text} = substr($narg[2], 
-                                                   $sel_item->{p1},
-                                                   ($sel_item->{p2} -
-                                                   $sel_item->{p1}) + 1
-                                                   );
-                }
-            }
-        }
-
-        if (exists($expr->{numeric_literal}))
-        {
-            @narg = ();
-            push @narg, $expr,
-            $expr->{numeric_literal},
-            $txt;
-
-            return @narg;
-        }
-        elsif (exists($expr->{string_literal}))
-        {
-            @narg = ();
-            push @narg, $expr,
-            $expr->{string_literal},
-            $txt;
-
-            return @narg;
-        }
-        elsif (exists($expr->{column_name}))
-        {
-            my $colname;
-            for my $namedef (@{$expr->{column_name}})
-            {
-                my $namepiece;
-                if (exists($namedef->{bareword}))
-                {
-                    $namepiece = $namedef->{bareword};
-                }
-                else
-                {
-                    $namepiece = $namedef->{quoted_string};
-                }
-                if (defined($colname))
-                { $colname .= '.' }
-                else {$colname = ""}
-                $colname .= $namepiece;
-            }
-            @narg = ();
-            push @narg, $expr,
-            $colname,
-            $txt;
-
-            return @narg;
-        }
-        elsif (exists($expr->{math_op}))
-        {
-            if  (exists($expr->{operands}))
-            {
-
-                my @foo;
-                for my $op (@{$expr->{operands}})
-                {
-                    $narg[0] = $op;
-
-                    my @outi = convert_valex(@narg);
-
-#                    print Data::Dumper->Dump(\@outi), "\n";
-
-                    push @foo, $outi[1];
-                    
-                    # very simple constant folding for numeric literals
-                    if (scalar(@foo) > 2)
-                    {
-                        if ($foo[-2] =~ m/\|\|/)
-                        {
-                            # concatenation
-                            my $e2 = "concatenate( " . 
-                                $foo[-3] . ", " . $foo[-1] . " )";
-                            splice @foo, -3;
-                            push @foo, $e2;
-                        }
-                        elsif (($foo[-1] =~ m/^\s*\d+\s*$/)
-                               &&($foo[-3] =~ m/^\s*\d+\s*$/)
-                               && ($foo[-2] =~ m/\+|\-|\*|\//))
-                        {
-                            my $e1 = "$foo[-3] $foo[-2] $foo[-1]";
-                            print $e1, " = ";
-                            my $e2 = eval($e1);
-                            print $e2, "\n";
-                            splice @foo, -3;
-                            push @foo, $e2;
-                        }
-                    }
-                    
-
-                }
-                if (scalar(@foo) > 1)
-                {
-                    $narg[1] = '( ' . join(" ", @foo) . ' )';
-                }
-                else
-                {
-                    $narg[1] = $foo[0];
-                }
-            }
-            $narg[0] = $expr;
-        }
-        elsif (exists($expr->{function_name}))
-        {
-            # double-nested operands list in functions
-            # XXX XXX: don't forget ALL/DISTINCT
-            if  (exists($expr->{operands}))
-            {
-                my @foo;
-                for my $op (@{$expr->{operands}})
-                {
-                    if  (exists($op->{operands}))
-                    {
-                        for my $op2 (@{$op->{operands}})
-                        {
-                            $narg[0] = $op2;
-
-                            my @outi = convert_valex(@narg);
-                            push @foo, $outi[1];
-
-                        }
-                    }
-                    else
-                    {
-                        # maybe a subquery
-                        $narg[0] = $op;
-                        my @outi = convert_valex(@narg);
-                    }
-                }
-#                print Data::Dumper->Dump(\@foo,['foo']);
-                $narg[1] = $expr->{function_name};
-                if (scalar(@foo) > 1)
-                {
-                    $narg[1] .= '( ' . join(",", @foo) . ' )';
-                }
-                else
-                {
-                    $narg[1] .= '(';
-                    $narg[1] .= $foo[0]
-                        if (scalar(@foo));
-                    $narg[1] .= ')';
-                }
-            }
-            $narg[0] = $expr;
-        }
-        elsif (exists($expr->{comp_op}))
-        {
-            if  (exists($expr->{operands}))
-            {
-
-                my @foo;
-                for my $op (@{$expr->{operands}})
-                {
-                    $narg[0] = $op;
-
-                    my @outi = convert_valex(@narg);
-
-#                    print Data::Dumper->Dump(\@outi), "\n";
-
-                    push @foo, $outi[1];
-
-                }
-                if (scalar(@foo) > 1)
-                {
-                    $narg[1] = '( ' . join(" ", @foo) . ' )';
-                }
-                else
-                {
-                    $narg[1] = $foo[0];
-                }
-            }
-            $narg[0] = $expr;
-        }
-        elsif (exists($expr->{bool_op}))
-        {
-            if  (exists($expr->{operands}))
-            {
-
-                my $twiddle = -1;
-
-                my @foo;
-                for my $op (@{$expr->{operands}})
-                {
-                    $twiddle *= -1; # count every other op
-
-                    if ((ref($op) eq 'ARRAY')
-                        && ($twiddle < 0))
-                    {
-                        # deref the array for the operator name
-                        $op = $op->[0];
-                    }
-
-                    $narg[0] = $op;
-
-                    my @outi = convert_valex(@narg);
-
-#                    print Data::Dumper->Dump(\@outi), "\n";
-
-                    push @foo, $outi[1];
-
-                }
-                if (scalar(@foo) > 1)
-                {
-                    $narg[1] = '( ' . join(" ", @foo) . ' )';
-                }
-                else
-                {
-                    $narg[1] = $foo[0];
-                }
-            }
-            $narg[0] = $expr;
-        }
-        else
-        {
-#            print "h2\n";
-#            print Data::Dumper->Dump([$expr],['expr']);
-            keys( %{$expr} ); # XXX XXX: need to reset expression!!
-            
-            while ( my ($kk2, $vv2) = each ( %{$expr} ) ) # big while
-            {
-                print "k2: $kk2\n";
-
-                $narg[0] = $vv2;
-
-                my @outi = convert_valex(@narg);
-
-#                print "k: ", $kk2, "\n";
-                $expr->{$kk2} = $narg[0];
-            }
-            $narg[0] = $expr;
-        }
-    }       
-    return @narg;
-} # end convert_valex
 
 
 END { }       # module clean-up code here (global destructor)

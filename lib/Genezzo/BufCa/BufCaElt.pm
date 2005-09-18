@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BufCaElt.pm,v 7.4 2005/09/07 08:50:59 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BufCaElt.pm,v 7.5 2005/09/15 08:55:14 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -23,7 +23,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 7.4 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.5 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
 #    @EXPORT      = qw(&func1 &func2 &func4 &func5);
@@ -213,7 +213,7 @@ sub RSVP
         return undef;
     }
 
-    greet $args{name};
+#    greet $args{name};
 #    print $args{name},"\n";
 
     unless (exists($self->{info}->{mailbox}))
@@ -223,7 +223,7 @@ sub RSVP
 
     $self->{info}->{mailbox}->{$args{name}} = $args{value};
 
-    whoami;
+#    whoami;
 
     return $self->{info};
 }

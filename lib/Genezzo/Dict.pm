@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 7.6 2005/08/29 05:09:28 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 7.9 2005/09/18 07:51:25 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -19,7 +19,7 @@ use Genezzo::Havok;
 
 BEGIN {
     our $VERSION;
-    $VERSION = do { my @r = (q$Revision: 7.6 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.9 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -462,6 +462,26 @@ sub new
     return $newdict;
 
 } # end new
+
+sub SetDBH
+{
+    my $self    = shift;
+    my $dbh     = shift;
+    my $init_db = shift;
+
+    return undef
+        unless (defined($dbh));
+
+    $self->{dbh} = $dbh;
+
+    if ($init_db)
+    {
+        whisper "\ninit\n";
+    }
+#    $dbh->Parseall("s _tab1 *");
+
+    return $dbh;
+}
 
 sub name
 {
@@ -1604,7 +1624,7 @@ sub _get_table
     unless (exists ($tshref->{$tsname}))
     { 
         # NOTE: INIT if first load via SYSTEM tablespace
-        my $init = ($tsname =~ m/SYSTEM/);
+        my $init = ($tsname eq 'SYSTEM');
         my $tsid = $init ? 1 :
             $self->{ts_name2tsid}->{$tsname};
 
@@ -1766,6 +1786,102 @@ sub _get_table
     return ($$reftabi);
 
 } # end _get_table
+
+sub DictObjectExists
+{
+#    greet (@_);
+    my $self = shift;
+    whoami;
+
+    my %optional = (
+                    object_type => "TABLE",
+                    silent_exists    => 1,
+                    silent_notexists => 0,
+                    str_exists    => 
+                    "OBJTYPE \'OBJNAME\' already exists\n",
+                    str_notexists => 
+                    "OBJTYPE \'OBJNAME\' does not exist\n" 
+                    );
+
+    my %required = (
+                    object_name => "no object name !"
+                    );
+    my %args = (
+                %optional,
+		@_
+                );
+
+    return 0
+        unless (Validate(\%args, \%required));
+    
+    my $object_type = $args{object_type};
+
+    my %nargs = @_;
+    if ($object_type =~ m/^TABLE$/i ) 
+    {
+        $nargs{tname} = $args{object_name};
+        return &$tabexists(dhash => $self, %nargs);
+    }
+
+    if ($object_type =~ m/^TABLESPACE$/i )
+    {
+        my $tsname = $args{object_name};
+
+        my $dbh = $self->{dbh};
+
+        my $sth = 
+            $dbh->prepare('select tsid, blocksize from _tspace' . 
+                          ' where tsname = \'' . 
+                          $tsname . '\'');    
+        
+        unless (defined($sth) && ($sth->execute()))
+        {
+            my $msg = "recursive sql failure";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+                
+            &$GZERR(%earg)
+                if (defined($GZERR));
+            return 0;
+        }
+        
+        my @ggg = $sth->fetchrow_array();
+
+        if (scalar(@ggg))
+        {
+            greet "tablespace exists";
+            unless ($args{silent_exists})
+            {
+                my $outstr = $args{str_exists} ;
+                $outstr =~ s/OBJNAME/$tsname/;
+                $outstr =~ s/OBJTYPE/$object_type/;
+
+                my %earg = (self => $self, msg => $outstr, 
+                            severity => 'warn');
+            
+                &$GZERR(%earg)
+                    if (defined($GZERR));
+            }
+            return 1 ;
+        }
+
+        unless ($args{silent_notexists})
+        {
+            greet "tablespace does not exist";
+            my $outstr = $args{str_notexists} ;
+            $outstr =~ s/OBJNAME/$tsname/;
+            $outstr =~ s/OBJTYPE/$object_type/;
+
+            my %earg = (self => $self, msg => $outstr, 
+                    severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+        }
+        return 0 ;
+    } # end tablespace
+    return 0 ;
+} # end DictObjectExists
 
 sub DictTableExists
 {
@@ -2111,6 +2227,7 @@ sub DictTableAllTab
 # DictFileInfo                                                             #
 # DictGrowTablespace                                                       #
 # DictSetFileInfo                                                          #
+# DictTSpaceCreate                                                         #
 #                                                                          #
 ##++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++##
 
@@ -2205,6 +2322,52 @@ sub DictAddFile
     my $tshref = $self->{tablespaces};
 
     my $tsname = $args{tsname};
+
+
+    unless (exists($tshref->{$tsname}))
+    {
+        my ($tsid, $blocksize);
+
+        if (1) 
+        {
+            my $dbh = $self->{dbh};
+
+            my $sth = 
+                $dbh->prepare('select tsid, blocksize from _tspace where tsname = \'' . 
+                              $tsname . '\'');    
+
+            unless (defined($sth) && ($sth->execute()))
+            {
+                my $msg = "recursive sql failure";
+                my %earg = (self => $self, msg => $msg,
+                            severity => 'warn');
+                
+                &$GZERR(%earg)
+                    if (defined($GZERR));
+                return 0;
+            }
+
+            my @ggg = $sth->fetchrow_array();
+
+            unless (scalar(@ggg))
+            {
+                my $msg = "no such tablespace: $tsname \n" ;
+                my %earg = (self => $self, msg => $msg,
+                            severity => 'warn');
+                
+                &$GZERR(%earg)
+                    if (defined($GZERR));
+                return 0;
+            }
+
+            $tsid      = shift @ggg;
+            $blocksize = shift @ggg;
+        }
+
+        # load the tablespace dictionary structures
+        return undef
+            unless $self->_dict_ts_guts($tsname, $tsid, $blocksize);
+    }
 
     unless (exists($tshref->{$tsname}))
     {
@@ -2677,6 +2840,190 @@ sub DictSetFileInfo
     return $foo;
 
 } # end DictSetFileInfo
+
+sub _dict_ts_guts
+{
+    my $self = shift;
+    my ($tsname , $tsid, $blocksize) = @_;
+    my $ts1;
+
+    {
+        my $tshref = $self->{tablespaces};
+        my %tspace_args = (name      => $tsname,
+                           tsid      => $tsid,
+                           gnz_home  => $self->{gnz_home},
+                           blocksize => $blocksize,
+                           GZERR     => $self->{GZERR},
+                           dict      => $self);
+
+        if (exists($self->{prefs})
+            && exists($self->{prefs}->{bc_size}))
+        {
+            # set the buffer cache size if prefs are loaded
+            $tspace_args{bc_size} = $self->{prefs}->{bc_size}
+        }
+
+        $ts1 = Genezzo::Tablespace->new(%tspace_args);
+
+        unless ($ts1->TSLoad(loadtype => "NORMAL"))
+        {
+            whisper "load failed";
+            return undef;
+        }
+
+        $tshref->{$tsname} = {
+            tsref => $ts1,     # tablespace object reference
+            table_cache => {}  # cache of bound table hashes
+        };
+
+    }
+    return $ts1;
+}
+
+sub DictTSpaceCreate
+{
+    my $self = shift;
+
+    my %required = (
+                    tablespace => "no tablespace !"
+                    );
+
+    my %optional = (
+                    blocksize   => $self->{blocksize},
+                    dbh_ctx     => {}
+                    );
+
+
+    my %args = (
+                %optional,
+		@_);
+#    tablespace
+
+#    greet (%args);
+
+    return 0
+        unless (Validate(\%args, \%required));
+
+    unless ($self->{started} || $self->{preload} )
+    {
+        my %earg = (self => $self, msg => "dict not started\n",
+                    severity => 'warn');
+            
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
+        return 0;
+    }
+
+    my $tsname = $args{tablespace};
+
+    # insert the tablespace
+    # XXX XXX: check for duplicate names? 
+
+    my $dbh = $self->{dbh};
+    my $sth = $dbh->prepare("select tsid from _tspace");    
+    
+    unless (defined($sth) && ($sth->execute()))
+    {
+        my $msg = "recursive sql failure";
+        my %earg = (self => $self, msg => $msg,
+                severity => 'warn');
+            
+        &$GZERR(%earg)
+            if (defined($GZERR));
+        return 0;
+    }
+    my $tsid = -1;
+    while (1)
+    {
+        my @ggg = $sth->fetchrow_array();
+
+#         whisper $tsid, "\n";
+
+        last
+            unless (scalar(@ggg));
+        # get max tsid
+        $tsid = $ggg[0]
+            if ($ggg[0] > $tsid);
+    }
+    $tsid++;
+    unless ($tsid > 0)
+    {
+        my $msg = "bad tablespace id $tsid";
+        my %earg = (self => $self, msg => $msg,
+                severity => 'warn');
+            
+        &$GZERR(%earg)
+            if (defined($GZERR));
+        return 0;
+    }
+
+    $sth = $dbh->prepare('select tsid from _tspace where tsname = \'' . 
+                         $tsname . '\'');    
+
+    unless (defined($sth) && ($sth->execute()))
+    {
+        my $msg = "recursive sql failure";
+        my %earg = (self => $self, msg => $msg,
+                severity => 'warn');
+            
+        &$GZERR(%earg)
+            if (defined($GZERR));
+        return 0;
+    }
+
+    my @ggg = $sth->fetchrow_array();
+
+    if (scalar(@ggg))
+    {
+        my $msg = "tablespace $tsname already exists \n" ;
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'warn');
+            
+        &$GZERR(%earg)
+            if (defined($GZERR));
+        return 0;
+    }
+
+    my $hashi  = $self->DictTableGetTable (tname => "_tspace") ;
+    my $tv = tied(%{$hashi});
+
+    my $rowarr = [$tsid, $tsname, 
+                  time_iso8601(),    # creationdate
+                  $args{blocksize}
+                  ];
+
+    my $rid = $tv->HPush($rowarr);
+
+    unless (defined($rid))
+    {
+        my $msg = "failed to create tablespace $tsname \n" ;
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'info');
+            
+        &$GZERR(%earg)
+            if (defined($GZERR));
+        return 0;
+    }
+
+    return undef
+        unless $self->_dict_ts_guts($tsname, $tsid, $args{blocksize});
+#    my $alltspace =  $self->_get_table(tname => "_tspace");
+
+    # XXX XXX: update this bogus index
+    $self->{ts_name2tsid}->{$tsname} = $tsid;
+
+
+    my $msg = "tablespace $tsname created \n" ;
+    my %earg = (self => $self, msg => $msg,
+                severity => 'info');
+            
+    &$GZERR(%earg)
+        if (defined($GZERR));
+
+    my @stat = (1, $tsname);
+    return @stat ;
+}
 
 ##------------------------------------------------------------------------##
 #                                                                          #

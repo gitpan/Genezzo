@@ -538,9 +538,23 @@ NEW FEATURES - Object-Oriented SysHooks
   In Version 0.47, a single package can load multiple functions as 
   a set of class methods, versus package methods.
 
+NEW FEATURES - Tablespaces
+  In Version 0.51, users can create additional tablespaces (collections
+  of datafiles for storage) for tables and indexes.  By default, all
+  tables and indexes are created in the SYSTEM tablespace.  The command
+  "CREATE TABLESPACE tablespace_name" creates a new, empty tablespace.
+  You must add files to the tablespace use "addfile tsname=..." or "af
+  tsname=..." before it can be used.  See "addfile help" for more details.
+  CREATE TABLE and CREATE INDEX now take a new TABLESPACE option.  Note
+  that key constraints on a table inherit its tablespace.  A table or
+  index can only be stored in a single tablespace, and they cannot be
+  moved to a different tablespace.  Additional files may be added to any
+  tablespace at any time.  Currently, there is no support for DROP
+  TABLESPACE, or taking tablespace offline.
+
 INCOMPATIBLE CHANGES
 
-  Version 0.48 dictionary and block format is incompatible with
+  Version 0.51 dictionary and block format is incompatible with
   previous releases.  No upgrade path is supported.
   Version 0.48 thru 0.50 are compatible.
 
