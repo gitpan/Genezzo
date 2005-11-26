@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Plan.pm,v 7.1 2005/07/19 07:49:03 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Plan.pm,v 7.3 2005/11/26 01:53:39 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -10,6 +10,7 @@ use Genezzo::Util;
 
 use Genezzo::Plan::TypeCheck;
 use Genezzo::Plan::MakeAlgebra;
+use Genezzo::Plan::QueryRewrite;
 use Genezzo::Parse::SQL;
 use Parse::RecDescent;
 
@@ -22,7 +23,7 @@ use Carp;
 our $VERSION;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 7.1 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.3 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -111,6 +112,8 @@ EOF_func
             return 0;
         }
     }
+
+    $self->{queryRewrite} = Genezzo::Plan::QueryRewrite->new(%nargs);
     
     return 1;
 }
@@ -233,9 +236,95 @@ sub TypeCheck
     return undef
         unless (Validate(\%args, \%required));
 
-    return $self->{typeCheck}->TypeCheck(algebra   => $args{algebra},
-                                         statement => $args{statement},
-                                         dict      => $self->Dict());
+    my @foo = $self->{typeCheck}->TypeCheck(algebra   => $args{algebra},
+                                            statement => $args{statement},
+                                            dict      => $self->Dict());
+
+
+    return @foo;
+}
+
+sub QueryRewrite
+{
+    my $self = shift;
+
+    my %required = (
+                    algebra   => "no algebra !",
+                    statement => "no sql statement !"
+                    );
+
+    my %args = ( # %optional,
+                @_);
+
+    return undef
+        unless (Validate(\%args, \%required));
+
+    # QUERY REWRITE
+
+    whoami;
+    my $alg = $args{algebra};
+
+    my @baz =
+        $self->{queryRewrite}->QueryRewrite(algebra   => $alg,
+                                            statement => $args{statement},
+                                            dict      => $self->Dict());
+
+    return @baz;
+}
+
+sub Plan
+{
+    my $self = shift;
+
+    my %required = (
+                    statement => "no statement!"
+                    );
+
+    my %args = ( # %optional,
+                @_);
+
+    return undef
+        unless (Validate(\%args, \%required));
+
+    my $plan_status = {};
+
+    my $sqltxt = $args{statement};
+    my $parse_tree = $self->Parse(statement => $sqltxt);
+
+    return $plan_status
+        unless (defined($parse_tree));
+
+    $plan_status->{phase} = "parse";
+    $plan_status->{parse_tree} = $parse_tree;
+    $plan_status->{statement}  = $sqltxt;
+    
+    my $algebra = $self->Algebra(parse_tree => $parse_tree);
+    
+    return $plan_status
+        unless (defined($algebra));
+    $plan_status->{phase} = "algebra";
+    $plan_status->{algebra} = $algebra;
+
+    my ($tc, $err_status) 
+        = $self->TypeCheck(algebra   => $algebra,
+                           statement => $sqltxt);
+
+    $plan_status->{phase} = "typecheck";
+    $plan_status->{algebra} = $tc;
+    $plan_status->{error_status} = $err_status;
+
+    return $plan_status
+        if ($err_status);
+
+    ($tc, $err_status) 
+        = $self->QueryRewrite(algebra   => $tc,
+                              statement => $sqltxt);
+
+    $plan_status->{phase} = "queryrewrite";
+    $plan_status->{algebra} = $tc;
+    $plan_status->{error_status} = $err_status;
+
+    return $plan_status;
 
 }
 
@@ -279,11 +368,11 @@ sub SQLWhere2
 
         no warnings qw(uninitialized); # shut off null string warnings
 
-        my ($tabdef, $rid, $outarr) = @_;
+        my ($tabdef, $rid, $outarr, $get_alias_col) = @_;
         return 1
             if (defined($outarr) &&
-                scalar(@{$outarr}) &&
                 ( ';
+#                scalar(@{$outarr}) &&
 
     my $AndPurity = 0;    # WHERE clauses of ANDed predicates may
     my $AndTokens = [];   # be suitable for index lookups, but ORs

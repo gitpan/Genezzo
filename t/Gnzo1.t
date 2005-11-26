@@ -1,4 +1,4 @@
-# Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
+# Copyright (c) 2003, 2004, 2005 Jeffrey I Cohen.  All rights reserved.
 #
 # Before `make install' is performed this script should be runnable with
 # `make test'. After `make install' it should work as `perl test.pl'
@@ -30,13 +30,17 @@ $TEST_COUNT = 2;
 
 my $dbinit   = 1;
 my $gnz_home = File::Spec->catdir("t", "gnz_home");
-rmtree($gnz_home, 1, 1);
+my $gnz_restore = File::Spec->catdir("t", "restore");
+#rmtree($gnz_home, 1, 1);
 #mkpath($gnz_home, 1, 0755);
 
 {
-    my $fb = Genezzo::GenDBI->new(exe => $0, 
-                             gnz_home => $gnz_home, 
-                             dbinit => $dbinit);
+    use Genezzo::TestSetup;
+
+    my $fb = 
+        Genezzo::TestSetup::CreateOrRestoreDB( 
+                                               gnz_home => $gnz_home,
+                                               restore_dir => $gnz_restore);
 
     unless (defined($fb))
     {

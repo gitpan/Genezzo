@@ -8,7 +8,7 @@
 # Change 1..1 below to 1..last_test_to_print .
 # (It may become useful if the test is moved to ./t subdirectory.)
 
-BEGIN { $| = 1; print "1..10\n"; }
+BEGIN { $| = 1; print "1..2\n"; }
 END {print "not ok 1\n" unless $loaded;}
 use Genezzo::GenDBI;
 $loaded = 1;
@@ -34,17 +34,14 @@ my $gnz_restore = File::Spec->catdir("t", "restore");
 #rmtree($gnz_home, 1, 1);
 #mkpath($gnz_home, 1, 0755);
 
-#my $ins_count = 1000;
-my $ins_count = 400;
-
-if (1)
 {
     use Genezzo::TestSetup;
 
     my $fb = 
         Genezzo::TestSetup::CreateOrRestoreDB( 
                                                gnz_home => $gnz_home,
-                                               restore_dir => $gnz_restore);
+                                               restore_dir => $gnz_restore,
+                                               dbinit => 1);
 
     unless (defined($fb))
     {
@@ -53,93 +50,6 @@ if (1)
     }
     ok();
     $dbinit = 0;
-
-}
-
-if (1)
-{
-    use Genezzo::Util;
-
-    my $fb = Genezzo::GenDBI->new(exe => $0, 
-                             gnz_home => $gnz_home, 
-                             dbinit => $dbinit);
-
-    unless (defined($fb))
-    {
-        not_ok ("could not find database");
-        exit 1;
-    }
-    ok();
-    $dbinit = 0;
-
-    if ($fb->Parseall("startup"))
-    {       
-        ok();
-    }
-    else
-    {
-        not_ok ("could not startup");
-    }
-
-    if ($fb->Parseall("af filesize=16K"))
-    {       
-        ok();
-    }
-    else
-    {
-        not_ok ("could not addfile");
-    }
-    if ($fb->Parseall("af filesize=16k"))
-    {       
-        ok();
-    }
-    else
-    {
-        not_ok ("could not addfile");
-    }
-    if ($fb->Parseall("af "))
-    {       
-        ok();
-    }
-    else
-    {
-        not_ok ("could not addfile");
-    }
-
-    if ($fb->Parseall("ct EMP index id=n cname=c"))
-    {       
-        ok();
-    }
-    else
-    {
-        not_ok ("could not create table");
-    }   
-
-    for my $ii (1..$ins_count)
-    {
-        my $ins = "i EMP $ii foo_$ii";
-
-        if ($fb->Parseall($ins))
-        {       
-#            ok();
-        }
-        else
-        {
-            not_ok ("could not insert: $ins");
-            last;
-        }   
-    }
-    ok ();
-
-    if ($fb->Parseall("commit"))
-    {       
-        ok();
-    }
-    else
-    {
-        not_ok ("could not commit");
-    }   
-
 
 }
 

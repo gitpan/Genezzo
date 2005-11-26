@@ -1,5 +1,11 @@
 Revision history for Perl extension Genezzo
 
+0.52 Fri Nov 25 18:15:16 2005
+        - fix unary expression evaluation
+        - use TestSetup for regress
+        - extend type checking for FROM clause subqueries, set operations
+        - basic join support
+
 0.51 Sun Sep 18 00:44:17 2005
         - dictionary recursive sql support
         - CREATE TABLESPACE, add TABLESPACE support to CREATE TABLE/INDEX

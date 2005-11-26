@@ -90,11 +90,13 @@ SQL SUPPORT -- see LIMITATIONS
     DELETE from tablename [WHERE ...]
 
   SELECT:  The Genezzo parser can parse complex SELECT statements,
-           but the execution engine can only handle simple SELECTS.
+           but the execution engine can only handle simple SELECTS
+           and basic joins.
 
     SELECT * FROM tablename [WHERE ...]
     SELECT COUNT(*) FROM tablename 
     SELECT ECOUNT(*) FROM tablename
+    SELECT * from t1, t2 where t1.col1 = t2.col1    
 
     SELECT expr [[AS] column_alias] [, expr [[AS] column_alias]]
       FROM tablename
@@ -156,8 +158,10 @@ LIMITATIONS
   General: No locking/multiuser support, bind variables, only single SYSTEM
            tablespace, incomplete DBI support.
 
-  SELECT: Single table queries only -- no joins, ORDER BY, GROUP BY, 
+  SELECT: Simple queries only -- no ORDER BY, GROUP BY, 
           HAVING, subqueries, set functions (UNION, INTERSECT).
+          Only basic FROM clause joins: FROM t1, t2, ... is
+          supported.
           No aggregation functions other than COUNT(*), ECOUNT(*).
           COUNT and ECOUNT do not accept a WHERE clause.
   
@@ -174,8 +178,8 @@ EXAMPLES
         
   Some very basic SQL create/drop/describe table, select, insert, update
   and delete syntax is supported, and like standard SQL, table and
-  column names are case-insensitive unless quoted.  More complex SQL,
-  such as joins, parses, but is ignored.  The only supported functions
+  column names are case-insensitive unless quoted.  More complex SQL
+  parses, but is ignored.  The only supported functions
   are count(*) and ecount(*), a non-blocking count estimation function.
   The database also supports commit to force changes to disk, and a crude
   rollback.  NOTE: Data definition (such as create table or ct) must be
@@ -194,6 +198,12 @@ EXAMPLES
     select * from _tab1 where tname =~ m/col/;
     select * from _tab1 where tid < 5;
     select * from _tab1 where numcols > 3 AND numcols < 6;
+
+    rem basic joins
+    select * from _tab1, _col1  where _tab1.tid = _col1.tid 
+     and _tab1.tname =~ m/col/;
+
+
 
     rem  Column aliases and Expressions
     select tid as Table_ID, tname Name, (tid+1)/2 from _tab1;
@@ -552,9 +562,12 @@ NEW FEATURES - Tablespaces
   tablespace at any time.  Currently, there is no support for DROP
   TABLESPACE, or taking tablespace offline.
 
+NEW FEATURES - Joins
+  In Version 0.52, basic joins are supported.
+
 INCOMPATIBLE CHANGES
 
-  Version 0.51 dictionary and block format is incompatible with
+  Version 0.52 dictionary and block format is incompatible with
   previous releases.  No upgrade path is supported.
   Version 0.48 thru 0.50 are compatible.
 

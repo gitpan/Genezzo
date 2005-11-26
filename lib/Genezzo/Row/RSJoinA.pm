@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSExpr.pm,v 7.2 2005/11/26 02:10:29 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSJoinA.pm,v 1.5 2005/11/26 02:09:25 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -8,7 +8,7 @@
 use strict;
 use warnings;
 
-package Genezzo::Row::RSExpr;
+package Genezzo::Row::RSJoinA;
 
 use Genezzo::Util;
 use Genezzo::PushHash::PushHash;
@@ -59,11 +59,11 @@ our $GZERR = sub {
 sub _init
 {
 #    whoami;
-    #greet @_;
+#    greet @_;
     my $self      =  shift;
 
     my %required  =  (
-                      rs => "no rowsource!"
+                      rs_list => "no rowsource list!"
                       );
     
     my %args = (@_);
@@ -71,16 +71,21 @@ sub _init
     return 0
         unless (Validate(\%args, \%required));
 
-    $self->{rs} = $args{rs};
+    $self->{rs_list} = $args{rs_list};
 
     if (defined($args{select_list}))
     {
 #        greet $args{select_list};
         $self->{select_list} = $args{select_list};
         return 0
-            unless (defined($args{alias}));
-        $self->{alias} = $args{alias};
+            unless (defined($args{alias_list}));
+        $self->{alias_list} = $args{alias_list};
     }
+
+    # XXX XXX XXX XXX: why doesn't this work?
+    # need to build a composite rid if joining multiple row sources
+    $self->{rid_fixup} = (scalar(@{$self->{rs_list}}) > 1);
+
     return 1;
 }
 
@@ -126,7 +131,7 @@ sub SelectList
 sub HPush
 {
     my $self = shift;
-    my $rs = $self->{rs};
+    my $rs = $self->{rs_list};
 
 #    whoami;
 
@@ -136,18 +141,32 @@ sub HPush
 sub HCount
 {
     my $self = shift;
-    my $rs = $self->{rs};
+    my $rsl = $self->{rs_list};
 
     whoami;
 
-    return ($rs->HCount(@_));
+    return 0 # terminate if no row sources
+        unless (scalar(@{$rsl}));
+
+    # multiply the counts (cartesian product)
+
+    my $grandtotal = 1; # multiplicative identity for first row source
+
+    for my $rs (@{$rsl})
+    {
+        $grandtotal *= $rs->HCount(@_);
+
+        return 0 # terminate if one row source is empty...
+            unless ($grandtotal);
+    }
+    return $grandtotal;
 }
 
 # standard hash methods follow
 sub STORE
 {
     my $self = shift;
-    my $rs = $self->{rs};
+    my $rs = $self->{rs_list};
 
     whoami;
 
@@ -156,35 +175,188 @@ sub STORE
  
 sub FETCH 
 {
-    my $self = shift;
-    my $rs = $self->{rs};
-
-    whoami;
-
-    return ($rs->FETCH(@_));
+    my ($self, $place) = @_;
+    return $self->_localFetch($place, "STANDARD");
 }
+sub _localFetch
+{
+    my ($self, $place, $mode) = @_;
+    my $rsl = $self->{rs_list};
+
+#    whoami;
+
+    my @placelist;
+    if ($self->{rid_fixup})
+    {
+        # URL-style substitution to handle spaces, weird chars
+        $place =~ s/\%([A-Fa-f0-9]{2})/pack('C', hex($1))/seg;
+
+        @placelist = UnPackRow($place,
+                               $Genezzo::Util::UNPACK_TEMPL_ARR); # 
+    }
+    else
+    {
+        push @placelist, $place;
+    }
+
+    if ($mode eq "STANDARD")
+    {
+        my @outval;
+
+        if (scalar(@{$rsl} == 1))
+        {
+            my $keyval = shift @placelist;
+            # NOTE: each rowsource must have at least one row for a valid join
+            return undef
+                unless (defined($keyval));
+
+            return $rsl->[0]->FETCH($keyval);
+        }
+
+        for my $rs (@{$rsl})
+        {
+            my $keyval = shift @placelist;
+
+            # NOTE: each rowsource must have at least one row for a valid join
+            return undef
+                unless (defined($keyval));
+            
+            push @outval, @{$rs->FETCH($keyval)};
+        }
+        return (\@outval);
+    }
+    elsif ($mode eq "HASH")
+    {
+        my $outhsh = {};
+
+        my $idx = 0;
+
+        for my $rs (@{$rsl})
+        {
+            my $keyval = shift @placelist;
+
+            # NOTE: each rowsource must have at least one row for a valid join
+            return undef
+                unless (defined($keyval));
+            my $alias = $self->{alias_list}->[$idx];
+            $outhsh->{$alias} = $rs->FETCH($keyval);
+            $idx++;
+        }
+        return $outhsh;
+    }
+    return undef;
+}
+
 sub FIRSTKEY 
 {
     my $self = shift;
-    my $rs = $self->{rs};
+    my $rsl = $self->{rs_list};
 
 #    whoami;
 
-    return ($rs->FIRSTKEY(@_));
+    my @firstkey;
+    for my $rs (@{$rsl})
+    {
+        my $keyval = $rs->FIRSTKEY(@_);
+
+        # NOTE: each rowsource must have at least one row for a valid join
+        return undef
+            unless (defined($keyval));
+
+        push @firstkey, $keyval;
+    }
+
+    if ($self->{rid_fixup})
+    {    
+        # create a composite key out of all the firstkeys
+        my $packstr = PackRow(\@firstkey);
+        # URL-style substitution to handle spaces, weird chars
+        $packstr =~ s/([^a-zA-Z0-9])/uc(sprintf("%%%02lx",  ord $1))/eg;
+
+        return ($packstr);
+    }
+    # just a single rowsource, return rid
+    return $firstkey[0];
+
 }
 sub NEXTKEY  
 {
-    my $self = shift;
-    my $rs = $self->{rs};
+    my ($self, $prevkey) = @_;
+    my $rsl = $self->{rs_list};
 
 #    whoami;
 
-    return ($rs->NEXTKEY(@_));
+    return (undef)
+        unless (defined ($prevkey));
+
+    my @prevkeylist;
+    if ($self->{rid_fixup})
+    {
+        # URL-style substitution to handle spaces, weird chars
+        $prevkey =~ s/\%([A-Fa-f0-9]{2})/pack('C', hex($1))/seg;
+
+        @prevkeylist = UnPackRow($prevkey, 
+                                 $Genezzo::Util::UNPACK_TEMPL_ARR); # 
+    }
+    else
+    {
+        push @prevkeylist, $prevkey;
+    }
+
+    my $idx = scalar(@prevkeylist) - 1;
+    
+    while ($idx >= 0)
+    {
+        # starting at the last rowsource in the list, get the nextkey 
+        my $nextkey = $rsl->[$idx]->NEXTKEY($prevkeylist[$idx]);
+        if (defined($nextkey))
+        {
+            # got it - update that portion of the composite key
+            $prevkeylist[$idx] = $nextkey;
+
+            # advanced trailing key portion - exit the loop and return
+            # updated key value
+            last;
+        }
+        else
+        {
+            # if rowsource at idx=0 is lastkey, then there is no NEXTKEY
+            return undef
+                unless ($idx > 0);
+
+            # reset this portion of the key to its firstkey, then
+            # decrement the index in order to advance the prior
+            # segment of the key
+            $nextkey = $rsl->[$idx]->FIRSTKEY();
+
+            # NOTE: each rowsource must have at least one row for a valid join
+            return undef 
+                unless (defined($nextkey));
+            $prevkeylist[$idx] = $nextkey;
+            # not done yet -- get the nextkey for the prior portion
+        }
+        $idx--;
+    } # end while
+    
+    return undef
+        unless ($idx >= 0);
+
+    if ($self->{rid_fixup})
+    {    
+        my $packstr = PackRow(\@prevkeylist);
+        # URL-style substitution to handle spaces, weird chars
+        $packstr =~ s/([^a-zA-Z0-9])/uc(sprintf("%%%02lx",  ord $1))/eg;
+
+        return ($packstr);
+    }
+    # just a single rowsource, return rid
+    return $prevkeylist[0];
+
 }
 sub EXISTS   
 {
     my $self = shift;
-    my $rs = $self->{rs};
+    my $rs = $self->{rs_list};
 
 #    whoami;
 
@@ -193,7 +365,7 @@ sub EXISTS
 sub DELETE   
 {
     my $self = shift;
-    my $rs = $self->{rs};
+    my $rs = $self->{rs_list};
 
 #    whoami;
 
@@ -202,7 +374,7 @@ sub DELETE
 sub CLEAR    
 {
     my $self = shift;
-    my $rs = $self->{rs};
+    my $rs = $self->{rs_list};
 
 #    whoami;
 
@@ -212,7 +384,7 @@ sub CLEAR
 sub AUTOLOAD 
 {
     my $self = shift;
-    my $rs = $self->{rs};
+    my $rsl = $self->{rs_list};
 
     our $AUTOLOAD;
     my $newfunc = $AUTOLOAD;
@@ -220,7 +392,12 @@ sub AUTOLOAD
     return if $newfunc eq 'DESTROY';
 
 #    greet $newfunc;
-    return ($rs->$newfunc(@_));
+    if (scalar(@{$rsl}) == 1)
+    {
+        # handle FIRSTCOUNT, etc, for case of single row source
+        return ($rsl->[0]->$newfunc(@_));        
+    }
+    return ($rsl->$newfunc(@_));
 }
 
 sub SQLPrepare # get a DBI-style statement handle
@@ -228,11 +405,10 @@ sub SQLPrepare # get a DBI-style statement handle
     my $self = shift;
     my %args = @_;
     $args{pushhash} = $self;
-    $args{rs}       = $self->{rs};
+    $args{rs_list}       = $self->{rs_list};
     if (defined($self->{select_list}))
     {
         $args{select_list} = $self->{select_list};
-        $args{alias}       = $self->{alias};
     }
     $args{use_select_list} = defined($self->SelectList());
 
@@ -242,12 +418,12 @@ sub SQLPrepare # get a DBI-style statement handle
         $args{GZERR} = $self->{GZERR};
     }
 
-    my $sth = Genezzo::Row::SQL_RSExpr->new(%args);
+    my $sth = Genezzo::Row::SQL_RSJoinA->new(%args);
 
     return $sth;
 }
 
-package Genezzo::Row::SQL_RSExpr;
+package Genezzo::Row::SQL_RSJoinA;
 use strict;
 use warnings;
 use Genezzo::Util;
@@ -262,26 +438,33 @@ sub _init
     $self->{pushhash} = $args{pushhash};
 
     return 0
-        unless (defined($args{rs}));
-    my $rs = $args{rs};
+        unless (defined($args{rs_list}));
 
-    my %nargs = @_;
+    my $rsl = $args{rs_list};
 
-    $self->{sql_rs}   = $rs->SQLPrepare(%nargs);
-    return 0
-        unless (defined($self->{sql_rs}));
+    $self->{sql_rs}   = [];
+    for my $rs (@{$rsl})
+    {
+        my $prep = $rs->SQLPrepare(@_);
 
+        return 0
+            unless (defined($prep));
+
+        push @{$self->{sql_rs}}, $prep;
+    }
     if (defined($args{select_list}))
     {
 #        greet $args{select_list};
         $self->{select_list} = $args{select_list};
-        return 0
-            unless (defined($args{alias}));
-        $self->{alias} = $args{alias};
     }
 
     $self->{rownum} = 0;
     $self->{use_select_list} = $args{use_select_list};
+
+    if (defined($args{filter}))
+    {
+        $self->{SQLFilter} = $args{filter}; 
+    }
 
     return 1;
 }
@@ -311,24 +494,100 @@ sub new
 
 } # end new
 
-# XXX XXX: where is SQLExecute?
+# SQL-style execute and fetch functions
+sub SQLExecute
+{
+    my $self = shift;
+
+    my $sql_rsl = $self->{sql_rs};
+    my $newlist = [];
+    for my $rs (@{$sql_rsl})
+    {
+        my $prep = $rs->SQLExecute(@_);
+
+        return 0
+            unless (defined($prep));
+
+        push @{$newlist}, $prep;
+    }
+
+    $self->{sql_rs} = $newlist;
+
+    $self->{SQLFetchKey} = $self->{pushhash}->FIRSTKEY();
+
+    return (1);
+}
+
 
 sub SQLFetch
 {
     my $self = shift;
-    my $rs = $self->{sql_rs};
+    my $rsl = $self->{sql_rs};
     my $is_undef;
+
+    my $fullfilter = $self->{SQLFilter};
+    my $filter = (defined($fullfilter)) ? $fullfilter->{filter} : undef;
 
 #    whoami;
 
     my $tc_rownum = $self->{rownum} + 1;
 
 #    my ($tc_rid, $vv) = $rs->SQLFetch(@_);
-    my ($rid, $vv) = $rs->SQLFetch(@_);
-    greet $rid, $vv;
 
-    return undef # check if child has terminated
-        unless (defined($rid));
+    my ($rid, $vv);
+
+  L_w1:
+    while (defined($self->{SQLFetchKey}))
+    {
+        my $currkey = $self->{SQLFetchKey};
+        my $outarr  = $self->{pushhash}->_localFetch($currkey, "HASH");
+        my $get_alias_col = $outarr;
+
+        # save the value of the key because we pre-advance to the next one
+        $self->{SQLFetchKey} = $self->{pushhash}->NEXTKEY($currkey);
+        
+        $rid = $currkey;
+        $vv = $outarr;
+
+        greet $rid, $vv;
+        
+        return undef # check if child has terminated
+            unless (defined($rid));
+
+        if (!(defined($vv) && defined($filter)))
+        {
+            last L_w1;
+        }
+        else
+        {
+            # filter is defined
+            my $val;
+
+            # be very paranoid - filter might be invalid perl
+            eval {$val = &$filter($self, $currkey, $outarr, $get_alias_col) };
+            if ($@)
+            {
+                whisper "filter blew up: $@";
+                greet   $fullfilter;
+
+                my $msg = "bad filter: $@\n" ;
+#            $msg .= Dumper($fullfilter)
+#               if (defined($fullfilter));
+                my %earg = (self => $self, msg => $msg,
+                            severity => 'warn');
+            
+                &$GZERR(%earg)
+                    if (defined($GZERR));
+
+                return undef;
+            }
+            last L_w1
+                unless (!$val);
+            # clear out rid and values in case next fetch hits EOF
+            $rid = undef;
+            $vv  = undef;
+        }
+    } # end while
 
     my @big_arr;
 
@@ -337,8 +596,7 @@ sub SQLFetch
         if ($self->{use_select_list})
         {
             my $outarr = $vv;
-            my $alias = $self->{alias};
-            my $get_alias_col = {$alias => $outarr};
+            my $get_alias_col = $outarr;
 
             for my $valex (@{$self->{select_list}})
             {
@@ -438,6 +696,7 @@ sub SQLFetch
 
 #    return ($tc_rid, \@big_arr);
     return ($rid, \@big_arr);
+
 }
 
 sub AUTOLOAD 
@@ -466,7 +725,7 @@ __END__
 
 =head1 NAME
 
-Genezzo::Row::RSExpr - Row Source Expression Evaluation
+Genezzo::Row::RSJoinA - Row Source Expression Evaluation
 
 =head1 SYNOPSIS
 
@@ -482,11 +741,9 @@ Genezzo::Row::RSExpr - Row Source Expression Evaluation
 
 various
 
-=head1 TODO
+=head1 #TODO
 
 =over 4
-
-=item SQLPrepare/SQLFetch: requires ALIAS argument, which doesn't make sense for rowsources like RSDual (see XEval).  "Alias" is only necessary to disambiguate named columns.
 
 =back
 

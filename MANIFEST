@@ -3,6 +3,7 @@ MANIFEST
 Makefile.PL
 README
 TODO
+t/AAASetup1.t
 t/Block1.t
 t/Block2.t
 t/Block3.t
@@ -35,6 +36,7 @@ lib/Genezzo/Row/RSDual.pm
 lib/Genezzo/Row/RSExpr.pm
 lib/Genezzo/Row/RSFile.pm
 lib/Genezzo/Row/RSBlock.pm
+lib/Genezzo/Row/RSJoinA.pm
 lib/Genezzo/SpaceMan/SMFile.pm
 lib/Genezzo/BufCa/BCFile.pm
 lib/Genezzo/BufCa/BufCa.pm
@@ -42,6 +44,7 @@ lib/Genezzo/BufCa/BufCaElt.pm
 lib/Genezzo/BufCa/DirtyScalar.pm
 lib/Genezzo/BufCa/PinScalar.pm
 lib/Genezzo/Dict.pm
+lib/Genezzo/dict.sql
 lib/Genezzo/Havok.pm
 lib/Genezzo/Havok/SysHook.pm
 lib/Genezzo/Havok/UserExtend.pm
@@ -53,6 +56,7 @@ lib/Genezzo/Parse/SQLGrammar.pl
 lib/Genezzo/Parse/SQL.pm
 lib/Genezzo/Plan.pm
 lib/Genezzo/Plan/MakeAlgebra.pm
+lib/Genezzo/Plan/QueryRewrite.pm
 lib/Genezzo/Plan/TypeCheck.pm
 lib/Genezzo/GenDBI.pm
 lib/Genezzo/Util.pm
@@ -73,6 +77,7 @@ lib/Genezzo/Block/Std.pm
 lib/Genezzo/Index/bt2.pm
 lib/Genezzo/Index/bt3.pm
 lib/Genezzo/Index/btHash.pm
+lib/Genezzo/TestSetup.pm
 lib/Genezzo/XEval.pm
 lib/Genezzo/XEval/Prepare.pm
 lib/Genezzo/XEval/SQLAlter.pm

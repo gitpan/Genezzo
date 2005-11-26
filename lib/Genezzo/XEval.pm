@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/XEval.pm,v 7.1 2005/07/19 07:49:03 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/XEval.pm,v 7.4 2005/11/26 01:57:30 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -20,7 +20,7 @@ use Carp;
 our $VERSION;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 7.1 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.4 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -40,8 +40,23 @@ our $GZERR = sub {
         }
     }
 
+    my $warn = 1;
+    if (exists($args{severity}))
+    {
+        my $sev = uc($args{severity});
+        $sev = 'WARNING'
+            if ($sev =~ m/warn/i);
+
+        # don't print 'INFO' prefix
+        if ($args{severity} =~ m/info/i)
+        {
+            printf ("%s: ", $sev);
+            $warn = 0;
+        }
+
+    }
     carp $args{msg}
-        if warnings::enabled();
+      if (warnings::enabled() && $warn);
     
 };
 
@@ -54,6 +69,7 @@ sub _init
         unless (defined($args{plan}));
 
     $self->{plan} = $args{plan};
+    $self->{prepare} = Genezzo::XEval::Prepare->new();
     
     return 1;
 }
@@ -105,6 +121,31 @@ sub Dict
         $self->{dictobj} = shift;
     }
     return $self->{dictobj};    
+}
+
+sub Prepare
+{
+    whoami;
+
+    my $self = shift;
+
+    my %required = (
+                    plan => "no plan!"
+                    );
+
+    my %args = ( # %optional,
+                @_);
+
+    my ($msg, %earg);
+
+    return undef
+        unless (Validate(\%args, \%required));
+
+    my $alg = $args{plan};
+
+    return ($self->{prepare}->Prepare(plan => $alg,
+                                      dict => $self->Dict()));
+
 }
 
 sub SQLAlter
@@ -359,6 +400,8 @@ sub SQLInsert
     # standard INSERT into ... VALUES ...
     if (ref($alg->{sql_insert}->[1]->{insert_values}) eq 'ARRAY')
     {
+        my $tabinfo = $alg->{sql_insert}->[0]->{insert_tabinfo};
+
         use Genezzo::Row::RSExpr;
         use Genezzo::Row::RSDual;
 
@@ -376,7 +419,11 @@ sub SQLInsert
         my %nargs = (
                      GZERR       => $self->{GZERR},
                      rs          => $rsd_tv,
-                     select_list => \@sel_list
+                     select_list => \@sel_list,
+                     # NOTE: alias is now a required argument for
+                     # RSExpr, even though the DUAL rowsource cannot
+                     # have name column expressions.
+                     alias       => $tabinfo->{tc_table_fullname}
                      );
         my %rsx_h;
         my $rsx_tv = tie %rsx_h, 'Genezzo::Row::RSExpr', %nargs;

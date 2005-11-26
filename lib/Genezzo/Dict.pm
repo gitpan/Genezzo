@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 7.9 2005/09/18 07:51:25 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 7.13 2005/11/26 01:52:22 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -19,7 +19,7 @@ use Genezzo::Havok;
 
 BEGIN {
     our $VERSION;
-    $VERSION = do { my @r = (q$Revision: 7.9 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.13 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -333,6 +333,9 @@ sub _init
         mkpath($fhts, 1, 0711); # XXX XXX : what should permissions be?
     }
 
+
+    $self->{phase_three} = 0;
+
     if (defined($args{init_db}) && ($args{init_db} > 0))
     {
         $self->{started}  = 1; # Note: pretend dictionary already started
@@ -402,10 +405,13 @@ sub _init
                 unless ($self->dictp2_define_cons());
 
 
-        }
+        } # end self->dictinit
         return 0 
             unless ($self->DictSave());
-    }
+
+        $self->{phase_three} = 1;
+
+    } # end defined init_db
 
     $self->{started} = 0;
 
@@ -421,8 +427,6 @@ sub new
     
     $self->{dict_tables}   = {};
 
-    $self->{ts_name2tsid}  = {}; # XXX XXX
-    $self->{ts_tsname_idx} = {}; # XXX XXX
     $self->{ts_tsid_idx}   = {}; # XXX XXX
 
     $self->{afu_tid_idx}   = {}; # XXX XXX - allfilesused
@@ -480,7 +484,182 @@ sub SetDBH
     }
 #    $dbh->Parseall("s _tab1 *");
 
+    if ($self->{phase_three})
+    {
+        $self->DictStartup();
+        
+        # phase three: recursive dictionary sql
+        whisper "load recursive sql";
+
+        my $dict_sql = "dict.sql";
+        my $dict_fh; 
+
+        my $subdir = "Genezzo";        
+        my $dir_h;
+
+        my @file_list;
+
+        for my $dir (@INC) 
+        {
+            my $dspec = File::Spec->catdir($dir, $subdir);
+
+            whisper "dir: $dspec";
+
+            if ( opendir($dir_h, $dspec) ) 
+            {
+                my $fnam;
+                while ($fnam  = readdir($dir_h))
+                {
+                    if ($fnam =~ m/^dict\.sql$/)
+                    {
+                        $fnam = 
+                            File::Spec->rel2abs(
+                                                File::Spec->catfile(
+                                                                    $dir,
+                                                                    $subdir,
+                                                                    $dict_sql
+                                                                    ));
+                        whisper "fnam: $fnam";
+                        push @file_list, $fnam;
+                        last;
+                    }
+                } # end while
+                closedir $dir_h;
+            } # end if open
+            last
+                if (scalar(@file_list));
+        } # end for my dir
+        
+
+        return undef
+            unless (scalar(@file_list));
+        $dict_sql = pop @file_list;
+
+        return undef        
+            unless (open ($dict_fh, "< $dict_sql" ) );
+        
+        if (1)
+        {
+            my $prev_line = undef;  # accumulated input of 
+                                    # multi-line statement
+
+          L_w1:
+            while (<$dict_fh>) {
+                my $in_line = $_;
+                if (defined($prev_line))
+                {
+#                        $prev_line .= "\n" ;
+                        # input is already newline terminated
+                }
+                else
+                {
+                    next L_w1 if ($in_line =~ m/^REM/i);
+                    next L_w1 unless ($in_line =~ m/\S/);
+
+                    $prev_line = "" ;
+                }
+                $prev_line .= $in_line;
+
+                if ($in_line !~ m/;$/)
+                {
+                    next L_w1;
+                }
+                else
+                {
+                    $prev_line =~ s/;(\s*)$//  # Note: remove the semicolon
+                            ;
+                }
+
+                whisper "dict.sql: $prev_line";
+
+                $dbh->Parseall ($prev_line);
+                $prev_line = undef;
+            } # end big while
+            close ($dict_fh);
+        } # end 
+
+        $self->DictShutdown();
+        $self->{phase_three} = 0;
+    } # end if phase_three
+
     return $dbh;
+}
+
+sub _sql_execute
+{
+#    greet (@_);
+    my $self = shift;
+    
+    my %required = (sql_statement => "no sql!");
+
+    my %args = (
+#                %optional,
+		@_
+                );
+
+    return undef
+        unless (Validate(\%args, \%required));
+
+    my $dbh = $self->{dbh};
+    unless (defined($dbh))
+    {
+        my $msg = "recursive sql failure: no database handle";
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'warn');
+                
+        &$GZERR(%earg)
+            if (defined($GZERR));
+        return undef;
+    }
+
+    my $sql = $args{sql_statement};
+
+    my $sth = 
+        $dbh->prepare($sql);
+        
+    unless (defined($sth) && ($sth->execute()))
+    {
+        my $msg = "recursive sql failure: $sql";
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'warn');
+                
+        &$GZERR(%earg)
+            if (defined($GZERR));
+        return undef;
+    }
+
+    return $sth;
+
+} # end _sql_execute
+
+sub _get_tsid_by_name
+{
+    my $self = shift;
+    my $tsname = shift;
+
+    return undef
+        unless (defined($tsname));
+
+    if ($tsname eq 'SYSTEM')
+    {
+        return 1; # easy peasy: SYSTEM is tablespace # 1
+    }
+
+    my $sql = 'select tsid from _tspace where tsname = \'' .
+        $tsname . '\'';
+
+    my $sth =  $self->_sql_execute(sql_statement => $sql);
+        
+    return undef
+        unless (defined($sth));
+    my @ggg = $sth->fetchrow_array();
+
+    return undef
+        unless (scalar(@ggg));
+
+    my $tsid = shift @ggg;
+    
+    return $tsid;
 }
 
 sub name
@@ -594,8 +773,6 @@ sub DictDump
     }
     elsif ($params[0] =~ m/^tsidx/i) # dump tablespace index information
     {
-        print "name2tsid\t", Dumper($self->{ts_name2tsid});
-        print "ts_tsname\t", Dumper($self->{ts_tsname_idx});
         print "ts_tsid\t", Dumper($self->{ts_tsid_idx});
         print "afu_tid\t", Dumper($self->{afu_tid_idx});
         print "tsf_fid\t", Dumper($self->{tsf_fid_idx});
@@ -725,7 +902,7 @@ sub DictStartup
         $self->{use_constraints} = 1; # Note: used in get_table
     }
 
-    if ($self->{use_havok})
+    if (!$self->{phase_three} && $self->{use_havok})
     {
         $Genezzo::Havok::GZERR = 
             sub {
@@ -737,7 +914,7 @@ sub DictStartup
     }
 
     # use sys_hook to define a dictionary startup hook
-    if (defined(&dicthook1))  
+    if (!$self->{phase_three} && defined(&dicthook1))  
     {
         return 0
             unless (dicthook1(self => $self));
@@ -1367,29 +1544,23 @@ sub _loadDictMemStructs
 
     # clean up first
     delete $self->{dict_tables};
-    delete $self->{ts_name2tsid};
 
     # indexes
-    delete $self->{ts_tsname_idx};
     delete $self->{ts_tsid_idx};
     delete $self->{afu_tid_idx};
     delete $self->{tsf_fid_idx};
 
     # tied hashes for indexes
-    delete $self->{ts_tsname_tv};
     delete $self->{ts_tsid_tv};
     delete $self->{afu_tid_tv};
     delete $self->{tsf_fid_tv};
 
-    my (%tt1, %tt2, %tt3, %tt4);
-    $self->{ts_tsname_idx} = \%tt1; # XXX XXX
+    my (%tt2, %tt3, %tt4);
     $self->{ts_tsid_idx}   = \%tt2; # XXX XXX
     $self->{afu_tid_idx}   = \%tt3; # XXX XXX- define here, update in 
                                     # dicttablealltab
     $self->{tsf_fid_idx}   = \%tt4; # XXX XXX
 
-    $self->{ts_tsname_tv} =
-        tie %tt1, 'Genezzo::Index::btHash';
     $self->{ts_tsid_tv}   = 
         tie %tt2, 'Genezzo::Index::btHash';
     my %t3arg = (
@@ -1414,9 +1585,6 @@ sub _loadDictMemStructs
         my $tsname = $vv->[$getcol->{tsname}];
         my $tsid   = $vv->[$getcol->{tsid}];
 
-        $self->{ts_name2tsid}->{$tsname}  = $tsid;
-
-        $self->{ts_tsname_idx}->{$tsname} = $kk;
         $self->{ts_tsid_idx}->{$tsid}     = $kk;
 
         $prev_tsid   = $tsid;
@@ -1625,8 +1793,13 @@ sub _get_table
     { 
         # NOTE: INIT if first load via SYSTEM tablespace
         my $init = ($tsname eq 'SYSTEM');
-        my $tsid = $init ? 1 :
-            $self->{ts_name2tsid}->{$tsname};
+        my $tsid = $self->_get_tsid_by_name($tsname);
+        
+        unless (defined($tsid))
+        {
+            whisper "no tsid!";
+            return undef;
+        }
 
         my %tspace_args = (name      => $tsname,
                            tsid      => $tsid,
@@ -1827,25 +2000,15 @@ sub DictObjectExists
     {
         my $tsname = $args{object_name};
 
-        my $dbh = $self->{dbh};
-
         my $sth = 
-            $dbh->prepare('select tsid, blocksize from _tspace' . 
-                          ' where tsname = \'' . 
-                          $tsname . '\'');    
+            $self->_sql_execute(sql_statement =>
+                                'select tsid, blocksize from _tspace' . 
+                                ' where tsname = \'' . 
+                                $tsname . '\'');    
         
-        unless (defined($sth) && ($sth->execute()))
-        {
-            my $msg = "recursive sql failure";
-            my %earg = (self => $self, msg => $msg,
-                        severity => 'warn');
-                
-            &$GZERR(%earg)
-                if (defined($GZERR));
-            return 0;
-        }
-        
-        my @ggg = $sth->fetchrow_array();
+        my @ggg;
+        @ggg = $sth->fetchrow_array()
+            if (defined($sth));
 
         if (scalar(@ggg))
         {
@@ -1929,7 +2092,20 @@ sub DictTableAllTab
 
         my $objtype = $args{object_type} || "TABLE"; # XXX XXX object type
 
-        my $tablespace_id = $self->{ts_name2tsid}->{$args{tablespace}};
+        my $tablespace_id = $self->_get_tsid_by_name($args{tablespace});
+        unless (defined($tablespace_id))
+        {
+            my $tsname = $args{tablespace};
+            my $msg = "invalid tablespace: $tsname";
+            my %earg = (self => $self, msg => $msg, 
+                        severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
+            return 0 ;
+
+        }
         $self->{dict_tables}->{$tablename}->{tablespace_id} = $tablespace_id;
 
         my $alltables =  $self->_get_table(tname => "_tab1");
@@ -2330,24 +2506,15 @@ sub DictAddFile
 
         if (1) 
         {
-            my $dbh = $self->{dbh};
+            my $s1 = 
+                'select tsid, blocksize from _tspace where tsname = \'' . 
+                $tsname . '\'' ;
 
-            my $sth = 
-                $dbh->prepare('select tsid, blocksize from _tspace where tsname = \'' . 
-                              $tsname . '\'');    
+            my $sth = $self->_sql_execute(sql_statement => $s1);
 
-            unless (defined($sth) && ($sth->execute()))
-            {
-                my $msg = "recursive sql failure";
-                my %earg = (self => $self, msg => $msg,
-                            severity => 'warn');
-                
-                &$GZERR(%earg)
-                    if (defined($GZERR));
-                return 0;
-            }
-
-            my @ggg = $sth->fetchrow_array();
+            my @ggg;
+            @ggg = $sth->fetchrow_array()
+                if (defined($sth));
 
             unless (scalar(@ggg))
             {
@@ -2460,7 +2627,7 @@ sub _DictTSAddFile
     $fileidx++;
 
     my $tsname = $args{tsname};
-    my $tablespace_id = $self->{ts_name2tsid}->{$tsname};
+    my $tablespace_id = $self->_get_tsid_by_name($tsname);
 
     unless (defined($tablespace_id))
     {
@@ -2918,23 +3085,24 @@ sub DictTSpaceCreate
     my $tsname = $args{tablespace};
 
     # insert the tablespace
-    # XXX XXX: check for duplicate names? 
+    my $tsid = $self->_get_tsid_by_name($tsname);
 
-    my $dbh = $self->{dbh};
-    my $sth = $dbh->prepare("select tsid from _tspace");    
-    
-    unless (defined($sth) && ($sth->execute()))
+    if (defined($tsid))
     {
-        my $msg = "recursive sql failure";
+        my $msg = "tablespace $tsname already exists \n" ;
         my %earg = (self => $self, msg => $msg,
-                severity => 'warn');
+                    severity => 'warn');
             
         &$GZERR(%earg)
             if (defined($GZERR));
         return 0;
     }
-    my $tsid = -1;
-    while (1)
+
+    my $sth = $self->_sql_execute(sql_statement =>
+                                  "select tsid from _tspace");    
+    
+    $tsid = -1;
+    while (defined($sth))
     {
         my @ggg = $sth->fetchrow_array();
 
@@ -2945,6 +3113,7 @@ sub DictTSpaceCreate
         # get max tsid
         $tsid = $ggg[0]
             if ($ggg[0] > $tsid);
+# XXX XXX: need maxtsid function!!
     }
     $tsid++;
     unless ($tsid > 0)
@@ -2958,32 +3127,6 @@ sub DictTSpaceCreate
         return 0;
     }
 
-    $sth = $dbh->prepare('select tsid from _tspace where tsname = \'' . 
-                         $tsname . '\'');    
-
-    unless (defined($sth) && ($sth->execute()))
-    {
-        my $msg = "recursive sql failure";
-        my %earg = (self => $self, msg => $msg,
-                severity => 'warn');
-            
-        &$GZERR(%earg)
-            if (defined($GZERR));
-        return 0;
-    }
-
-    my @ggg = $sth->fetchrow_array();
-
-    if (scalar(@ggg))
-    {
-        my $msg = "tablespace $tsname already exists \n" ;
-        my %earg = (self => $self, msg => $msg,
-                    severity => 'warn');
-            
-        &$GZERR(%earg)
-            if (defined($GZERR));
-        return 0;
-    }
 
     my $hashi  = $self->DictTableGetTable (tname => "_tspace") ;
     my $tv = tied(%{$hashi});
@@ -3009,10 +3152,6 @@ sub DictTSpaceCreate
     return undef
         unless $self->_dict_ts_guts($tsname, $tsid, $args{blocksize});
 #    my $alltspace =  $self->_get_table(tname => "_tspace");
-
-    # XXX XXX: update this bogus index
-    $self->{ts_name2tsid}->{$tsname} = $tsid;
-
 
     my $msg = "tablespace $tsname created \n" ;
     my %earg = (self => $self, msg => $msg,
@@ -5314,7 +5453,7 @@ sub _make_cons_ck_check
     # build callback using closure 
 
     $cons_ck_fn{check_insert} = sub {
-        my ($val, $place) = @_;
+        my ($val, $place, $tablename) = @_;
 
 #        greet $cons_name, $i_name;
 
@@ -5330,10 +5469,25 @@ sub _make_cons_ck_check
             return 1;
         }
 
+        # need the tablename to build get_alias_col hash
+        my $get_alias_col = {};
+        unless (defined($tablename))
+        {
+            my $msg = "no tablename!\n";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+               
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
+            return 1;
+        }
+        $get_alias_col->{$tablename} = $val;
+
         # Note: filter returns 1 for success, but callback returns 1
         # for failure
 
-        unless (&$filter($tabdef, $place, $val))
+        unless (&$filter($tabdef, $place, $val, $get_alias_col))
         {
             my $msg = "violated constraint $cons_name\n" .
                 "must satisfy $check_text\n";

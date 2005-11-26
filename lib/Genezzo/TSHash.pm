@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/TSHash.pm,v 7.1 2005/07/19 07:49:03 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/TSHash.pm,v 7.2 2005/11/26 02:11:32 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -170,6 +170,7 @@ sub SQLFetch
 
     while (my ($currkey, $outarr) = each %{$ref})
     {
+        # XXX XXX XXX: need to add get_col_alias?
         # Note: always return the rid
         return ($currkey, $outarr)
             unless (defined($filter) &&
@@ -223,9 +224,11 @@ Genezzo::TSHash - Table Space Hash
 
 various
 
-=head1 #TODO
+=head1 TODO
 
 =over 4
+
+=item SQLFetch: need to handle get_col_alias for filter?
 
 =back
 

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 7.9 2005/09/18 07:49:19 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 7.13 2005/11/26 01:53:04 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -49,11 +49,11 @@ BEGIN {
 	
 }
 
-our $VERSION   = '0.51';
+our $VERSION   = '0.52';
 our $RELSTATUS = 'Alpha'; # release status
 # grab the code check-in date and convert to YYYYMMDD
 our $RELDATE   = 
-    do { my @r = (q$Date: 2005/09/18 07:49:19 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
+    do { my @r = (q$Date: 2005/11/26 01:53:04 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
 
 our $errstr; # DBI errstr
 
@@ -190,9 +190,9 @@ sub _init
     $self->{plan}  = Genezzo::Plan->new(%nargs);    # build a real parser 
     return 0
         unless (defined($self->{plan}));
-    $self->{xeval}  = Genezzo::XEval->new(%nargs,   # build evaluator
-                                          plan => $self->{plan}
-                                          );
+    $self->{xeval} = Genezzo::XEval->new(%nargs,   # build evaluator
+                                         plan => $self->{plan}
+                                         );
     return 0
         unless (defined($self->{xeval}));
 
@@ -499,7 +499,8 @@ sub build_dict_dbh
     $self->{xeval} = $old_self->{xeval};
     $self->{dbh_ctx} = {}; # database handle context
     $self->{dictobj} = $old_self->{dictobj};
-    
+
+    # CLONE the database handle
     my $foo = bless $self, $class;
 
     my $stat = $self->{dictobj}->SetDBH($foo, $self->{init_db});
@@ -591,6 +592,16 @@ sub Kgnz_Explain
 
         print "\n\n";
 
+        unless ($err_status)
+        {
+            ($tc, $err_status) 
+                 = $self->{plan}->QueryRewrite(algebra   => $tc,
+                                               statement => $sqltxt);
+
+             print Data::Dumper->Dump([$tc],['query_rewrite']);
+            
+            print "\n\n";
+        }
     }
 
     return 1;
@@ -1673,11 +1684,13 @@ sub SQLSelectPrepare2
 
     greet $sqltxt;
 
-    my $parse_tree = $self->{plan}->Parse(statement => $sqltxt);
+    my $plan_status = $self->{plan}->Plan(statement => $sqltxt);
 
-    greet $parse_tree;
-
-    unless (defined($parse_tree))
+    if (exists($plan_status->{parse_tree}))
+    {
+        greet $plan_status->{parse_tree};
+    }
+    else
     {
         my $msg  = "Input: " . $sqltxt;
         my %earg = (self => $self, msg => $msg, severity => 'warn');
@@ -1688,13 +1701,19 @@ sub SQLSelectPrepare2
         return undef;
     }
 
-    my $algebra = $self->{plan}->Algebra(parse_tree => $parse_tree);
+    return undef
+        unless (exists($plan_status->{algebra}));
 
-    my ($tc, $err_status) = 
-        $self->{plan}->TypeCheck(algebra   => $algebra,
-                                 statement => $sqltxt);
+    my ($tc, $err_status);
+    $tc = $plan_status->{algebra};
+    $err_status = $plan_status->{error_status};
 
     greet $tc, $err_status;
+
+    return undef
+        if ($err_status);
+
+    ($tc, $err_status)  = $self->{xeval}->Prepare(plan => $tc);
 
     return undef
         if ($err_status);
@@ -1755,6 +1774,7 @@ sub _SQLselprep_Algebra
 
     my $tablename = $from->[0]->[0]->{tc_table_fullname};
     greet "table:",$tablename;
+    my $tablealias = $from->[0]->[0]->{tc_table_fullalias};
 
     foreach my $i (@{$sel_list})
     {
@@ -1805,10 +1825,13 @@ sub _SQLselprep_Algebra
         greet $where;
     }
 
-    return ($self->CommonSelectPrepare(tablename   => $tablename, 
+    return ($self->CommonSelectPrepare(tablename   => $tablename,
+                                       tablealias  => $tablealias,
                                        colpairs    => \@colpairs,
                                        where2      => $where,
-                                       select_list => $sel_list
+                                       select_list => $sel_list,
+                                       alg_plan    => $sql_cmd,
+                                       alg_from    => $from
                                        )
             );
 }
@@ -1820,11 +1843,13 @@ sub SQLCreate
     my $dictobj = $self->{dictobj};
     my $sqltxt = $self->{current_line};
 
-    my $parse_tree = $self->{plan}->Parse(statement => $sqltxt);
+    my $plan_status = $self->{plan}->Plan(statement => $sqltxt);
 
-    greet $parse_tree;
-
-    unless (defined($parse_tree))
+    if (exists($plan_status->{parse_tree}))
+    {
+        greet $plan_status->{parse_tree};
+    }
+    else
     {
         my $msg  = "Input: " . $sqltxt;
         my %earg = (self => $self, msg => $msg, severity => 'warn');
@@ -1835,13 +1860,19 @@ sub SQLCreate
         return undef;
     }
 
-    my $algebra = $self->{plan}->Algebra(parse_tree => $parse_tree);
+    return undef
+        unless (exists($plan_status->{algebra}));
 
-    my ($tc, $err_status) = 
-        $self->{plan}->TypeCheck(algebra   => $algebra,
-                                 statement => $sqltxt);
+    my ($tc, $err_status);
+    $tc = $plan_status->{algebra};
+    $err_status = $plan_status->{error_status};
 
     greet "SQLCREATE:", $tc, $err_status;
+
+    return undef
+        if ($err_status);
+
+    ($tc, $err_status)  = $self->{xeval}->Prepare(plan => $tc);
 
     return undef
         if ($err_status);
@@ -1985,11 +2016,13 @@ sub SQLAlter
     my $dictobj = $self->{dictobj};
     my $sqltxt = $self->{current_line};
 
-    my $parse_tree = $self->{plan}->Parse(statement => $sqltxt);
+    my $plan_status = $self->{plan}->Plan(statement => $sqltxt);
 
-    greet $parse_tree;
-
-    unless (defined($parse_tree))
+    if (exists($plan_status->{parse_tree}))
+    {
+        greet $plan_status->{parse_tree};
+    }
+    else
     {
         my $msg  = "Input: " . $sqltxt;
         my %earg = (self => $self, msg => $msg, severity => 'warn');
@@ -2000,13 +2033,19 @@ sub SQLAlter
         return undef;
     }
 
-    my $algebra = $self->{plan}->Algebra(parse_tree => $parse_tree);
+    return undef
+        unless (exists($plan_status->{algebra}));
 
-    my ($tc, $err_status) = 
-        $self->{plan}->TypeCheck(algebra   => $algebra,
-                                 statement => $sqltxt);
+    my ($tc, $err_status);
+    $tc = $plan_status->{algebra};
+    $err_status = $plan_status->{error_status};
 
     greet $tc, $err_status;
+
+    return undef
+        if ($err_status);
+
+    ($tc, $err_status)  = $self->{xeval}->Prepare(plan => $tc);
 
     return undef
         if ($err_status);
@@ -2033,14 +2072,16 @@ sub SQLUpdate
 
     my ($rownum, $rowcount) = (0, 0);
 
-    my $parse_tree = $self->{plan}->Parse(statement => $sqltxt);
+    my $plan_status = $self->{plan}->Plan(statement => $sqltxt);
 
-    greet $parse_tree;
-
-    unless (defined($parse_tree))
+    if (exists($plan_status->{parse_tree}))
     {
-        $msg  = "Input: " . $sqltxt;
-        %earg = (self => $self, msg => $msg, severity => 'warn');
+        greet $plan_status->{parse_tree};
+    }
+    else
+    {
+        my $msg  = "Input: " . $sqltxt;
+        my %earg = (self => $self, msg => $msg, severity => 'warn');
 
         &$GZERR(%earg)
             if (defined($GZERR));
@@ -2048,13 +2089,19 @@ sub SQLUpdate
         return undef;
     }
 
-    my $algebra = $self->{plan}->Algebra(parse_tree => $parse_tree);
+    return undef
+        unless (exists($plan_status->{algebra}));
 
-    my ($tc, $err_status) = 
-        $self->{plan}->TypeCheck(algebra   => $algebra,
-                                 statement => $sqltxt);
+    my ($tc, $err_status);
+    $tc = $plan_status->{algebra};
+    $err_status = $plan_status->{error_status};
 
     greet $tc, $err_status;
+
+    return undef
+        if ($err_status);
+
+    ($tc, $err_status)  = $self->{xeval}->Prepare(plan => $tc);
 
     return undef
         if ($err_status);
@@ -2196,11 +2243,13 @@ sub SQLInsert
 
     my (@got_vals, @sel_prep_info);
 
-    my $parse_tree = $self->{plan}->Parse(statement => $sqltxt);
+    my $plan_status = $self->{plan}->Plan(statement => $sqltxt);
 
-    greet $parse_tree;
-
-    unless (defined($parse_tree))
+    if (exists($plan_status->{parse_tree}))
+    {
+        greet $plan_status->{parse_tree};
+    }
+    else
     {
         my $msg  = "Input: " . $sqltxt;
         my %earg = (self => $self, msg => $msg, severity => 'warn');
@@ -2211,16 +2260,23 @@ sub SQLInsert
         return undef;
     }
 
-    my $algebra = $self->{plan}->Algebra(parse_tree => $parse_tree);
+    return undef
+        unless (exists($plan_status->{algebra}));
 
-    my ($tc, $err_status) = 
-        $self->{plan}->TypeCheck(algebra   => $algebra,
-                                 statement => $sqltxt);
+    my ($tc, $err_status);
+    $tc = $plan_status->{algebra};
+    $err_status = $plan_status->{error_status};
 
     greet $tc, $err_status;
 
     return undef
         if ($err_status);
+
+    ($tc, $err_status)  = $self->{xeval}->Prepare(plan => $tc);
+
+    return undef
+        if ($err_status);
+
 
     my @iii =  ($self->{xeval}->SQLInsert(plan    => $tc,
                                           dbh_ctx => $self->{dbh_ctx}
@@ -2390,11 +2446,13 @@ sub SQLDelete
 
     my $sqltxt = $self->{current_line};
 
-    my $parse_tree = $self->{plan}->Parse(statement => $sqltxt);
+    my $plan_status = $self->{plan}->Plan(statement => $sqltxt);
 
-    greet $parse_tree;
-
-    unless (defined($parse_tree))
+    if (exists($plan_status->{parse_tree}))
+    {
+        greet $plan_status->{parse_tree};
+    }
+    else
     {
         my $msg  = "Input: " . $sqltxt;
         my %earg = (self => $self, msg => $msg, severity => 'warn');
@@ -2405,13 +2463,19 @@ sub SQLDelete
         return undef;
     }
 
-    my $algebra = $self->{plan}->Algebra(parse_tree => $parse_tree);
+    return undef
+        unless (exists($plan_status->{algebra}));
 
-    my ($tc, $err_status) = 
-        $self->{plan}->TypeCheck(algebra   => $algebra,
-                                 statement => $sqltxt);
+    my ($tc, $err_status);
+    $tc = $plan_status->{algebra};
+    $err_status = $plan_status->{error_status};
 
     greet $tc, $err_status;
+
+    return undef
+        if ($err_status);
+
+    ($tc, $err_status)  = $self->{xeval}->Prepare(plan => $tc);
 
     return undef
         if ($err_status);
@@ -2938,6 +3002,18 @@ sub CommonSelectPrepare
         {
             $prep_th->{select_list} = $args{select_list};
         }
+        if (defined($args{alg_plan}))
+        {
+            $prep_th->{alg_plan} = $args{alg_plan};
+        }
+        if (defined($args{tablealias}))
+        {
+            $prep_th->{tablealias} = $args{tablealias};
+        }
+        if (defined($args{alg_from}))
+        {
+            $prep_th->{alg_from} = $args{alg_from};
+        }
 
         push @outi, $prep_th;
         push @outi, "SELECT";
@@ -2976,21 +3052,108 @@ sub SelectExecute
     # XXX XXX: ok to sqlexecute even for hcount, ecount
     {
         use Genezzo::Row::RSExpr;
+        use Genezzo::Row::RSJoinA;
+
+        my $use_joina = 0;
 
         my $tv = tied(%{$hashi});
+        my $tv_list = [];
+        my $alias_list = [];
+
+        if (exists($prep_th->{alg_plan}))
+        {
+#            my %nargs = (algebra => $prep_th->{alg_plan});
+#            my ($tc, $from, $sel_list, $where) = 
+#                $self->{plan}->GetFromWhereEtc(%nargs);
+            my $from = $prep_th->{alg_from};
+
+            # for join, build list of all tables
+            if (defined($from) && (scalar(@{$from}) > 1))
+            {
+                $use_joina = 1;
+
+                for my $f_elt (@{$from})
+                {
+                    my $too_complex = (scalar(@{$f_elt}) > 1);
+
+                    unless ($too_complex)
+                    {
+                        $too_complex =
+                            (!(exists($f_elt->[0]->{tc_table_fullname})))
+                    }
+
+                    if ($too_complex)
+                    {
+                        my $msg = "FROM clause too complex - could not prepare";
+                        my %earg = (self => $self, msg => $msg, 
+                                    severity => 'warn');
+                        
+                        &$GZERR(%earg)
+                            if (defined($GZERR));
+
+                        return @outi;
+                    }
+
+                    $tablename = $f_elt->[0]->{tc_table_fullname};
+                    $hashi = 
+                        $dictobj->DictTableGetTable (tname   => $tablename,
+                                                     dbh_ctx => $self->{dbh_ctx}) ;
+
+                    unless (defined($hashi))
+                    {
+                        my $msg = "table lookup failed: $tablename";
+                        my %earg = (self => $self, msg => $msg, 
+                                    severity => 'warn');
+                        
+                        &$GZERR(%earg)
+                            if (defined($GZERR));
+
+                        return @outi;
+                    }
+
+                    $tv = tied(%{$hashi});
+
+                    push @{$tv_list}, $tv;
+                    push @{$alias_list}, $f_elt->[0]->{tc_table_fullalias};
+                } # end for f_elt
+            } # from > 1
+        } # if alg_plan
+
+
 
         my %nargs = (
-                     GZERR     => $self->{GZERR},
-                     rs        => $tv
+                     GZERR     => $self->{GZERR}
                      );
+
+        if (!$use_joina)
+        {
+            $nargs{rs} = $tv;
+            if (exists($prep_th->{tablealias}))
+            {
+                $nargs{alias} = $prep_th->{tablealias};
+            }
+        }
+        else
+        {
+            $nargs{rs_list}    = $tv_list;
+            $nargs{alias_list} = $alias_list;
+        }
 
         if (exists($prep_th->{select_list}))
         {
             $nargs{select_list} = $prep_th->{select_list};
         }
 
-        my %rsx_h;
-        my $rsx_tv = tie %rsx_h, 'Genezzo::Row::RSExpr', %nargs;
+        my ($rsx_tv, %rsx_h);
+
+        if (!$use_joina)
+        {
+            $rsx_tv = tie %rsx_h, 'Genezzo::Row::RSExpr', %nargs;
+        }
+        else
+        {
+            $rsx_tv = tie %rsx_h, 'Genezzo::Row::RSJoinA', %nargs;
+        }
 
         my %prep;
         $prep{filter} = $filter    # fix for hcount/ecount
@@ -3003,6 +3166,7 @@ sub SelectExecute
         }
         else
         {
+            # XXX: obsolete?
             $sth = $tv->SQLPrepare(%prep);
         }
 

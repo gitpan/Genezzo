@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSTab.pm,v 7.2 2005/08/08 03:04:57 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSTab.pm,v 7.3 2005/11/26 02:08:07 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -533,7 +533,7 @@ sub HPush
 
     # CONSTRAINT - "check constraints" first
 
-    if ($self->check_insert($value))
+    if ($self->check_insert($value, undef, $self->{tablename}))
     {
         # Note: $place is undefined, because we haven't pushed
         # yet.  But might need it for check constraints that
@@ -751,7 +751,7 @@ sub STORE
     }
 
     # CONSTRAINT - do "check constraints" before update
-    if ($self->check_insert($value, $place))
+    if ($self->check_insert($value, $place, $self->{tablename}))
     {
         # Check constraint FAILED
         return undef;
@@ -1319,6 +1319,7 @@ sub SQLPrepare # get a DBI-style statement handle
     my $self = shift;
     my %args = @_;
     $args{pushhash} = $self;
+    $args{tablename} = $self->{tablename};
 
     if ((exists($self->{GZERR}))
         && (defined($self->{GZERR})))
@@ -1344,6 +1345,11 @@ sub _init
     return 0
         unless (defined($args{pushhash}));
     $self->{pushhash} = $args{pushhash};
+    $self->{tablename} = $args{tablename};
+    if (defined($args{alias}))
+    {
+        $self->{tablename} = $args{alias};
+    }
 
     if (defined($args{filter}))
     {
@@ -1468,6 +1474,8 @@ sub SQLFetch
         }
 
         my $outarr  = $self->FETCH($currkey);
+        my $tablename = $self->{tablename};
+        my $get_col_alias = {$tablename => $outarr};
 
         # save the value of the key because we pre-advance to the next one
         $self->{SQLFetchKey} = $self->NEXTKEY($currkey)
@@ -1481,7 +1489,7 @@ sub SQLFetch
         my $val;
 
         # be very paranoid - filter might be invalid perl
-        eval {$val = &$filter($self, $currkey, $outarr) };
+        eval {$val = &$filter($self, $currkey, $outarr, $get_col_alias) };
         if ($@)
         {
             whisper "filter blew up: $@";

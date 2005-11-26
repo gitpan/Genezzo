@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Plan/RCS/TypeCheck.pm,v 7.4 2005/09/15 08:51:44 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Plan/RCS/TypeCheck.pm,v 7.8 2005/11/24 08:56:04 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -17,7 +17,7 @@ use Carp;
 our $VERSION;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 7.4 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.8 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -454,17 +454,47 @@ sub _get_table_info # private
                 
         } # end if new tablespace name
 
-        if (exists($genTree->{table_alias}) &&
-            (scalar(@{$genTree->{table_alias}})))
+        if (exists($genTree->{table_alias}))
         {
-            # don't build an alias unless we really have one
-            my @full_name = _process_name_pieces(@{$genTree->{table_alias}});
+            if (scalar(@{$genTree->{table_alias}}))
+            {
+                # don't build an alias unless we really have one
+                my @full_name = 
+                    _process_name_pieces(@{$genTree->{table_alias}});
 
-            # build a "dot" separated string
-            my $full_name_str = join('.', @full_name);
+                # build a "dot" separated string
+                my $full_name_str = join('.', @full_name);
 
-            $genTree->{tc_table_fullalias} = $full_name_str;
-        }
+                $genTree->{tc_table_fullalias} = $full_name_str;
+            }
+            # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
+            # detect FROM clause subquery -- need to build
+            # tc_table_colhsh, tc_table_colarr later
+            # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
+            unless (exists($genTree->{table_name}))
+            {
+                # uniquely number each table reference
+                # Note: use for join order to select STAR expansion
+                $genTree->{tc_table_position} = $treeCtx->{tpos};
+                
+                if (exists($genTree->{tc_table_fullalias}))
+                {
+                    $genTree->{tc_FROM_SUBQ} = { alias => "USER_ALIAS" };
+                }
+                else
+                {
+                    # build a unique alias
+                    # XXX XXX: need a better unique function
+                    $genTree->{tc_table_fullalias} = 
+                        "_SYS_ALIAS_" . $treeCtx->{tpos};
+                    $genTree->{tc_FROM_SUBQ} = { alias => "SYSTEM_ALIAS" };
+                }
+                $genTree->{tc_FROM_SUBQ}->{subq_schema} = "UNKNOWN" ;
+                $treeCtx->{tpos}++;
+                # setup the "table fullname" for check table...
+                $genTree->{tc_table_fullname} = $genTree->{tc_table_fullalias};
+            } # end if FROM subq
+        } # end if table alias
 
         while ( my ($kk, $vv) = each ( %{$genTree})) # big while
         {
@@ -666,7 +696,8 @@ sub ColumnCheck
 
     $tc3->{AndPurity} = 1; # false if find OR's
 
-    $algebra = $self->_sql_where($algebra, $args{dict}, $tc_sth);
+# XXX XXX: moved this to XEVal::Prepare
+#    $algebra = $self->_sql_where($algebra, $args{dict}, $tc_sth);
 
     if (0) # XXX XXX XXX XXX
     {
@@ -715,6 +746,116 @@ sub ColumnCheck
     return $algebra;
 }
 
+sub _FROM_subq_star_fixup
+{
+#    whoami;
+
+    # NOTE: get the current subroutine name so it is easier 
+    # to call recursively
+    my $subname = (caller(0))[3];
+
+    my $self = shift;
+    # generic tree of hashes/arrays
+    my ($genTree, $dict, $tc_sth) = @_;
+
+    my $treeCtx = $tc_sth->{tc3};
+
+    return 
+        unless (exists($genTree->{tc_FROM_SUBQ})
+                && exists($genTree->{tc_FROM_SUBQ}->{subq_schema})
+                && ($genTree->{tc_FROM_SUBQ}->{subq_schema} eq 'UNKNOWN'));
+
+    return
+        if (exists($genTree->{tc_table_colarr})
+            && scalar($genTree->{tc_table_colarr}));
+
+    if (exists($genTree->{sql_query})
+        && exists($genTree->{sql_query}->{operands})
+        && scalar($genTree->{sql_query}->{operands}))
+    {
+        # select list of 1st sql query takes precedence for set operations...
+        my $first_op = $genTree->{sql_query}->{operands}->[0];
+
+        while (!exists($first_op->{sql_select})
+               && exists($first_op->{operands})
+               && scalar(@{$first_op->{operands}}))
+        {
+            # XXX XXX: this needs to be recursive for nested set operations!!
+            $first_op = $first_op->{operands}->[0];
+        }
+
+        if (exists($first_op->{sql_select})
+            && exists($first_op->{sql_select}->{select_list})
+            && scalar(@{$first_op->{sql_select}->{select_list}}))
+        {
+            my $sel_list1 = $first_op->{sql_select}->{select_list};
+                        
+            $genTree->{tc_table_colarr} = [];
+            $genTree->{tc_table_colhsh} = {};
+
+            my $sel_index = 0;
+            for my $sel_item (@{$sel_list1})
+            {
+                $sel_index++;
+#                            greet $sel_item;
+
+                # XXX XXX: is there some way to streamline handling of
+                # literals here?
+
+                my ($hnam, $htyp);
+                if (scalar(@{$sel_item->{col_alias}}))
+                {
+                    # XXX XXX: eliminate this duplicate code
+                    my @full_name = 
+                        _process_name_pieces(
+                                             @{$sel_item->{col_alias}});
+                    $hnam = join('.',@full_name);
+#                                greet 1, $hnam;
+                }
+                else
+                {
+                    my $col_hd;
+                    if (exists($sel_item->{p1}))
+                    {
+                        $col_hd = substr($treeCtx->{statement},
+                                         $sel_item->{p1},
+                                         ($sel_item->{p2} - $sel_item->{p1}) + 1
+                                         );
+                        $col_hd =~ s/^\s*//; # trim leading spaces
+#                                    greet 2, $col_hd;
+                    }
+                    else
+                    {
+                        # XXX XXX: generated col for STAR - fake it
+                            
+                        # XXX XXX: assume have a column name
+                        my $npa = $sel_item->{value_expression}->{column_name};
+                            
+                        my @col_name =  _process_name_pieces(@{$npa});
+
+                        $col_hd = join(".", @col_name);
+#                                    greet 3, $col_hd;
+                    }
+                    $hnam = $col_hd;
+                                
+
+                } # end no alias
+                $htyp = $sel_item->{value_expression}->{tc_expr_type};
+
+                my $h1 = { colname => $hnam,
+                           coltype => $htyp };
+                push @{$genTree->{tc_table_colarr}}, $h1;
+
+                # XXX XXX: need duplicate col name check
+                # or type mismatch here!!
+                $genTree->{tc_table_colhsh}->{$hnam} =
+                    [$sel_index, $htyp];
+            } # end for
+        }
+    }
+    $genTree->{tc_FROM_SUBQ}->{subq_schema} = 'OK';
+
+}
 # expand STAR select lists...
 #
 #
@@ -791,6 +932,9 @@ sub _get_star_cols
             unshift @{$treeCtx->{qb_list}}, $current_qb;
         }
 
+        # fixup star select lists for FROM subqueries
+        $self->_FROM_subq_star_fixup($genTree, $dict, $tc_sth);
+
         if (exists($genTree->{select_list}))
         {
             # if the select list is STAR (not an array)
@@ -821,6 +965,8 @@ sub _get_star_cols
                     # convert to array of value expressions 
                     for my $colcnt (0..(scalar(@{$col_list})-1))
                     {
+                        my $old_colname = $col_list->[$colcnt];
+
                         # quote the strings to preserve case
                         my $cv = 
                         {quoted_string => '"' . $col_list->[$colcnt] . '"'};
@@ -841,13 +987,22 @@ sub _get_star_cols
                         push @{$foo}, $cv;
 
                         # build the value expression
-                        $col_list->[$colcnt] 
-                            = {
-                                col_alias => [],
-                                value_expression => {
-                                    column_name => $foo
+                        my $nx = {
+                            col_alias => [],
+                            value_expression => {
+                                column_name => $foo
                                 }
-                            };
+                        };
+                        $col_list->[$colcnt] = $nx;
+
+                        # FROM SUBQUERY type fixup...
+                        if (exists($hvv->{tc_table_colhsh})
+                            && exists($hvv->{tc_table_colhsh}->{$old_colname}))
+                        {
+                            $nx->{value_expression}->{tc_expr_type} = 
+                                $hvv->{tc_table_colhsh}->{$old_colname}->[1];
+
+                        }
                     }
                     # store tables in tpos order
                     $tab_cols[$tpos] = $col_list;
@@ -1505,466 +1660,6 @@ sub _fixup_comp_op
     return $genTree;
 }
 
-# sqlwhere
-#
-sub _sql_where
-{
-#    whoami;
-
-    # NOTE: get the current subroutine name so it is easier 
-    # to call recursively
-    my $subname = (caller(0))[3];
-
-    my $self = shift;
-    # generic tree of hashes/arrays
-    my ($genTree, $dict, $tc_sth) = @_;
-
-    my $treeCtx = $tc_sth->{tc3};
-
-    # recursively convert all elements of array
-    if (ref($genTree) eq 'ARRAY')
-    {
-        my $maxi = scalar(@{$genTree});
-        $maxi--;
-        for my $i (0..$maxi)
-        {
-            $genTree->[$i] = $self->$subname($genTree->[$i], $dict, $tc_sth);
-        }
-
-    }
-    if (ref($genTree) eq 'HASH')
-    {
-        keys( %{$genTree} ); # XXX XXX: need to reset expression!!
-
-        # convert subtree first, then process local select list
-        {
-            my $qb_setup = 0; # TRUE if top hash of query block
-            
-            if (exists($genTree->{query_block})) 
-            {
-                $qb_setup = 1;
-                
-                # keep track of current query block number
-                my $current_qb = $genTree->{query_block};
-
-                # push on the front
-                unshift @{$treeCtx->{qb_list}}, $current_qb;
-            }
-            
-            while ( my ($kk, $vv) = each ( %{$genTree})) # big while
-            {
-                # convert subtree first...
-                $genTree->{$kk} = $self->$subname($vv, $dict, $tc_sth);
-            }
-
-            if ($qb_setup)
-            {
-                # pop from the front
-                shift @{$treeCtx->{qb_list}};
-            }
-
-        }
-
-        # recursively convert all elements of hash
-
-        my $qb_setup = 0; # TRUE if top hash of query block
-
-        if (exists($genTree->{query_block})) 
-        {
-            $qb_setup = 1;
-
-            # keep track of current query block number
-            my $current_qb = $genTree->{query_block};
-
-            # push on the front
-            unshift @{$treeCtx->{qb_list}}, $current_qb;
-        }
-
-        if (exists($genTree->{tc_column_name}))
-        {
-            if (exists($genTree->{tc_column_num}))
-            {
-                $genTree->{vx} = 
-                    '$outarr->[' . ($genTree->{tc_column_num} - 1) .
-                    ']';
-            }
-            else
-            {
-                if ($genTree->{tc_column_name} =~ m/^rid$/i)
-                {
-#                    $genTree->{vx} = '$tc_rid';
-                    $genTree->{vx} = '$rid';
-                }
-                if ($genTree->{tc_column_name} =~ m/^rownum$/i)
-                {
-                    $genTree->{vx} = '$tc_rownum';
-                }
-            }
-        }
-
-        if (exists($genTree->{numeric_literal}))
-        {
-            $genTree->{vx} = $genTree->{numeric_literal};
-        }
-
-        if (exists($genTree->{tfn_literal}))
-        {
-            $genTree->{vx} = $genTree->{tfn_literal};
-        }
-
-        if (exists($genTree->{string_literal}))
-        {
-            $genTree->{vx} = $genTree->{string_literal};
-        }
-
-        if (exists($genTree->{comp_op}))
-        {
-            my $bigstr = '( ';
-            for my $op1 (@{$genTree->{operands}})
-            {
-                if (ref($op1) eq 'HASH')
-                {
-                    if (exists($op1->{vx}))
-                    {
-                        $bigstr .= $op1->{vx} . ' ';
-                    }
-                    if (exists($op1->{tc_comp_op}))
-                    {
-                        $bigstr .= $op1->{tc_comp_op} . ' ';
-                    }
-                }
-            }
-            $bigstr .= ')';
-            $genTree->{vx} = $bigstr;
-
-            # build an index key if have an expression like:
-            # column_name comp_op literal
-            #
-            if (3 == scalar(@{$genTree->{operands}}))
-            {
-                my $oplist = $genTree->{operands};
-                my ($colnum, $comp_op, $literal);
-                
-                if (ref($oplist->[0]) eq 'HASH')
-                {
-                    $colnum = ($oplist->[0]->{tc_column_num}) - 1
-                        if (exists($oplist->[0]->{tc_column_num}));
-                }
-                if (ref($oplist->[1]) eq 'HASH')
-                {
-                    my $tok_expr = '(eq|==|<|>|lt|gt|le|ge|<=|>=)';
-
-                    $comp_op = $oplist->[1]->{tc_comp_op}
-                        if (exists($oplist->[1]->{tc_comp_op})
-                            && ($oplist->[1]->{tc_comp_op} =~
-                                m/^$tok_expr$/
-                                )
-                            );
-                }
-                if (ref($oplist->[2]) eq 'HASH')
-                {
-                    if (exists($oplist->[2]->{string_literal}))
-                    {
-                        $literal = $oplist->[2]->{string_literal};
-                    }
-                    elsif (exists($oplist->[2]->{numeric_literal}))
-                    {
-                        $literal = $oplist->[2]->{numeric_literal};
-                    }
-                }
-
-                if (defined($colnum)  && 
-                    defined($comp_op) && 
-                    defined($literal))
-                {
-                    # XXX XXX: change to better format
-                    $genTree->{tc_index_key} =
-                        [
-                         { col     => $colnum  },
-                         { op      => $comp_op },
-                         { literal => $literal }
-                         ];
-                }
-                
-            } # end build index key
-        }
-
-        if (exists($genTree->{IS}))
-        {
-            my $bigstr = '';
-
-            # XXX XXX XXX: not an array!
-            my $op1 = $genTree->{operands};
-            {
-                if (exists($op1->{vx}))
-                {
-                    $bigstr .= $op1->{vx} . ' ';
-                }
-            }
-
-            my $tfn1 = $genTree->{IS}->[0]->{TFN}->{tfn_literal};
-            my $not1 = scalar(@{$genTree->{IS}->[0]->{not}});
-
-            my $s2;
-            if (!(defined($tfn1)))
-            {
-                # not null = is defined
-                $s2 = '(';
-                $s2 .= '!' if (!$not1);
-                $s2 .= 'defined(' . $bigstr . '))';
-
-                # NOTE: Reset AndPurity if have "IS NULL" predicate
-                # because can't do index search on null values.
-                $treeCtx->{AndPurity} = 0
-                    unless ($not1);
-
-            }
-            else
-            {
-                # not true = is false
-                $s2 = '(('.$bigstr .') == ';
-                my $tf_val = ($not1) ? 1 : 0;
-                if ($tfn1) # true
-                {
-                    $tf_val = ($not1) ? 0 : 1;
-                }
-                $s2 .= $tf_val . ')';
-            }
-            $genTree->{vx} = $s2;
-            
-        }
-
-        if (exists($genTree->{math_op}))
-        {
-
-            # fixup the perl operators like 'comp_perlish'
-            if (($genTree->{math_op} eq 'perlish_substitution')
-                && (3 == scalar(@{$genTree->{operands}})))
-            {
-
-                my $op2 =
-                    $genTree->{operands}->[2];
-
-                # XXX XXX: op2 should be an array of 
-                # perl regex pieces -- reassemble it.  
-                # may need to do some work for non-standard
-                # quoting
-                
-#                my $perl_lit = join("", @{$op2});
-                my $perl_lit = "";
-                for my $toknum (0..(scalar(@{$op2})-1))
-                {
-
-                    # need to skip duplicate quote, e.g.
-                    # s/foo/bar/g becomes
-                    # ['s', '/', 'foo', '/', '/', 'bar', '/', 'g']
-                    # Note the duplicate quotes in position 3,4
-
-                    next if ($toknum == 3);
-                    $perl_lit .= $op2->[$toknum];
-                }
-
-                $genTree->{operands}->[2] = {
-                    string_literal => $perl_lit,
-                    # Note: fill in all the string literal info
-                    vx             => $perl_lit,
-                    tc_expr_type   => 'c',
-                    orig_reg_exp => $op2
-                    };
-
-                if ($op2->[0] !~ /^s$/)
-                {
-                    my $msg = "illegal expression ($perl_lit)\n" .
-                        "only substitution (s//) regexps are " .
-                        "allowed in SELECT list"; 
-                    
-                    my %earg = (self => $self, msg => $msg,
-                                severity => 'warn');
-                
-                    &$GZERR(%earg)
-                        if (defined($GZERR));
-                    
-                    return undef; 
-                }
-
-            }
-
-            my $bigstr = '( ';
-            for my $op1 (@{$genTree->{operands}})
-            {
-                if (ref($op1))
-                {
-                    if (exists($op1->{vx}))
-                    {
-                        $bigstr .= $op1->{vx} . ' ';
-                    }
-                }
-                else
-                {
-                    # XXX XXX: concatenation
-                    if ($op1 eq '||')
-                    { $op1 = '.'; }
-
-                    $bigstr .= $op1 . ' ';
-                }
-            }
-            $bigstr .= ')';
-            $genTree->{vx} = $bigstr;
-        }
-
-        if (exists($genTree->{bool_op}))
-        {
-            my $bigstr = '( ';
-
-            if ($genTree->{bool_op} =~ m/NOT/i)
-            {
-                # treat NOT a little special, since it's a prefix
-                # operator, not an infix op like AND/OR.  Should only
-                # have one operand.
-                $bigstr .= '!( ';
-            }
-
-            my $op_cnt = 0;
-            for my $op1 (@{$genTree->{operands}})
-            {
-                if (ref($op1) eq 'HASH')
-                {
-                    if (exists($op1->{vx}))
-                    {
-                        if (defined($op1->{vx}))
-                        {
-                            $bigstr .= ' ' . $op1->{vx} ;
-                        }
-                        else
-                        {
-                            # handle NULL/UNDEF
-                            $bigstr .= ' undef';
-                        }
-                    }
-                }
-                elsif (ref($op1) eq 'ARRAY')
-                {
-                    if ($op1->[0] =~ m/^or$/i)
-                    {
-                        # found an OR
-                        $treeCtx->{AndPurity} = 0;
-
-                        $bigstr .= '|| ';
-                    }
-                    elsif ($op1->[0] =~ m/^and$/i)
-                    {
-                        $bigstr .= '&& ';
-                    }
-                    else
-                    {
-                        $bigstr .= $op1->[0] . ' ';
-                    }
-
-                }
-                else
-                {
-                    $bigstr .= $op1 . ' ';
-                }
-
-                $op_cnt++;
-            }
-            if ($genTree->{bool_op} =~ m/NOT/i)
-            {
-                # terminate the NOT expression
-                $bigstr .= ')';
-            }
-
-            $bigstr .= ')';
-            $genTree->{vx} = $bigstr;
-        }
-
-        if (exists($genTree->{function_name}))
-        {
-            my $foundIt = 0;
-            my $fn_name = 'Genezzo::GenDBI::'. $genTree->{function_name};
-
-            # look in GenDBI namespace first, then system
-            for my $numtries (1..2)
-            {
-                # check if function exists
-                if (defined(&$fn_name))
-                {
-                    $foundIt = 1;
-                    last;
-                } 
-                last
-                    if ($numtries > 1);
-                $fn_name = $genTree->{function_name};
-                # XXX XXX XXX XXX: how to do check for MAIN functions?
-                $foundIt = 1;
-                last; # XXX XXX XXX XXX: how to do check for MAIN functions?
-                # XXX XXX XXX also min, max, count, in, any, etc
-            }
-
-            unless ($foundIt)
-            {
-                my $msg = "function \'$fn_name\' not found\n";
-                
-                my %earg = (self => $self, msg => $msg,
-                            severity => 'warn');
-                
-                &$GZERR(%earg)
-                    if (defined($GZERR));
-                
-#                       return undef; # XXX XXX XXX XXX
-            }
-
-
-            my $bigstr  = ' ' . $fn_name . '( ';
-            
-            # 
-
-            if (exists($genTree->{operands})
-                && (ref($genTree->{operands}) eq 'ARRAY')
-                && scalar(@{$genTree->{operands}}))
-            {
-                # XXX XXX: deal with ALL/DISTINCT/SUBQUERIES
-
-                my $fn_ops = $genTree->{operands}->[0];
-
-                # XXX XXX: what about COUNT(*), ECOUNT?
-                if (exists($fn_ops->{operands})
-                    && (ref($fn_ops->{operands}) eq 'ARRAY'))
-                {
-                    my $cnt_ff = 0;
-                    for my $op1 (@{$fn_ops->{operands}})
-                    {
-                        if (exists($op1->{vx}))
-                        {
-                            $bigstr .= ',' if ($cnt_ff);
-                            if (defined($op1->{vx}))
-                            {
-                                $bigstr .= ' ' . $op1->{vx} ;
-                            }
-                            else
-                            {
-                                # handle NULL/UNDEF
-                                $bigstr .= ' undef';
-                            }
-                        }
-                        $cnt_ff++;
-                    }
-                }
-            }
-            $bigstr .= ')';
-            $genTree->{vx} = $bigstr;
-        } # end function name
-
-
-        if ($qb_setup)
-        {
-            # pop from the front
-            shift @{$treeCtx->{qb_list}};
-        }
-
-    }
-    return $genTree;
-}
 
 
 sub GetFromWhereEtc
@@ -2007,10 +1702,12 @@ sub GetFromWhereEtc
     }
 
     $tc4->{qb_list} = []; # build an arr starting with current query block num
+
+    greet $tc4;
+
     $tc4->{index_keys} = []             # only build index keys 
         if ($tc_sth->{tc3}->{AndPurity}); # if pure AND search condition
 
-    greet $tc4;
 
     $algebra = $self->_get_from_where($algebra, $args{dict}, $tc_sth);
 
@@ -2189,7 +1886,7 @@ base table.
 
 =item update pod
 
-=item need to handle FROM clause subqueries -- some tricky column type issues.
+=item need to handle FROM clause subqueries -- some tricky column type issues.  check for duplicate aliases/type mismatch in _FROM_subq_star_fixup ?
 
 =item check bool_op - AND purity if no OR's.
 
@@ -2201,8 +1898,6 @@ base table.
       for these functions.
 
 =item refactor to common TreeWalker 
-
-=item _process_name_pieces: quoted string/case-insensitivity 
 
 =item handle all pseudo cols
 
