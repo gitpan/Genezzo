@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/gendba.pl,v 7.2 2005/08/25 09:13:27 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/gendba.pl,v 7.3 2005/11/28 04:33:26 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -87,16 +87,16 @@ table data with updates and queries.
 =head2 Commands
 
 Genezzo supports some very basic SQL create/drop/alter/describe table,
-select, insert, update and delete syntax, but unlike standard SQL,
-table and column names are case-sensitive.  More complex SQL, such as
-joins, parses, but is ignored.  The only supported functions are
-count(*) and ecount(*), a non-blocking count estimation function.  The
-database also supports commit to force changes to disk, but no
-rollback.  NOTE: Data definition (such as create table or ct) must be
-manually committed to keep the database in a consistent state.
-Uncommitted inserts and updates will only be block-consistent -- there
-is no guarantee that the data will get flushed to disk, and no
-guarantee whether the changes will or will not take effect.
+select, insert, update and delete syntax, and like standard SQL, table
+and column names are case-insensitive unless quoted.  More complex SQL
+parses, but is ignored.  The only supported functions are count(*) and
+ecount(*), a non-blocking count estimation function.  The database
+also supports commit to force changes to disk, but no rollback.
+NOTE: Data definition (such as create table or ct) must be manually
+committed to keep the database in a consistent state.  Uncommitted
+inserts and updates will only be block-consistent -- there is no
+guarantee that the data will get flushed to disk, and no guarantee
+whether the changes will or will not take effect.
 
     rem  Some simple SELECTs
     select * from _col1;
@@ -107,19 +107,25 @@ guarantee whether the changes will or will not take effect.
     rem  SELECTs with WHERE, perl and SQL style.
     select * from _tab1 where tname =~ m/col/;
     select * from _tab1 where tid < 5;
-    select * from _tab1 where (numcols > 3) AND (numcols < 6);
-    select tid as Table_ID, tname Name from _tab1;
+    select * from _tab1 where numcols > 3 AND numcols < 6;
+
+    rem basic joins
+    select * from _tab1, _col1  where _tab1.tid = _col1.tid 
+     and _tab1.tname =~ m/col/;
+
+    rem  Column aliases and Expressions
+    select tid as Table_ID, tname Name, (tid+1)/2 from _tab1;
 
     rem  Basic INSERT
-    insert into test1 values (a,b,c,d);
-    insert into test1(col2, col1) values (a,b,c,d);
+    insert into test1 values ('a','b','c','d');
+    insert into test1(col2, col1) values ('a','b','c','d');
 
     rem CREATE TABLE and INSERT...SELECT
     create table test2(col1 char, col2 char);
     insert into test2 (col1) select col1 from test1;
 
     rem  DELETE with WHERE
-    delete from test1 where (col1 < 'bravo') AND (col2 > 5);
+    delete from test1 where col1 < 'bravo' and col2 > 5;
 
     rem  UPDATE with WHERE (no subqueries supported)
     update test2 set col2 = 'foo' where col2 is null;
@@ -130,10 +136,7 @@ guarantee whether the changes will or will not take effect.
     rem ADD a CHECK CONSTRAINT
     alter table test2 add constraint t2_cn1 check (col2 =~ m/(a|b|c|d)/x );
 
-
     commit
-
-
 
 Genezzo also supports the following "short" commands: ct, dt, s, i, d, u
 

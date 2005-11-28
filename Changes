@@ -1,5 +1,8 @@
 Revision history for Perl extension Genezzo
 
+0.53 Sun Nov 27 20:32:23 2005
+        - Documentation fixes
+
 0.52 Fri Nov 25 18:15:16 2005
         - fix unary expression evaluation
         - use TestSetup for regress

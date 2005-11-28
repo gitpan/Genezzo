@@ -203,8 +203,6 @@ EXAMPLES
     select * from _tab1, _col1  where _tab1.tid = _col1.tid 
      and _tab1.tname =~ m/col/;
 
-
-
     rem  Column aliases and Expressions
     select tid as Table_ID, tname Name, (tid+1)/2 from _tab1;
 
