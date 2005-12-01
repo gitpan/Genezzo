@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Plan/RCS/QueryRewrite.pm,v 1.5 2005/11/15 07:47:40 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Plan/RCS/QueryRewrite.pm,v 1.6 2005/12/01 08:07:52 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -17,7 +17,7 @@ use Carp;
 our $VERSION;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 1.5 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.6 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -278,7 +278,7 @@ sub _IN_rewrite
 
     push @outi, $new_comp_eq, $comp_op, $op1, $subq;
 
-    print Data::Dumper->Dump(\@outi);
+# XXX XXX:    print Data::Dumper->Dump(\@outi);
 
     return @outi;
 }
@@ -374,7 +374,7 @@ sub _subq_nest_nj
 
             if (scalar(@foo) > 1)
             {
-                print "\nbingo!\n\n";
+### XXX XXX:               print "\nbingo!\n\n";
                     
                 @foo = $self->_IN_rewrite($genTree, $dict, $tc_sth, 
                                           $current_qb, $treeCtx);

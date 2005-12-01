@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/gendba.pl,v 7.3 2005/11/28 04:33:26 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/gendba.pl,v 7.4 2005/12/01 08:07:33 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -194,7 +194,7 @@ datafile, Genezzo can be configured to use datafiles that grow to some
 maximum size, and it can also be configured to automatically create
 new datafiles as necessary.
 
-All tables are currently created in the system tablespace.
+All tables are currently created in the system tablespace by default.
 
 There are a couple of other useful commands:
 

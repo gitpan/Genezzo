@@ -1,5 +1,9 @@
 Revision history for Perl extension Genezzo
 
+0.54 Wed Nov 30 23:58:53 2005
+        - Documentation fixes
+        - quiet debug info in QueryRewrite (thanks, Eric)
+
 0.53 Sun Nov 27 20:32:23 2005
         - Documentation fixes
 

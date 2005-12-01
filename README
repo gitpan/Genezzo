@@ -155,12 +155,12 @@ SQL SUPPORT -- see LIMITATIONS
 
 LIMITATIONS
 
-  General: No locking/multiuser support, bind variables, only single SYSTEM
-           tablespace, incomplete DBI support.
+  General: No locking/multiuser support, bind variables,          
+  incomplete DBI support.
 
   SELECT: Simple queries only -- no ORDER BY, GROUP BY, 
           HAVING, subqueries, set functions (UNION, INTERSECT).
-          Only basic FROM clause joins: FROM t1, t2, ... is
+          Only basic FROM clause joins: FROM t1, t2, ... are
           supported.
           No aggregation functions other than COUNT(*), ECOUNT(*).
           COUNT and ECOUNT do not accept a WHERE clause.
@@ -558,7 +558,11 @@ NEW FEATURES - Tablespaces
   index can only be stored in a single tablespace, and they cannot be
   moved to a different tablespace.  Additional files may be added to any
   tablespace at any time.  Currently, there is no support for DROP
-  TABLESPACE, or taking tablespace offline.
+  TABLESPACE, or taking tablespace offline.  Example:
+
+  gendba 1> create tablespace ts1
+  gendba 2> addfile tsname=ts1
+  gendba 3> create table mytab (col1 char) tablespace ts1
 
 NEW FEATURES - Joins
   In Version 0.52, basic joins are supported.
