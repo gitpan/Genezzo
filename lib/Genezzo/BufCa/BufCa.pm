@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BufCa.pm,v 7.2 2005/08/27 06:37:29 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BufCa.pm,v 7.2 2005/08/27 06:37:29 claude Exp $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #

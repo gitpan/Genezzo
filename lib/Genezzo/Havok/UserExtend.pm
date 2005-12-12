@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/UserExtend.pm,v 7.1 2005/07/19 07:49:03 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/UserExtend.pm,v 7.2 2005/12/12 09:14:17 claude Exp claude $
 #
 # copyright (c) 2004, 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -105,6 +105,7 @@ sub HavokInit
             greet $s1, $use_gzerr;
 
             no strict 'refs';
+            no warnings 'redefine';
 
             my @inargs;
 

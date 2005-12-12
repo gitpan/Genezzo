@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Havok.pm,v 7.1 2005/07/19 07:49:03 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Havok.pm,v 7.2 2005/12/12 09:13:42 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -18,7 +18,7 @@ use Carp;
 our $VERSION;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 7.1 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.2 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -346,6 +346,9 @@ dictionary tables.
 =item  Force Init/ReInit when new package is loaded.
 
 =item  update module flags if necessary, handle cleanup
+
+=item  use something like L<Sub::Install>, L<Sub::Installer>, or 
+L<Hook::WrapSub> to redefine the subroutines in SysHook, etc.
 
 =back
 

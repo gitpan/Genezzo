@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Util.pm,v 7.7 2005/09/07 08:24:50 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Util.pm,v 7.8 2005/12/12 09:13:13 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -20,7 +20,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 7.7 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.8 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
     @EXPORT      = qw(&whisper &whoami &greet 
@@ -112,6 +112,24 @@ BEGIN {
 
 }
 
+our $USE_FSYNC;
+
+BEGIN {
+    use Config;
+
+    # Win32: handle missing fsync problem
+    if (exists($Config{d_fsync})
+        && ($Config{d_fsync} eq "define"))
+    {
+#        print "\nuse fsync\n";
+        $USE_FSYNC = 1;
+    }
+    else
+    {
+        $USE_FSYNC = 0;
+    }
+
+}
 
 # non-exported package globals go here
 

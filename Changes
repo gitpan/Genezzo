@@ -1,5 +1,10 @@
 Revision history for Perl extension Genezzo
 
+0.55 Mon Dec 12 01:17:52 2005
+        - Fix "Drop Table" case-sensitivity (thanks, Andrew)
+        - Util::USE_FSYNC: check for missing fsync on Win32 and autoflush
+          instead
+
 0.54 Wed Nov 30 23:58:53 2005
         - Documentation fixes
         - quiet debug info in QueryRewrite (thanks, Eric)

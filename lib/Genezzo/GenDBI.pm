@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 7.15 2005/12/01 08:07:33 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 7.16 2005/12/12 09:16:50 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -49,11 +49,11 @@ BEGIN {
 	
 }
 
-our $VERSION   = '0.54';
+our $VERSION   = '0.55';
 our $RELSTATUS = 'Alpha'; # release status
 # grab the code check-in date and convert to YYYYMMDD
 our $RELDATE   = 
-    do { my @r = (q$Date: 2005/12/01 08:07:33 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
+    do { my @r = (q$Date: 2005/12/12 09:16:50 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
 
 our $errstr; # DBI errstr
 
@@ -1141,6 +1141,20 @@ sub Kgnz_Drop
         {
             next # optional "table" keyword... [not SQL standard]
                 if ($tablename =~ m/^table$/i);
+
+            # may need to distinguish between bareword and
+            # quoted strings
+            if ($tablename =~ m/^\"(.*)\"$/)
+            {
+                # strip leading/trailing quotes
+                my @p2 = $tablename =~ m/^\"(.*)\"$/;
+                $tablename = shift @p2;
+            }
+            else
+            {
+                # case-insensitive
+                $tablename = lc($tablename);
+            }
 
             $stat = $dictobj->DictTableDrop (tname   => $tablename,
                                              dbh_ctx => $self->{dbh_ctx}

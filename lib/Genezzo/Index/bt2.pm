@@ -250,7 +250,7 @@ sub _build_cmp_and_eq
         my $k2 = '$k2->[' . $ix;
         my ($eq_op, $cmp_op) = 
             ($keyvec->[$i] =~ m/n/) ? (' == ', ' <=> ') : (' eq ', ' cmp ');
-            
+
         $eq_expr  .= '('  . $k1 . $eq_op  . $k2 . ')';
         $cmp_expr .= '('  . $k1 . $cmp_op . $k2 . ')';
 
@@ -260,8 +260,13 @@ sub _build_cmp_and_eq
 
     my ($eq1, $cmp1);
 
-    my $eq_sub = '$eq1 = sub {my ($k1, $k2) = @_; '
-        . 'return (' . $eq_expr . ');};';
+
+    my $eq_sub = '$eq1 = sub {my ($k1, $k2) = @_; ';
+#    if (1 && !$Genezzo::Util::QUIETWHISPER)
+#    {
+#        $eq_sub .= 'greet $k1, $k2; ';
+#    }
+    $eq_sub .= 'return (' . $eq_expr . ');};';
 
 #    greet $eq_sub;
     eval $eq_sub;
@@ -271,8 +276,12 @@ sub _build_cmp_and_eq
         return undef;
     }
 
-    my $cmp_sub = '$cmp1 = sub {my ($k1, $k2) = @_; '
-        . 'return (' . $cmp_expr . ');};';
+    my $cmp_sub = '$cmp1 = sub {my ($k1, $k2) = @_; ';
+#    if (1 && !$Genezzo::Util::QUIETWHISPER)
+#    {
+#        $cmp_sub .= 'greet $k1, $k2; ';            
+#    }
+    $cmp_sub .= 'return (' . $cmp_expr . ');};';
 
 #    greet $cmp_sub;
     eval $cmp_sub;

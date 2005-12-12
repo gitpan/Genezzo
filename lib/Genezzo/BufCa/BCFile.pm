@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BCFile.pm,v 7.3 2005/09/07 08:28:34 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BCFile.pm,v 7.4 2005/12/12 09:15:43 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -576,6 +576,21 @@ sub Flush
     my $hitlist = $self->{ __PACKAGE__ . ":HITLIST"  };    
     my $fn_arr  = $self->{ __PACKAGE__ . ":FN_ARRAY" };
 
+    unless ($Genezzo::Util::USE_FSYNC)
+    {
+        # Win32 problem:
+        # no fsync, so have to autoflush everything, which may be much
+        # more inefficient.
+        for my $th (@{$fn_arr})
+        {
+            if (exists($th->{fh})
+                && defined($th->{fh}))
+            {
+                $th->{fh}->autoflush(1);
+            }
+        }
+    }
+
     my %sync_list;
 
     # HOOK: PRE FLUSH BCFILE
@@ -608,18 +623,40 @@ sub Flush
         $bce->_dirty(0);
     }
 
-    for my $fnum (keys (%sync_list))
-    {
-        # sync the file handles - normally, can bcfile can buffer
-        # writes, but in this case we want to assure they get written
-        # before commit
-        #
-        # Note: sync is an IO::Handle method inherited by IO::File
-        my $fname  = $fn_arr->[$fnum-1]->{name};
-        my $fh     = $fn_arr->[$fnum-1]->{fh};
 
-        whisper "failed to sync $fname"
-            unless ($fh->sync); # should be "0 but true"
+    if ($Genezzo::Util::USE_FSYNC)
+    {
+##        print "\nsync here!\n";
+        
+        for my $fnum (keys (%sync_list))
+        {
+            # sync the file handles - normally, can bcfile can buffer
+            # writes, but in this case we want to assure they get written
+            # before commit
+            #
+            # Note: sync is an IO::Handle method inherited by IO::File
+            my $fname  = $fn_arr->[$fnum-1]->{name};
+            my $fh     = $fn_arr->[$fnum-1]->{fh};
+
+            whisper "failed to sync $fname"
+                unless ($fh->sync); # should be "0 but true"
+        }
+    }
+    else
+    {
+##        print "\nno sync here!\n";
+        # Win32 problem:
+        # cleanup the autoflush
+        for my $th (@{$fn_arr})
+        {
+            if (exists($th->{fh})
+                && defined($th->{fh}))
+            {
+                $th->{fh}->autoflush(0);
+            }
+        }
+
+            
     }
 
     # HOOK: POST FLUSH BCFILE

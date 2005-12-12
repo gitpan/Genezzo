@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/SysHook.pm,v 7.3 2005/08/25 09:14:46 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/SysHook.pm,v 7.4 2005/12/12 09:14:17 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -23,7 +23,7 @@ our %ReqObjList;      # Object-Oriented Require
 our %ReqObjMethod;    # Object-Oriented Meth
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 7.3 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.4 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     $Got_Hooks = 0;
 }
@@ -220,6 +220,7 @@ sub HavokInit
             # XXX XXX: check for existance of "args" function...
 
             no strict 'refs';
+            no warnings 'redefine';
 
             my @inargs;
 

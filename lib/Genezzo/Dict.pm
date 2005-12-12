@@ -3703,7 +3703,7 @@ sub _drop_constraint
 {
     my $self     = shift;
 
-#    whoami @_;
+    whoami @_;
 
     my $vv = shift;
     greet $vv;
