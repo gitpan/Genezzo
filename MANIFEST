@@ -21,6 +21,7 @@ t/Index1.t
 t/Index2.t
 t/Index3.t
 t/Prefs1.t
+t/PTPrep1.t
 t/PushHash1.t
 t/Row1.t
 t/Util1.t
@@ -74,6 +75,7 @@ lib/Genezzo/Block/RDBlk_NN.pm
 lib/Genezzo/Block/RDBArray.pm
 lib/Genezzo/Block/RowDir.pm
 lib/Genezzo/Block/Std.pm
+lib/Genezzo/Block/Util.pm
 lib/Genezzo/Index/bt2.pm
 lib/Genezzo/Index/bt3.pm
 lib/Genezzo/Index/btHash.pm

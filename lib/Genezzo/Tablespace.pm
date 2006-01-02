@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Tablespace.pm,v 7.8 2005/09/07 08:51:47 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Tablespace.pm,v 7.10 2006/01/02 10:32:13 claude Exp claude $
 #
-# copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 package Genezzo::Tablespace;  # assumes Some/Module.pm
@@ -18,6 +18,7 @@ use Genezzo::Row::RSIdx1;
 use Genezzo::Row::RSTab;
 use Genezzo::BufCa::BCFile;
 use Genezzo::Dict;
+use Genezzo::Block::Util;
 use File::Spec;
 use warnings::register;
 
@@ -28,7 +29,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 7.8 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.10 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
 #    @EXPORT      = qw(&func1 &func2 &func4 &func5);
@@ -959,13 +960,10 @@ sub TSExtendFile ()
 
     my $packstr  = "\0" x $blocksize ; # fill with nulls
 
-    # XXX XXX: compute a basic 32 bit checksum
-    my $packlen  = $Genezzo::Block::Std::LenFtrTemplate;
-    my $ckTempl  = '%32C' . ($blocksize - $packlen); # skip the footer
-    my $cksum    = unpack($ckTempl, $packstr) % 65535;
-    my $basicftr = pack($Genezzo::Block::Std::FtrTemplate, 0, 0, $cksum);
+    my $refbuf = \$packstr;
 
-    substr($packstr, $blocksize-$packlen, $packlen) = $basicftr;
+    # set the checksum in the footer
+    Genezzo::Block::Util::UpdateBlockFooter($refbuf, $blocksize);
 
     for (my $cnt = 0; $cnt < $numblks; $cnt++)
     {
@@ -1626,7 +1624,7 @@ L<Genezzo::PushHash::PushHash>,
 L<Genezzo::Dict>,
 L<perl(1)>.
 
-Copyright (c) 2003, 2004, 2005 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2003-2006 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

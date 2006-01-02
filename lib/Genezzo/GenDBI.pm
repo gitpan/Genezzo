@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 7.16 2005/12/12 09:16:50 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 7.17 2006/01/02 10:38:23 claude Exp claude $
 #
-# copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 package Genezzo::GenDBI;
@@ -49,11 +49,11 @@ BEGIN {
 	
 }
 
-our $VERSION   = '0.55';
+our $VERSION   = '0.56';
 our $RELSTATUS = 'Alpha'; # release status
 # grab the code check-in date and convert to YYYYMMDD
 our $RELDATE   = 
-    do { my @r = (q$Date: 2005/12/12 09:16:50 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
+    do { my @r = (q$Date: 2006/01/02 10:38:23 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
 
 our $errstr; # DBI errstr
 
@@ -108,15 +108,17 @@ our $dbi_gzerr = sub {
         # don't print 'INFO' prefix
         if ($args{severity} !~ m/info/i)
         {
+#            printf STDERR ("%s: ", $sev);
             printf ("%s: ", $sev);
             $warn = 1;
         }
-
     }
     # XXX XXX XXX
-    print __PACKAGE__, ": ",  $args{msg};
+#    print STDERR __PACKAGE__, ": ",  $args{msg};
+    print  __PACKAGE__, ": ",  $args{msg};
     # add a newline if necessary
-    print "\n" unless $args{msg}=~/\n$/;
+#    print STDERR "\n" unless $args{msg}=~/\n$/;
+    print  "\n" unless $args{msg}=~/\n$/;
 #    carp $args{msg}
 #      if (warnings::enabled() && $warn);
     
@@ -1244,11 +1246,52 @@ sub Kgnz_Rollback
 	
 }
 
+# XXX: note - not a class or instance method
+sub getversionstring
+{
+    return undef
+        unless (scalar(@_) > 2);
+    my ($verzion, $relstat, $reldate, $getlicense) = @_;
+
+    my $bigstr = "Genezzo Version " . $verzion . " - " . $relstat . " " ;
+    $bigstr .=  $reldate . "  (www.genezzo.com)\n";
+    $bigstr .= "Copyright (c) 2003-2006 Jeffrey I Cohen.  All rights reserved.\n";
+
+    if (defined($getlicense))
+    {
+        my $llstr;
+        $llstr = <<'EOF_littlelicense';
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program; if not, write to the Free Software
+    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  US
+
+Address bug reports and comments to: jcohen@genezzo.com
+
+For more information, please visit the Genezzo homepage 
+at http://www.genezzo.com
+EOF_littlelicense
+    $bigstr .= $llstr;
+    }
+
+    return $bigstr;
+}
+
 sub PrintVersionString
 {
     my $self = shift;
     my $msg = "\n\nGenezzo Version $VERSION - $RELSTATUS $RELDATE  (www.genezzo.com)\n";
-    $msg .= "Copyright (c) 2003, 2004, 2005 Jeffrey I Cohen.  All rights reserved.\n";
+    $msg .= "Copyright (c) 2003-2006 Jeffrey I Cohen.  All rights reserved.\n";
     $msg .= "\nType \"SHOW\" to obtain license information.\n\n";
     my %earg = (self => $self, msg => $msg,
              severity => 'info');
@@ -1693,12 +1736,17 @@ sub SQLSelectPrepare
 }
 sub SQLSelectPrepare2
 {
-    my $self   = shift;    
-    my $sqltxt = shift;
+    my ($self, $sqltxt, $parse_tree) = @_;
 
     greet $sqltxt;
 
-    my $plan_status = $self->{plan}->Plan(statement => $sqltxt);
+    my %plan_args = (statement => $sqltxt);
+    if (defined($parse_tree))
+    {
+        $plan_args{parse_tree} = $parse_tree;
+    }
+
+    my $plan_status = $self->{plan}->Plan(%plan_args);
 
     if (exists($plan_status->{parse_tree}))
     {
@@ -3881,7 +3929,11 @@ sub Kgnz_Prepare
 
 sub Kgnz_Execute
 {
-    my ($self, $dispatch, @pwords) = @_;
+    my $self = shift;
+
+#    print join(" ", @_), "\n";
+
+    my ($dispatch, @pwords) = @_;
 
     return undef # no dispatch function if parse failed...
         unless (defined($dispatch));
@@ -3906,6 +3958,40 @@ sub do # DBI
 {
     my $self = shift;
     return $self->Parseall(@_);
+}
+
+sub parse_tree_prepare # XXX: DBI "extension"
+{
+    my $self = shift;
+    my %required = (
+                    statement_type => "no statement type !",
+                    parse_tree => "no parse tree !"
+                    );
+    my %optional = ();
+    my %args = (
+#                %optional,
+		@_);
+
+    return undef
+        unless (Validate(\%args, \%required));
+    
+    # XXX XXX: only support select for now...
+    return undef
+        unless ($args{statement_type} =~ m/select/i);
+
+    # call sql prepare directly, need to gimmick Plan to take parse tree
+
+    $self->_clearerror();
+#    my @param = ("SQLSelectPrepare2", undef, $args{parse_tree});
+    my @param = ("SQLSelectPrepare2", "", $args{parse_tree});
+    return undef
+        unless (scalar(@param));
+
+    my $sth = Genezzo::GStatement->new(gnz_h     => $self, 
+                                       dbh_ctx   => $self->{dbh_ctx},
+                                       GZERR     => $self->{GZERR},
+                                       statement => \@param);
+    return $sth;
 }
 
 sub prepare # DBI
@@ -4427,6 +4513,7 @@ sub _init
         $self->{param} = $args{statement};
         my $match1 = '(^Kgnz_Select$)';
         my $match2 = '(^SQLSelect$)';
+        my $match3 = '(^SQLSelectPrepare2$)';
 
         if (scalar(@{$self->{param}}))
         {
@@ -4448,6 +4535,17 @@ sub _init
                 $self->{select} = [];
                 push @{$self->{select}},
                     $self->{gnz_h}->SQLSelectPrepare(@{$self->{param}});
+
+                # check if prepare failed
+                return 0
+                    unless scalar(@{$self->{select}});
+            }
+            elsif ($self->{param}->[0] =~ m/$match3/ )
+            {
+                shift @{$self->{param}};
+                $self->{select} = [];
+                push @{$self->{select}},
+                    $self->{gnz_h}->SQLSelectPrepare2(@{$self->{param}});
 
                 # check if prepare failed
                 return 0
@@ -4755,7 +4853,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 L<perl(1)>, C<gendba.pl -man>,
 C<perldoc DBI>, L<http://dbi.perl.org/>
 
-Copyright (c) 2003, 2004, 2005 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2003-2006 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

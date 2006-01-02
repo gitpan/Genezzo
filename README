@@ -1,4 +1,4 @@
-Copyright (C) 2003,2004,2005 Jeffrey I Cohen.  All rights reserved, worldwide.
+Copyright (C) 2003-2006 Jeffrey I Cohen.  All rights reserved, worldwide.
 
 NAME
 
@@ -87,7 +87,7 @@ SQL SUPPORT -- see LIMITATIONS
     UPDATE tablename SET colname = expr [, colname = expr ...] [WHERE ...]
 
   DELETE:
-    DELETE from tablename [WHERE ...]
+    DELETE FROM tablename [WHERE ...]
 
   SELECT:  The Genezzo parser can parse complex SELECT statements,
            but the execution engine can only handle simple SELECTS
@@ -96,7 +96,7 @@ SQL SUPPORT -- see LIMITATIONS
     SELECT * FROM tablename [WHERE ...]
     SELECT COUNT(*) FROM tablename 
     SELECT ECOUNT(*) FROM tablename
-    SELECT * from t1, t2 where t1.col1 = t2.col1    
+    SELECT * FROM t1, t2 WHERE t1.col1 = t2.col1    
 
     SELECT expr [[AS] column_alias] [, expr [[AS] column_alias]]
       FROM tablename
@@ -515,9 +515,9 @@ NEW FEATURES - Improved Parser
   operation.  The count estimation function ECOUNT must be specified as
   ecount(*) in the select list.
 
-  While the parser is smarter, the execution phase is not improved.
-  The select list can still only contain individual columns or count(*)
-  or ecount(*).  Joins, Group By, and Order By are still missing.
+  While the parser is smarter, the execution phase is not improved.  The
+  only supported aggregation functions are count(*) or ecount(*) in the
+  select list.  Having, Group By, and Order By are still missing.
 
   Version 0.40 allows arbitrary expressions in SELECT lists, e.g:
 
@@ -569,7 +569,7 @@ NEW FEATURES - Joins
 
 INCOMPATIBLE CHANGES
 
-  Version 0.52 dictionary and block format is incompatible with
+  Version 0.56 dictionary and block format is incompatible with
   previous releases.  No upgrade path is supported.
   Version 0.48 thru 0.50 are compatible.
 
@@ -582,7 +582,7 @@ AUTHOR
 
   Original author: Jeffrey I Cohen <jcohen@genezzo.com>
 
-  Copyright (c) 2003, 2004, 2005 Jeffrey I Cohen.  All rights reserved.
+  Copyright (c) 2003, 2004, 2005, 2006 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

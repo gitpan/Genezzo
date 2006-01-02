@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/genexp.pl,v 7.1 2005/07/19 07:49:03 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/genexp.pl,v 7.2 2005/12/27 01:13:05 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -26,6 +26,7 @@ Options:
     -help            brief help message
     -man             full documentation
     -gnz_home        supply a directory for the gnz_home
+    -version         print version information
     -define key=val  define a configuration parameter
 
 =head1 OPTIONS
@@ -45,6 +46,9 @@ Options:
     Supply the location for the gnz_home installation.  If 
     specified, it overrides the GNZ_HOME environment variable.
 
+=item B<-version>
+    
+    Print version information.  
 
 =item B<-define> key=value
     
@@ -134,16 +138,32 @@ sub setinit
 BEGIN {
     my $man  = 0;
     my $help = 0;
+    my $verzion = 0;
     my $gnz_home = '';
     my %defs = ();      # list of --define key=value
 
     GetOptions(
                'help|?' => \$help, man => \$man, 
+               version => \$verzion,
                'gnz_home=s' => \$gnz_home,
                'define=s'   => \%defs)
         or pod2usage(2);
 
     $glob_id = "Genezzo Version $Genezzo::GenDBI::VERSION - $Genezzo::GenDBI::RELSTATUS $Genezzo::GenDBI::RELDATE\n\n"; 
+
+
+    if ($verzion)
+    {
+        my $bigmsg = 
+            Genezzo::GenDBI::getversionstring(
+                                              $Genezzo::GenDBI::VERSION,
+                                              $Genezzo::GenDBI::RELSTATUS,
+                                              $Genezzo::GenDBI::RELDATE,
+                                              1);
+        pod2usage(-exitstatus => 0, -verbose => 0, 
+                  -msg => $bigmsg
+                  );
+    }
 
     pod2usage(-msg => $glob_id, -exitstatus => 1) if $help;
     pod2usage(-msg => $glob_id, -exitstatus => 0, -verbose => 2) if $man;

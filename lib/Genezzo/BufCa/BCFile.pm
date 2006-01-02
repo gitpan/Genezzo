@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BCFile.pm,v 7.4 2005/12/12 09:15:43 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BCFile.pm,v 7.5 2005/12/30 10:09:20 claude Exp claude $
 #
-# copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 use strict;
@@ -13,6 +13,7 @@ package Genezzo::BufCa::BCFile;
 use IO::File;
 use IO::Handle;
 use Genezzo::BufCa::BufCa;
+use Genezzo::Block::Util;
 use Genezzo::Util;
 use Carp;
 use warnings::register;
@@ -262,24 +263,10 @@ sub _filereadblock
 
     if (1)
     {
-        # XXX XXX: compute a basic 32 bit checksum
-#        my $basicftr = pack($Genezzo::Block::Std::FtrTemplate, 0, 0, 0);
-        my $packlen  = $Genezzo::Block::Std::LenFtrTemplate;
-
-        my $skippy = $blocksize-$packlen; # skip to end of buffer
-        # get the checksum
-        my @outarr = unpack("x$skippy $Genezzo::Block::Std::FtrTemplate", 
-                            $$refbuf);
-
-        # zero out the checksum because it wasn't part of the original
-        # calculation
-#        substr($$refbuf, $blocksize-$packlen, $packlen) = $basicftr;
-
-        # calculate checksum and test if matches stored value
-        my $ckTempl  = '%32C' . ($blocksize - $packlen); # skip the footer
-        my $cksum = unpack($ckTempl, $$refbuf) % 65535;
-        my $ck1 = pop @outarr;
-        unless ($cksum == $ck1)
+        my @cksums = Genezzo::Block::Util::GetChecksums($refbuf, $blocksize);
+        # test if the calculated checksum matches the stored checksum
+        unless ((scalar(@cksums) == 2) &&
+                ($cksums[0] == $cksums[1]))
         {
             # XXX XXX: need failure or repair procedure - warn about
             # problem but ignore for now
@@ -343,30 +330,13 @@ sub _filewriteblock
             unless (_init_filewriteblock($self, @_));
     }
 
-    # XXX: build a basic header with the file number, block number,
-    # etc 
-    # XXX XXX fileblockTmpl
-    my $basichdr = pack($Genezzo::Block::Std::fileblockTmpl, $fnum, $bnum); 
-    my $packlen  = $Genezzo::Block::Std::fbtLen;
-
-    substr($$refbuf, 0, $packlen) = $basichdr;
+    # update the block header with filenum, blocknum and 
+    # set the footer checksum
+    Genezzo::Block::Util::UpdateBlockHeader($fnum, $bnum, $refbuf, $blocksize);
 
     if (1)
     {
-        # XXX XXX: compute a basic 32 bit checksum 
-        # -- see perldoc unpack
-#        my $basicftr = pack($Genezzo::Block::Std::FtrTemplate, 0, 0, 0);
-        $packlen     = $Genezzo::Block::Std::LenFtrTemplate;
-
-        # zero out the checksum because the old checksum isn't part of
-        # the new checksum
-#        substr($$refbuf, $blocksize-$packlen, $packlen) = $basicftr;
-
-        my $ckTempl  = '%32C' . ($blocksize - $packlen); # skip the footer
-        my $cksum    = unpack($ckTempl, $$refbuf) % 65535;
-        my $basicftr = pack($Genezzo::Block::Std::FtrTemplate, 0, 0, $cksum);
-        # add the checksum to the end of the block
-        substr($$refbuf, $blocksize-$packlen, $packlen) = $basicftr;
+        Genezzo::Block::Util::UpdateBlockFooter($refbuf, $blocksize);
     }
 
     # HOOK: PRE SYSWRITE BLOCK
@@ -875,7 +845,7 @@ Currently requires 2 blocks per open file.
 
 perl(1).
 
-Copyright (c) 2003, 2004, 2005 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2003-2006 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

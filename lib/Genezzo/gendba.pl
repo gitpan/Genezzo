@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/gendba.pl,v 7.4 2005/12/01 08:07:33 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/gendba.pl,v 7.5 2005/12/27 01:09:07 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -24,6 +24,7 @@ Options:
     -man             full documentation
     -init            build a gnz_home installation if necessary
     -gnz_home        supply a directory for the gnz_home
+    -version         print version information
     -shutdown        do not startup
     -define key=val  define a configuration parameter
 
@@ -51,6 +52,10 @@ Options:
     
     Supply the location for the gnz_home installation.  If 
     specified, it overrides the GNZ_HOME environment variable.
+
+=item B<-version>
+    
+    Print version information.  
 
 =item B<-shutdown>
     
@@ -296,6 +301,7 @@ BEGIN {
     my $man  = 0;
     my $help = 0;
     my $init = 0;
+    my $verzion = 0;
     my $shutdown = 0;
     my $gnz_home = '';
     my %defs     = ();    # list of --define key=value
@@ -303,6 +309,7 @@ BEGIN {
 
     GetOptions(
                'help|?' => \$help, man => \$man, init => \$init,
+               version => \$verzion,
                shutdown => \$shutdown,
                'gnz_home=s' => \$gnz_home,
                'define=s'   => \%defs,
@@ -311,6 +318,20 @@ BEGIN {
 
     $glob_id = "Genezzo Version $Genezzo::GenDBI::VERSION - $Genezzo::GenDBI::RELSTATUS $Genezzo::GenDBI::RELDATE\n\n"; 
 
+    
+    if ($verzion)
+    {
+        my $bigmsg = 
+            Genezzo::GenDBI::getversionstring(
+                                              $Genezzo::GenDBI::VERSION,
+                                              $Genezzo::GenDBI::RELSTATUS,
+                                              $Genezzo::GenDBI::RELDATE,
+                                              1);
+        pod2usage(-exitstatus => 0, -verbose => 0, 
+                  -msg => $bigmsg
+                  );
+    }
+    
     pod2usage(-msg => $glob_id, -exitstatus => 1) if $help;
     pod2usage(-msg => $glob_id, -exitstatus => 0, -verbose => 2) if $man;
 

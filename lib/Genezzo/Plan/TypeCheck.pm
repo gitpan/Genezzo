@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Plan/RCS/TypeCheck.pm,v 7.8 2005/11/24 08:56:04 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Plan/RCS/TypeCheck.pm,v 7.9 2005/12/27 01:14:49 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -17,7 +17,7 @@ use Carp;
 our $VERSION;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 7.8 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.9 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -1330,7 +1330,7 @@ sub _get_col_info # private
                 # (innermost) query block to earliest (outermost)
               L_qb:
                 for (my $qb_num = $current_qb;
-                     $qb_num > 0;
+                     (defined($qb_num) && ($qb_num > 0));
                      $qb_num--)
                 {
                     my $qb2 = $treeCtx->{tablist}->[$qb_num]->{tables};

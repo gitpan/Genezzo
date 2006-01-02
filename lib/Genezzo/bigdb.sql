@@ -1,8 +1,8 @@
-REM Copyright (c) 2004, 2005 Jeffrey I Cohen.  All rights reserved.
+REM Copyright (c) 2004, 2005, 2006 Jeffrey I Cohen.  All rights reserved.
 REM
 REM 
-select * from _pref1 where prefkey='bc_size';
-update  _pref1 set prefvalue=1000 where prefkey='bc_size';
+select * from _pref1 where pref_key='bc_size';
+update  _pref1 set pref_value=1000 where pref_key='bc_size';
 
 REM set tablespace to grow and acquire new datafiles
 select * from _tspace where tsname='SYSTEM';

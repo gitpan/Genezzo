@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Parse/RCS/SQLGrammar.pl,v 7.4 2005/09/18 07:52:09 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Parse/RCS/SQLGrammar.pl,v 7.5 2006/01/02 10:34:38 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -345,15 +345,53 @@ column_constraint_def: constraint_name(?) col_cons
         }
 }
 
+# use to disambiguate column list for FOREIGN KEY and list for REFERENCES
+ fkref_column_list: column_list
+{$return = $item[1]}
+
   constraint_name : CONSTRAINT_ big_id
 {$return = $item{big_id}}
 
 # XXX XXX: references on delete cascade - referential action
      col_cons     : NOT(?) NULL
+{$return = {operator => $item[2],
+            cons_type => 'nullable',
+            operands => $item{'NOT(?)'}            
+            }}
                   | UNIQUE
+{$return = {operator => $item[1],
+            cons_type => 'unique'
+            }}
                   | PRIMARY KEY
-                  | REFERENCES_ big_id '(' identifier ')'
+{$return = {operator => $item[1],
+            cons_type => 'primary_key'
+            }}
+                  | REFERENCES_ big_id fkref_column_list
+{$return = {operator => $item[1],
+            cons_type => 'foreign_key',
+            operands => 
+            {
+                table       => $item{big_id},
+                keycols     => $item{fkref_column_list}
+            }
+        }
+}
                   | sqCHECK_ '(' search_cond ')'
+{
+#
+# get start/stop position for search condition
+#
+    my $p1 = $itempos[3]{offset}{from};
+    my $p2 = $itempos[3]{offset}{to};
+    $return = {operator => $item[1],
+               cons_type => 'check',
+               operands => {
+                   p1 => $p1,
+                   p2 => $p2,
+                   sc_tree => $item{search_cond}
+               }
+           };
+}
 
    table_cons     : UNIQUE column_list 
 {$return = {operator => $item[1],
@@ -370,14 +408,14 @@ column_constraint_def: constraint_name(?) col_cons
         }
 }
                   | FOREIGN KEY column_list 
-                    REFERENCES_ big_id '(' identifier ')'
+                    REFERENCES_ big_id fkref_column_list
 {$return = {operator => $item[1],
             cons_type => 'foreign_key',
             operands => 
             {
                 column_list => $item{column_list},
                 table       => $item{big_id},
-                keycol      => $item{identifier}
+                keycols     => $item{fkref_column_list}
             }
         }
 }

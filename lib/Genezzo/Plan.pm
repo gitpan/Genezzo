@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Plan.pm,v 7.3 2005/11/26 01:53:39 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Plan.pm,v 7.4 2006/01/02 10:32:29 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -23,7 +23,7 @@ use Carp;
 our $VERSION;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 7.3 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.4 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -287,10 +287,19 @@ sub Plan
         unless (Validate(\%args, \%required));
 
     my $plan_status = {};
+    my ($sqltxt, $parse_tree);
 
-    my $sqltxt = $args{statement};
-    my $parse_tree = $self->Parse(statement => $sqltxt);
-
+    # allow parse tree as an optional argument
+    if (exists($args{parse_tree}) &&
+        defined($args{parse_tree}))
+    {
+        $parse_tree = $args{parse_tree};
+    }
+    else
+    {
+        $sqltxt = $args{statement};
+        $parse_tree = $self->Parse(statement => $sqltxt);
+    }
     return $plan_status
         unless (defined($parse_tree));
 
