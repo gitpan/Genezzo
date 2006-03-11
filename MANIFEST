@@ -20,6 +20,7 @@ t/Havok1.t
 t/Index1.t
 t/Index2.t
 t/Index3.t
+t/Join1.t
 t/Prefs1.t
 t/PTPrep1.t
 t/PushHash1.t
@@ -38,6 +39,7 @@ lib/Genezzo/Row/RSExpr.pm
 lib/Genezzo/Row/RSFile.pm
 lib/Genezzo/Row/RSBlock.pm
 lib/Genezzo/Row/RSJoinA.pm
+lib/Genezzo/SpaceMan/SMExtent.pm
 lib/Genezzo/SpaceMan/SMFile.pm
 lib/Genezzo/BufCa/BCFile.pm
 lib/Genezzo/BufCa/BufCa.pm

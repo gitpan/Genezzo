@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Plan/RCS/QueryRewrite.pm,v 1.6 2005/12/01 08:07:52 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Plan/RCS/QueryRewrite.pm,v 1.7 2006/03/01 08:41:16 claude Exp claude $
 #
-# copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2005,2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 package Genezzo::Plan::QueryRewrite;
@@ -17,7 +17,7 @@ use Carp;
 our $VERSION;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 1.6 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.7 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -507,7 +507,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 
 L<perl(1)>.
 
-Copyright (c) 2005 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2005,2006 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

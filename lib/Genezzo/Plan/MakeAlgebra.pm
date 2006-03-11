@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Plan/RCS/MakeAlgebra.pm,v 7.1 2005/07/19 07:49:03 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Plan/RCS/MakeAlgebra.pm,v 7.2 2006/02/23 07:53:06 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -17,7 +17,7 @@ use Carp;
 our $VERSION;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 7.1 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.2 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -234,6 +234,9 @@ sub convert_algebra # private
                 {
                     $toggle *= -1;
                     next L_all_opers if ($toggle) < 1;
+
+                    my $filter_type;
+                    $filter_type = undef;
                     
                     if ($oper eq "theta_join")
                     {
@@ -261,6 +264,7 @@ sub convert_algebra # private
                         {
                             # use generic search_cond, vs where_clause
                             $operands_key = "search_cond";
+                            $filter_type  = "WHERE";
 
                             # ignore empty list
                             my $a1 = $alg_oper{$oper};
@@ -286,6 +290,7 @@ sub convert_algebra # private
                             # is just a search condition
                             $oper_alias   = "filter";
                             $operands_key = "search_cond";
+                            $filter_type  = "HAVING";
 
                             # ignore empty list
                             my $a1 = $alg_oper{$oper};
@@ -346,6 +351,15 @@ sub convert_algebra # private
 
                             $hashi->{all_distinct} =
                                 $vv->{all_distinct};
+                        }
+                        if ($oper_alias eq "filter")
+                        {
+                            # mark filter if from WHERE or HAVING
+                            # clauses - useful for checking aggregate
+                            # functions (which cannot be in WHERE
+                            # clause)
+                            $hashi->{alg_filter_type} = $filter_type
+                                if (defined($filter_type));
                         }
 
                         $prev = $oper_alias;

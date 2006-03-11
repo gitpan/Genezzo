@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 7.13 2005/11/26 01:52:22 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 7.14 2006/02/12 07:56:17 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -19,7 +19,7 @@ use Genezzo::Havok;
 
 BEGIN {
     our $VERSION;
-    $VERSION = do { my @r = (q$Revision: 7.13 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.14 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -2492,7 +2492,7 @@ sub DictAddFile
     return 0
         unless (NumVal(val  => $filesize,
                        name => $filename,
-                       MIN  => 2 * $self->{blocksize}, 
+                       MIN  => 4 * $self->{blocksize}, 
                        MAX  => $Genezzo::Util::MAXDBSIZE));  
 
     my $tshref = $self->{tablespaces};

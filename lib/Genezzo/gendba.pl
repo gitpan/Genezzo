@@ -1,14 +1,15 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/gendba.pl,v 7.5 2005/12/27 01:09:07 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/gendba.pl,v 7.6 2006/01/06 08:50:46 claude Exp claude $
 #
-# copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
-#use strict;
 use Genezzo::GenDBI;
 use Getopt::Long;
 use Pod::Usage;
+use strict;
+use warnings;
 
 =head1 NAME
 
@@ -228,7 +229,7 @@ GNZ_HOME is undefined, the default location is $HOME/gnz_home.
 
 =head1 AUTHORS
 
-Copyright (c) 2003, 2004, 2005 Jeffrey I Cohen.  All rights reserved.  
+Copyright (c) 2003-2006 Jeffrey I Cohen.  All rights reserved.  
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

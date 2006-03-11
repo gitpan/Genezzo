@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BCFile.pm,v 7.5 2005/12/30 10:09:20 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BCFile.pm,v 7.8 2006/02/14 08:40:52 claude Exp claude $
 #
 # copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -21,6 +21,8 @@ use warnings::register;
 our @ISA = qw(Genezzo::BufCa::BufCa) ;
 
 # non-exported package globals go here
+
+our $USE_MAX_FILES = 1; # true if fixed number of open files
 
 # initialize package globals, first exported ones
 #my $Var1   = '';
@@ -63,6 +65,8 @@ sub _init
     $self->{cache_misses} =  0;
     $self->{read_only}    =  0; # TODO: set for read-only database support
 
+    $self->{open_list}    = [];
+
     return 1;
 }
 
@@ -97,6 +101,7 @@ sub Dump
                  cache_misses => $self->{cache_misses},
                  hitlist      => scalar keys %{$hitlist},
 #                 fileinfo     => $fn_arr
+                 open_list    => $self->{open_list}
                  );
 
     return \%hashi;
@@ -157,7 +162,18 @@ sub FileReg
             unless (scalar(@headerinfo));
         $th{hdrsize} = $headerinfo[0];
 
-         my $fileno = $args{FileNumber};
+        my $fileno = $args{FileNumber};
+
+        if ($USE_MAX_FILES)
+        {
+            # close everything
+            $th{fh}->close;
+            delete $th{fh};
+        }
+        else
+        {
+            push @{$self->{open_list}}, $fileno; # open file list
+        }
         
 #        greet $fileno;
 
@@ -170,6 +186,91 @@ sub FileReg
     }   
 
     return ($fn_hsh->{$args{FileName}})
+}
+
+sub _getOpenFileHandle
+{
+    my $self = shift;
+    my %required = (
+                    filenum  => "no filenum !"
+                    );
+
+    my %optional = (getscalar => 0); # return fname, fh, fhdrsize by default
+
+    my %args = (%optional,
+                @_);
+
+    return undef
+        unless (Validate(\%args, \%required));
+
+    my $fnum = $args{filenum};
+
+    my $fn_arr = $self->{ __PACKAGE__ . ":FN_ARRAY" };
+
+    # XXX: NOTE: treat filename array as 1 based, vs 0 based 
+    # -- use fn_arr[n-1]->name to get filename.
+
+    my $entry  = $fn_arr->[$fnum-1];
+
+    my $fname  = $entry->{name};
+
+    unless (exists($entry->{fh})
+            && (defined($entry->{fh})))
+    {
+
+        whisper "re-open $fname\n";
+
+        while ($USE_MAX_FILES)
+        {
+            my $num_open_files = scalar(@{$self->{open_list}});
+
+            last
+                if ($num_open_files < $Genezzo::Util::MAXOPENFILES);
+#                if ($num_open_files < 2);
+
+            # randomly close one of the open files -- remove it from
+            # the open list
+            my $close_victim = int(rand($num_open_files));
+                
+            my @foo = splice(@{$self->{open_list}}, $close_victim, 1);
+
+            last
+                unless (scalar(@foo));
+
+            my $close_fnum = $foo[0];
+
+            my $close_entry  = $fn_arr->[$close_fnum-1];
+
+            whisper "close $close_entry->{name}\n";
+
+            next
+                unless (exists($close_entry->{fh})
+                        && defined($close_entry->{fh}));
+            my $close_fh     = $close_entry->{fh};
+
+            if ($Genezzo::Util::USE_FSYNC)
+            {
+                whisper "failed to sync $fname"
+                    unless ($close_fh->sync); # should be "0 but true"
+            }
+            $close_fh->close;
+            delete $close_entry->{fh};
+
+            last;
+        } # end while
+
+        $entry->{fh} = new IO::File "+<$fname"
+            or die "Could not open $fname for writing : $! \n";
+
+        push @{$self->{open_list}}, $fnum; # open file list
+    }
+    my $fh     = $entry->{fh};
+    my $fhdrsz = $entry->{hdrsize};
+
+    return $entry
+        if $args{getscalar};
+
+    return ($fname, $fh, $fhdrsz);
 }
 
 sub BCFileInfoByName
@@ -188,19 +289,14 @@ sub BCFileInfoByName
     return undef
         unless (Validate(\%args, \%required));
 
-    my $fn_arr = $self->{ __PACKAGE__ . ":FN_ARRAY" };
     my $fn_hsh = $self->{ __PACKAGE__ . ":FN_HASH" };
 
     return undef
         unless (exists($fn_hsh->{$args{FileName}}));
 
-    # XXX: NOTE: treat filename array as 1 based, vs 0 based 
-    # -- use fn_arr[n-1]->name to get filename.
-
     my $fileno = $fn_hsh->{$args{FileName}};
 
-    $fileno--;
-    return ($fn_arr->[$fileno]);
+    return ($self->_getOpenFileHandle(filenum => $fileno, getscalar => 1));
 }
 
 sub FileSetHeaderInfoByName
@@ -397,10 +493,6 @@ sub ReadBlock
 #    whisper "miss!";
     $self->{cache_misses} +=  1;
 
-    my $fname  = $fn_arr->[$fnum-1]->{name};
-    my $fh     = $fn_arr->[$fnum-1]->{fh};
-    my $fhdrsz = $fn_arr->[$fnum-1]->{hdrsize};
-
     my $thing = $self->{bc}->GetFree();
 
     unless (2 == scalar(@{$thing}))
@@ -430,9 +522,8 @@ sub ReadBlock
 #            greet $hitlist;
             if ($bce->_dirty())
             {
-                my $ofname  = $fn_arr->[$ofnum-1]->{name};
-                my $ofh     = $fn_arr->[$ofnum-1]->{fh};
-                my $ofhdrsz = $fn_arr->[$ofnum-1]->{hdrsize};
+                my ($ofname, $ofh, $ofhdrsz) = 
+                    $self->_getOpenFileHandle(filenum => $ofnum);
 
                 return (undef)
                     unless (
@@ -463,6 +554,8 @@ sub ReadBlock
     $infoh->{blocknum} = $bnum;
 
     $bce->_fileread(1);
+
+    my ($fname, $fh, $fhdrsz) = $self->_getOpenFileHandle(filenum => $fnum);
     my $readstat =  $self->_filereadblock($fname, $fnum, $fh, $bnum, 
                                           $bce->{bigbuf}, $fhdrsz);
     $bce->_fileread(0);
@@ -521,9 +614,8 @@ sub WriteBlock
 
     if ($bce->_dirty())
     {
-        my $fname  = $fn_arr->[$fnum-1]->{name};
-        my $fh     = $fn_arr->[$fnum-1]->{fh};
-        my $fhdrsz = $fn_arr->[$fnum-1]->{hdrsize};
+        my ($fname, $fh, $fhdrsz) = 
+            $self->_getOpenFileHandle(filenum => $fnum);
 
         return (0)
             unless (
@@ -576,9 +668,8 @@ sub Flush
 
         if ($bce->_dirty())
         {
-            my $fname  = $fn_arr->[$fnum-1]->{name};
-            my $fh     = $fn_arr->[$fnum-1]->{fh};
-            my $fhdrsz = $fn_arr->[$fnum-1]->{hdrsize};
+            my ($fname, $fh, $fhdrsz) = 
+                $self->_getOpenFileHandle(filenum => $fnum);
 
             $sync_list{$fnum} = 1;
 
@@ -605,8 +696,8 @@ sub Flush
             # before commit
             #
             # Note: sync is an IO::Handle method inherited by IO::File
-            my $fname  = $fn_arr->[$fnum-1]->{name};
-            my $fh     = $fn_arr->[$fnum-1]->{fh};
+            my ($fname, $fh, $fhdrsz) = 
+                $self->_getOpenFileHandle(filenum => $fnum);
 
             whisper "failed to sync $fname"
                 unless ($fh->sync); # should be "0 but true"
@@ -658,9 +749,8 @@ sub Rollback
 
         if ($bce->_dirty())
         {
-            my $fname  = $fn_arr->[$fnum-1]->{name};
-            my $fh     = $fn_arr->[$fnum-1]->{fh};
-            my $fhdrsz = $fn_arr->[$fnum-1]->{hdrsize};
+            my ($fname, $fh, $fhdrsz) = 
+                $self->_getOpenFileHandle(filenum => $fnum);
 
             whisper "replace dirty block : $fname - $fnum : $bnum";
 
@@ -686,12 +776,12 @@ sub BCGrowFile
     whoami;
     my ($self, $filenumber, $startblock, $numblocks) = @_;
 
-    my $fnum = $filenumber;
-    my $fn_arr  = $self->{ __PACKAGE__ . ":FN_ARRAY" };
+    my $fnum      = $filenumber;
+    my $fn_arr    = $self->{ __PACKAGE__ . ":FN_ARRAY" };
     my $blocksize = $self->{bc}->{blocksize};
-    my $fname  = $fn_arr->[$fnum-1]->{name};
-    my $fh     = $fn_arr->[$fnum-1]->{fh};
-    my $fhdrsz = $fn_arr->[$fnum-1]->{hdrsize};
+
+    my ($fname, $fh, $fhdrsz) = 
+        $self->_getOpenFileHandle(filenum => $fnum);
  
     my $packstr  = "\0" x $blocksize ; # fill with nulls
 

@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Parse/RCS/SQLGrammar.pl,v 7.5 2006/01/02 10:34:38 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Parse/RCS/SQLGrammar.pl,v 7.6 2006/03/01 08:40:59 claude Exp claude $
 #
-# copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2005, 2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 use Parse::RecDescent;
@@ -1686,7 +1686,7 @@ sub SQLPrecompile
 #
 #L<perl(1)>.
 #
-#Copyright (c) 2005 Jeffrey I Cohen.  All rights reserved.
+#Copyright (c) 2005,2006 Jeffrey I Cohen.  All rights reserved.
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -1802,7 +1802,7 @@ goes to Terence Parr at ANTLR.org for his help on parsing issues.
 
 =head1 AUTHORS
 
-Copyright (c) 2005 Jeffrey I Cohen.  All rights reserved.  
+Copyright (c) 2005,2006 Jeffrey I Cohen.  All rights reserved.  
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

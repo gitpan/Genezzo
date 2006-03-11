@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Plan/RCS/TypeCheck.pm,v 7.9 2005/12/27 01:14:49 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Plan/RCS/TypeCheck.pm,v 7.14 2006/03/11 08:03:07 claude Exp claude $
 #
-# copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2005,2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 package Genezzo::Plan::TypeCheck;
@@ -17,7 +17,7 @@ use Carp;
 our $VERSION;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 7.9 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.14 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -52,6 +52,19 @@ sub _init
                 && defined($args{plan_ctx}));
 
     $self->{plan_ctx} = $args{plan_ctx};
+
+    my %valid_aggs = 
+        qw(
+           MIN      1
+           MAX      1
+           AVG      1
+           SUM      1
+           MEAN     1
+           STDDEV   1
+           COUNT    1
+           );
+
+    $self->{aggregate_functions} = \%valid_aggs;
 
     return 1;
 
@@ -146,17 +159,32 @@ sub TypeCheck
         $err_status = 1;
     }
 
+
     if (!defined($err_status))
     {
-        if (
-               scalar(@{$tc_sth->{tc1}->{tc_err}->{nosuch_table}})
-            || scalar(@{$tc_sth->{tc1}->{tc_err}->{duplicate_table}})
-            || scalar(@{$tc_sth->{tc3}->{tc_err}->{nosuch_column}})
-            )
+        for my $kk (keys(%{$tc_sth->{tc1}->{tc_err}}))
         {
-            greet "tc errors";
-            $err_status = 1;
+            if (scalar(@{$tc_sth->{tc1}->{tc_err}->{$kk}}))
+            {
+                $err_status = 1;
+                last;
+            }
         }
+        if (!defined($err_status))
+        {
+            for my $kk (keys(%{$tc_sth->{tc3}->{tc_err}}))
+            {
+                next          # only case of hash vs array
+                    if ($kk eq "duplicate_alias");
+                if (scalar(@{$tc_sth->{tc3}->{tc_err}->{$kk}}))
+                {
+                    $err_status = 1;
+                    last;
+                }
+            }
+        }
+        greet "tc errors"
+            if (defined($err_status));
     }
     
     # NOTE: attach the "statement handle" to the algebra -- it contains
@@ -693,6 +721,25 @@ sub ColumnCheck
     # perl equivalents
 
     $algebra = $self->_fixup_comp_op($algebra, $args{dict}, $tc_sth);
+
+    $tc3->{tc_err}->{invalid_args}   = [];
+    # mark aggregates and check for invalid args
+    $algebra = $self->_find_aggregate_functions($algebra, 
+                                                $args{dict}, 
+                                                $tc_sth);
+
+    $tc3->{tc_agg_check} = [];
+    # check for aggregates in WHERE clause
+    $algebra = $self->_check_aggregate_functions($algebra, 
+                                                 $args{dict}, 
+                                                 $tc_sth);
+
+    # check for GROUPing/aggregates
+
+    # check for final select list columns vs all projected columns in
+    # all clauses
+
+    # check args for all functions
 
     $tc3->{AndPurity} = 1; # false if find OR's
 
@@ -1661,6 +1708,225 @@ sub _fixup_comp_op
 }
 
 
+sub _find_aggregate_functions
+{
+#    whoami;
+
+    # NOTE: get the current subroutine name so it is easier 
+    # to call recursively
+    my $subname = (caller(0))[3];
+
+    my $self = shift;
+    # generic tree of hashes/arrays
+    my ($genTree, $dict, $tc_sth) = @_;
+
+    my $treeCtx = $tc_sth->{tc3};
+
+    # recursively convert all elements of array
+    if (ref($genTree) eq 'ARRAY')
+    {
+        my $maxi = scalar(@{$genTree});
+        $maxi--;
+        for my $i (0..$maxi)
+        {
+            $genTree->[$i] = $self->$subname($genTree->[$i], $dict, $tc_sth);
+        }
+
+    }
+    if (ref($genTree) eq 'HASH')
+    {
+        keys( %{$genTree} ); # XXX XXX: need to reset expression!!
+
+        # convert subtree first, then process local select list
+        {
+            my $qb_setup = 0; # TRUE if top hash of query block
+            
+            if (exists($genTree->{query_block})) 
+            {
+                $qb_setup = 1;
+                
+                # keep track of current query block number
+                my $current_qb = $genTree->{query_block};
+
+                # push on the front
+                unshift @{$treeCtx->{qb_list}}, $current_qb;
+            }
+            
+            while ( my ($kk, $vv) = each ( %{$genTree})) # big while
+            {
+                # convert subtree first...
+                $genTree->{$kk} = $self->$subname($vv, $dict, $tc_sth);
+            }
+
+            if ($qb_setup)
+            {
+                # pop from the front
+                shift @{$treeCtx->{qb_list}};
+            }
+
+        }
+
+        # recursively convert all elements of hash
+
+        my $qb_setup = 0; # TRUE if top hash of query block
+
+        if (exists($genTree->{query_block})) 
+        {
+            $qb_setup = 1;
+
+            # keep track of current query block number
+            my $current_qb = $genTree->{query_block};
+
+            # push on the front
+            unshift @{$treeCtx->{qb_list}}, $current_qb;
+        }
+
+        if (exists($genTree->{function_name}))
+        {
+            my $fname = uc($genTree->{function_name});
+            if (exists($self->{aggregate_functions}->{$fname}))
+            {
+                # perform final aggregation
+
+                # need to generate stages to perform aggregate
+                # initialization and intermediate aggregation
+
+                $genTree->{aggregate_stage} =
+                    "finalize";
+            }
+            else
+            {
+                if (exists($genTree->{operands}))
+                {
+                    my $ops = $genTree->{operands};
+                    if (scalar(@{$ops})
+                        && (exists($ops->[0]->{all_distinct})))
+                    {
+                        if (scalar(@{$ops->[0]->{all_distinct}}))
+                        {
+                            # invalid all/distinct qualifier 
+                            # for non-aggregate function
+
+                            my $adq = $ops->[0]->{all_distinct}->[0];
+
+                            my $msg = "invalid argument ". 
+                                "\'$adq\' for non-aggregate function \'$fname\'";
+
+                            my %earg = (self => $self, msg => $msg,
+                                        severity => 'warn');
+
+                            push @{$treeCtx->{tc_err}->{invalid_args}},  $msg;
+                            
+                            &$GZERR(%earg)
+                                if (defined($GZERR));
+                            
+                        }
+                    }
+                }
+            }
+        }
+    
+        if ($qb_setup)
+        {
+            # pop from the front
+            shift @{$treeCtx->{qb_list}};
+        }
+
+    }
+    return $genTree;
+} # end _find_aggregate_functions
+
+
+sub _check_aggregate_functions
+{
+#    whoami;
+
+    # NOTE: get the current subroutine name so it is easier 
+    # to call recursively
+    my $subname = (caller(0))[3];
+
+    my $self = shift;
+    # generic tree of hashes/arrays
+    my ($genTree, $dict, $tc_sth) = @_;
+
+    my $treeCtx = $tc_sth->{tc3};
+
+    # recursively convert all elements of array
+    if (ref($genTree) eq 'ARRAY')
+    {
+        my $maxi = scalar(@{$genTree});
+        $maxi--;
+        for my $i (0..$maxi)
+        {
+            $genTree->[$i] = $self->$subname($genTree->[$i], $dict, $tc_sth);
+        }
+
+    }
+    if (ref($genTree) eq 'HASH')
+    {
+        keys( %{$genTree} ); # XXX XXX: need to reset expression!!
+
+        my $got_one = 0;
+        if (exists($genTree->{alg_op_name}))
+        {
+            $got_one = 1;
+            push @{$treeCtx->{tc_agg_check}}, $genTree;
+        }
+
+        if (exists($genTree->{aggregate_stage}))
+        {
+            my $op_node = $treeCtx->{tc_agg_check}->[-1];
+            my $fname   = ($genTree->{function_name});
+            
+            if (exists($op_node->{alg_op_name}))
+            {
+                if ($op_node->{alg_op_name} eq 'project')
+                {
+                    # will need to check project to determine if all
+                    # projected columns are aggregates or GROUPed
+                    $op_node->{tc_has_agg} = 1;
+                }
+
+
+                # aggregates are legal in HAVING, ORDER BY,
+                # and illegal in WHERE clause
+
+                # XXX XXX : also illegal in JOIN conditions...
+
+                if (($op_node->{alg_op_name} eq 'filter')
+                    && ($op_node->{alg_filter_type} eq 'WHERE'))
+                {
+                    my $msg = "illegal use of" .
+                        " aggregate function \'$fname\' in WHERE clause";
+
+                    my %earg = (self => $self, msg => $msg,
+                                severity => 'warn');
+
+                    push @{$treeCtx->{tc_err}->{invalid_args}},  $msg;
+                    
+                    &$GZERR(%earg)
+                        if (defined($GZERR));
+                }
+            }
+
+        }
+
+
+        while ( my ($kk, $vv) = each ( %{$genTree})) # big while
+        {
+            $genTree->{$kk} = $self->$subname($vv, $dict, $tc_sth);
+        }
+
+        if ($got_one) 
+        {
+            pop @{$treeCtx->{tc_agg_check}};
+        }
+
+    }
+    return $genTree;
+} # end _check_aggregate_functions
+
+
 
 sub GetFromWhereEtc
 {
@@ -1793,7 +2059,12 @@ sub _get_from_where
                 {
                     $treeCtx->{select_list} = $genTree->{select_list};
                 }
-                if (exists($genTree->{search_cond}))
+                # distinguish WHERE and HAVING clauses...
+                if (exists($genTree->{search_cond}) &&
+                    (exists($genTree->{alg_op_name}) &&
+                     ($genTree->{alg_op_name} eq 'filter')) &&
+                    (exists($genTree->{alg_filter_type}) &&
+                     ($genTree->{alg_filter_type} eq 'WHERE')))
                 {
                     $treeCtx->{where} = $genTree->{search_cond};
                 }
@@ -1882,6 +2153,16 @@ base table.
 
 =over 4
 
+=item  need to generate stages to perform aggregate initialization and intermediate aggregation
+
+=item  check for aggregates in WHERE clause
+
+=item  check for GROUPing/aggregates
+
+=item  check for final select list columns vs all projected columns in all clauses
+
+=item  check args for all functions
+
 =item check for function existance in GenDBI and main namespaces
 
 =item update pod
@@ -1913,7 +2194,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 
 L<perl(1)>.
 
-Copyright (c) 2005 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2005,2006 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

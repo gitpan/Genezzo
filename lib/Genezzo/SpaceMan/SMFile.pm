@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/SpaceMan/RCS/SMFile.pm,v 7.4 2005/09/07 08:26:09 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/SpaceMan/RCS/SMFile.pm,v 7.9 2006/03/10 08:24:46 claude Exp claude $
 #
-# copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 package Genezzo::SpaceMan::SMFile;  # assumes Some/Module.pm
@@ -21,7 +21,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 7.4 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.9 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
     @EXPORT      = ( ); # qw(&NumVal);
@@ -74,7 +74,7 @@ sub new
 
     my $blessref = bless $self, $class;
 
-    unless (_tiefh($self, $bc))
+    unless (_tiefh($self, $bc, 0))
     {
         whisper "bad tie for file header";
         return undef;
@@ -195,7 +195,7 @@ sub PackSpaceList
     }
 
     my $bc = $self->{bc};
-    unless ($self->_tiefh($bc))
+    unless ($self->_tiefh($bc, 0))
     {
         whisper "bad fh tie";
         return (0);
@@ -271,7 +271,7 @@ sub UnPackSpaceList
 #    whoami;
 
     my $bc = $self->{bc};
-    unless ($self->_tiefh($bc))
+    unless ($self->_tiefh($bc, 0))
     {
         whisper "bad fh tie";
         return (0);
@@ -320,14 +320,15 @@ sub UnPackSpaceList
 
 sub _tiefh
 {
-    my ($self, $bc) = @_;
+    my ($self, $bc, $blocknum) = @_;
 
 #    whoami;
 
     my $fileheader = $bc->{fileheader};
 
-    # NOTE: always in block zero for now
-    my $blocknum = 0;
+    # XXX XXX:
+    # NOTE: always in block zero for now 
+#    my $blocknum = 0;
 
     $fileheader->{bceref} = 
         $self->{realbc}->ReadBlock(filenum  => $bc->{realbcfileno},
@@ -430,7 +431,7 @@ sub SMGrowFile
     my $bc = $self->{bc};
     my $freelist_idx = $self->{freelist_idx};
 
-    unless ($self->_tiefh($bc))
+    unless ($self->_tiefh($bc, 0))
     {
         whisper "bad fh tie";
         return (undef);
@@ -519,6 +520,7 @@ sub nextfreeblock
                     extentsize  => 2, # 2 blocks
                     pctincrease => 0, # make next extent 0% larger, i.e
                                       # the same size as previous
+                    all_info    => 0  # only return basic info
                     );
 
     my %required = (
@@ -534,12 +536,13 @@ sub nextfreeblock
 #    local $Genezzo::Util::QUIETWHISPER = 1; # XXX: quiet the whispering
     
     my $gotnewextent = 0; # true if get new extent
+    my $firstextent  = 0; # true if first extent for object
 
-   # get free extent info from fileheader
+    # get free extent info from fileheader
     my $bc = $self->{bc};
     my $freelist_idx = $self->{freelist_idx};
 
-    unless ($self->_tiefh($bc))
+    unless ($self->_tiefh($bc, 0))
     {
         whisper "bad fh tie";
         return (undef);
@@ -557,10 +560,11 @@ sub nextfreeblock
     my ($currBlocknum, @currExtent );
 
     my $spacelist = $self->UnPackSpaceList($tablename);
-#    greet $spacelist;
+#    greet "spacelist:", $spacelist;
 
     if (!(_is_valid_spacelist($spacelist)))
     {
+        $firstextent = 1; # true if first extent for object
         $spacelist = [ $tablename ];
     }
     else
@@ -600,6 +604,10 @@ sub nextfreeblock
         }        
 
     }
+
+    # don't exceed maximum extent
+    $extsize = $Genezzo::Util::MAXEXTENTSIZE
+        if ($extsize > $Genezzo::Util::MAXEXTENTSIZE);
 
   L_bigloop:
     while (1)
@@ -768,6 +776,19 @@ sub nextfreeblock
     push @outi, $currBlocknum;
     push @outi, @currExtent  # new extent info
         if ($gotnewextent);
+    
+    if ($args{all_info})
+    {
+        # NOTE: for RSFile
+        # return as hash vs simple array
+        my $h1 = {};
+        $h1->{basic_array} = \@outi;
+        $h1->{currblocknum} = $currBlocknum;
+        $h1->{currextent} = \@currExtent
+            if ($gotnewextent);
+        $h1->{firstextent} = $firstextent;
+        return $h1;
+    }
 
     return @outi;
 }
@@ -1063,7 +1084,7 @@ sub freetable # drop table/drop index/destroy any object
     my $bc = $self->{bc};
     my $freelist_idx = $self->{freelist_idx};
 
-    unless ($self->_tiefh($bc))
+    unless ($self->_tiefh($bc, 0))
     {
         whisper "bad fh tie";
         return (undef);
@@ -1133,7 +1154,7 @@ sub dump
 {
     my $self = shift;
     my $bc = $self->{bc};
-    unless ($self->_tiefh($bc))
+    unless ($self->_tiefh($bc, 0))
     {
         whisper "bad fh tie";
         return (undef);
@@ -1262,7 +1283,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 
 perl(1).
 
-Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2003, 2004, 2005, 2006 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

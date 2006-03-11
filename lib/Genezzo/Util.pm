@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Util.pm,v 7.9 2005/12/27 01:13:48 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Util.pm,v 7.11 2006/03/10 08:23:54 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -20,7 +20,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 7.9 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.11 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
     @EXPORT      = qw(&whisper &whoami &greet 
@@ -35,6 +35,7 @@ BEGIN {
 #    @EXPORT_OK   = qw($Var1 %Hashit &func3 &func5);
     @EXPORT_OK   = qw($QUIETWHISPER $WHISPERDEPTH $DEFBLOCKSIZE $USECARP 
                       $DEFDBSIZE $MINBLOCKSIZE $MAXBLOCKSIZE $MAXDBSIZE
+                      $MAXOPENFILES $MAXEXTENTSIZE
                       $UNPACK_TEMPL_ARR $WHISPER_PRINT $UTIL_EPRINT 
                       $WHISPERPREFIX $RAW_IO);
 
@@ -152,6 +153,9 @@ our $MINBLOCKSIZE = 1024; # 512;
 
 our $MAXBLOCKSIZE = 65536;
 our $MAXDBSIZE    = 2**31; # 2 Gig # XXX : 4 gig ok all platforms?
+
+our $MAXOPENFILES  = 100;   # number of open files in buffer cache
+our $MAXEXTENTSIZE = 1024;  # max number of blocks in an extent
 
 our $USECARP = 1;
 

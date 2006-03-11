@@ -1,5 +1,10 @@
 Revision history for Perl extension Genezzo
 
+0.57 Fri Mar 10 22:49:16 2006
+        - extent management in table segments - preliminary work.
+        - restrict buffer cache to 100 open files.
+        - require a minimum of 4 blocks per file.
+
 0.56 Mon Jan  2 02:41:05 2006
         - Fix "uninitialized value" for invalid column names in insert 
           (thanks, Eric)

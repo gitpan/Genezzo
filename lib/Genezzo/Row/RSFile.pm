@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSFile.pm,v 7.3 2005/09/07 08:27:12 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSFile.pm,v 7.10 2006/03/11 07:50:16 claude Exp claude $
 #
-# copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 use strict;
@@ -15,6 +15,7 @@ package Genezzo::Row::RSFile;
 use Genezzo::Util;
 use Genezzo::BufCa::BCFile;
 use Genezzo::SpaceMan::SMFile;
+use Genezzo::SpaceMan::SMExtent;
 use Genezzo::PushHash::HPHRowBlk;
 
 use Carp;
@@ -63,13 +64,18 @@ sub _init
     $self->{tso}       = $args{tso};
 
 #    $self->{initial_extent} = $args{initial_extent};
-#    $self->{next_extent} = $args{next_extent};
+#    $self->{next_extent}    = $args{next_extent};
 
-    $self->{smf} = Genezzo::SpaceMan::SMFile->new($args{filename},
-                                                  $args{numbytes},
-                                                  $args{numblocks},
-                                                  $args{bufcache},
-                                                  $args{filenumber});
+    my %nargs = (filename   => $args{filename},
+                 numbytes   => $args{numbytes},
+                 numblocks  => $args{numblocks},
+                 bufcache   => $args{bufcache},
+                 filenumber => $args{filenumber},
+                 tablename  => $args{tablename},
+                 object_id  => $args{object_id}
+                 );
+
+    $self->{smf} = Genezzo::SpaceMan::SMExtent->new(%nargs);
 
     return 0
         unless (defined($self->{smf}));
@@ -240,7 +246,10 @@ sub _make_new_chunk # override the hph method
     my $tso  = $self->{tso};
     my $tablename = $self->{tablename};
     my $object_id = $self->{object_id};
-    
+
+    my $gotnewextent = 0; # true if get new extent
+
+    # release tied blocks
     my $reftb = $self->{reftiebufa};
     $self->{rowd} = ();
     if (defined($reftb))
@@ -248,26 +257,34 @@ sub _make_new_chunk # override the hph method
         untie $reftb;
     }
 
-    my (@blockinfo, $blockno);
+    my ($blockinfo, $blockno);
     for my $num_tries (1..2)
     {
         my %nargs = (tablename   => $tablename,
                      object_id   => $object_id,
+                     all_info    => 1 # ask for all info
                      );
 
         # XXX XXX: get from TSO
         $nargs{pctincrease} = 50;
 
-        @blockinfo =
+        $blockinfo =
             $smf->nextfreeblock(%nargs);
 
-#    greet @blockinfo
-#        if (scalar(@blockinfo) > 1);
+        $gotnewextent = 0; # true if get new extent
 
-        $bc->{bufblockno} = $blockinfo[0];
+        if (defined($blockinfo))
+        {
+            if (exists($blockinfo->{currextent}))
+            {
+                greet "new extent", $blockinfo ;
+                $gotnewextent = 1; # true if get new extent
+            }
 
-        $blockno   = $bc->{bufblockno};
+            $bc->{bufblockno} = $blockinfo->{basic_array}->[0];
 
+            $blockno   = $bc->{bufblockno};
+        }
         last if (defined ($blockno));
 
         # no space left?  See if can extend this file.
@@ -319,6 +336,47 @@ sub _make_new_chunk # override the hph method
          ); # XXX XXX : get blocksize from bce!!
     
     $self->{reftiebufa} = \%tiebufa;
+
+    if ($gotnewextent)
+    {
+        # size of extent is last entry in blockinfo
+        my $extent_size = $blockinfo->{currextent}->[-1];
+
+#        print "e:", $extent_size, "\n";
+
+        # get meta data for the extent header
+        my $row = $self->{rowd}->_get_meta_row("XHD");
+
+#        if ($row && scalar(@{$row}) && ($row->[0] == $extent_size))
+#        {
+#            print "match for first extent\n";
+#        }
+#        else
+#        {
+#            print "no match for first extent - $extent_size\n";
+#        }
+
+        $self->{currextent}  = $blockno;
+        $self->{extent_size} = $extent_size;
+        $self->{extent_posn} = 0;
+    }
+    else
+    {
+        $self->{extent_posn} += 1;
+        my $posn = $self->{extent_posn};
+        # get meta data for the extent header
+        my $row = $self->{rowd}->_get_meta_row("XP");
+
+#        if ($row && scalar(@{$row}) && ($row->[0] == $posn))
+#        {
+#            print "match for position\n";
+#        }
+#        else
+#        {
+#            print "no match for position - $posn \n";
+#        }
+
+    }
     
     return ($self->{rowd});
 }
@@ -775,9 +833,11 @@ RSFile support all standard hph hierarchical pushhash operations.
 
 various
 
-=head1 #TODO
+=head1 TODO
 
 =over 4
+
+=item need error handlers vs "whisper"
 
 =back
 
@@ -789,7 +849,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 
 L<perl(1)>.
 
-Copyright (c) 2003, 2004, 2005 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2003, 2004, 2005, 2006 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
