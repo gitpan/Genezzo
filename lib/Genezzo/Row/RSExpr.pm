@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSExpr.pm,v 7.2 2005/11/26 02:10:29 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSExpr.pm,v 7.3 2006/03/30 07:20:30 claude Exp claude $
 #
-# copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2005, 2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 use strict;
@@ -63,7 +63,9 @@ sub _init
     my $self      =  shift;
 
     my %required  =  (
-                      rs => "no rowsource!"
+                      rs => "no rowsource!",
+                      dict => "no dictionary!",
+                      magic_dbh => "no dbh!"
                       );
     
     my %args = (@_);
@@ -71,7 +73,9 @@ sub _init
     return 0
         unless (Validate(\%args, \%required));
 
-    $self->{rs} = $args{rs};
+    $self->{rs}   = $args{rs};
+    $self->{dict} = $args{dict};
+    $self->{dbh}  = $args{magic_dbh};
 
     if (defined($args{select_list}))
     {
@@ -138,7 +142,7 @@ sub HCount
     my $self = shift;
     my $rs = $self->{rs};
 
-    whoami;
+#    whoami;
 
     return ($rs->HCount(@_));
 }
@@ -149,7 +153,7 @@ sub STORE
     my $self = shift;
     my $rs = $self->{rs};
 
-    whoami;
+#    whoami;
 
     return ($rs->STORE(@_));
 }
@@ -159,7 +163,7 @@ sub FETCH
     my $self = shift;
     my $rs = $self->{rs};
 
-    whoami;
+#    whoami;
 
     return ($rs->FETCH(@_));
 }
@@ -227,8 +231,11 @@ sub SQLPrepare # get a DBI-style statement handle
 {
     my $self = shift;
     my %args = @_;
-    $args{pushhash} = $self;
-    $args{rs}       = $self->{rs};
+    $args{pushhash}  = $self;
+    $args{rs}        = $self->{rs}; 
+    $args{dict}      = $self->{dict};
+    $args{magic_dbh} = $self->{dbh};
+
     if (defined($self->{select_list}))
     {
         $args{select_list} = $self->{select_list};
@@ -260,6 +267,8 @@ sub _init
     return 0
         unless (defined($args{pushhash}));
     $self->{pushhash} = $args{pushhash};
+    $self->{dict}     = $args{dict};
+    $self->{dbh}      = $args{magic_dbh};
 
     return 0
         unless (defined($args{rs}));
@@ -322,6 +331,8 @@ sub SQLFetch
 #    whoami;
 
     my $tc_rownum = $self->{rownum} + 1;
+    my $tc_dict   = $self->{dict};
+    my $tc_dbh    = $self->{dbh};
 
 #    my ($tc_rid, $vv) = $rs->SQLFetch(@_);
     my ($rid, $vv) = $rs->SQLFetch(@_);
@@ -498,7 +509,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 
 L<perl(1)>.
 
-Copyright (c) 2005 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2005, 2006 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

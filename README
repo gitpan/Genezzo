@@ -452,12 +452,13 @@ NEW FEATURES - ALTER TABLE ADD CONSTRAINT
 NEW FEATURES - System/User Extensibility
 
   Version 0.25 of Genezzo supports database extensibility.  See
-  Genezzo::Havok for more details.  The script "havok.sql" can be used
-  add extensibility tables to your database.  It can be invoked as
-  "@havok.sql" from the gendba command line.  In particular, the table
-  user_extend can be used to load new functions or perl modules into
-  Genezzo.  For example, the havok.sql script loads "Text::Soundex", so
-  queries can use Text::Soundex::soundex in the WHERE clause.
+  Genezzo::Havok for more details.  The script "havok.sql" (now
+  deprecated) can be used to add extensibility tables to your database.
+  In version 0.58 a new function HavokUse supercedes the havok.sql
+  script.  In particular, the table user_extend can be used to load
+  new functions or perl modules into Genezzo.  For example, the
+  havok.sql script loads "Text::Soundex", so queries can use
+  Text::Soundex::soundex in the WHERE clause.
 
   Version 0.28 of Genezzo slightly modifies the havok and user_extend
   tables, and it provides the capability to import functions into the
@@ -567,9 +568,43 @@ NEW FEATURES - Tablespaces
 NEW FEATURES - Joins
   In Version 0.52, basic joins are supported.
 
+NEW FEATURES - DUAL table
+
+  In version 0.58, Genezzo provides a single-row DUAL table which is
+  useful for evaluating expressions, e.g.:
+
+  gendba 1>  select (((5+5)/4)*32) from dual;
+  (((5+5)/4)*32)
+  ______________
+
+  80
+
+  1 row selected.
+
+
+NEW FEATURES - HavokUse function for System/User Extensibility
+
+  In version 0.58, the HavokUse function supercedes the havok.sql and
+  syshook.sql scripts.  HavokUse operates on Havok modules in a
+  fashion analogous to the way perl "use" loads perl modules. Havok
+  modules now use a metadata document similar to the MakeMaker META.yml
+  which lists module dependencies, table definitions, etc.  For example,
+  to load Genezzo::Havok::SysHook, use the command:
+
+      Select HavokUse('Genezzo::Havok::SysHook') from dual;
+
+  If the havok and sys_hook tables do not exist, HavokUse will create
+  and update these tables.  If the tables already exist, HavokUse will
+  do nothing, but return successfully.  See the Havok module for more
+  details.  Note that the "select" statement is now invoking
+  dictionary actions which may create and update new tables, and which
+  may need to be committed.  Also, HavokUse only performs partial
+  initialization -- it is still necessary to commit, shutdown and
+  restart to activate the new Havok modules.
+
 INCOMPATIBLE CHANGES
 
-  Version 0.57 dictionary and block format is incompatible with
+  Version 0.58 dictionary and block format is incompatible with
   previous releases.  No upgrade path is supported.
   Version 0.48 thru 0.50 are compatible.
 

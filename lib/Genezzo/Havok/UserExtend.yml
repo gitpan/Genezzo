@@ -1,0 +1,26 @@
+# havok version=7.09
+ABSTRACT:     
+AUTHOR:    Jeffrey I Cohen (jcohen@cpan.org)
+DML:    
+  -    
+    check:    
+
+    install:    
+
+
+
+LICENSE:    gpl
+NAME:    Genezzo::Havok::UserExtend
+PREREQ_HAVOK:    
+  Genezzo::Havok:    0.0
+
+TABLEDEFS:    
+  user_extend:    
+    create_table:    xid=n xtype=c xname=c args=c owner=c creationdate=c version=c
+    dml:    
+      -    i havok 2 Genezzo::Havok::UserExtend SYSTEM 2006-03-31T06:21:30 0 7.04
+
+
+
+UPDATED:    2006-04-03T00:56:05
+VERSION:    7.04

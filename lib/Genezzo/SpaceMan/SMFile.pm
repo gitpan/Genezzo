@@ -609,6 +609,13 @@ sub nextfreeblock
     $extsize = $Genezzo::Util::MAXEXTENTSIZE
         if ($extsize > $Genezzo::Util::MAXEXTENTSIZE);
 
+    # XXX XXX XXX XXX: can just clear @currExtent to force new extent
+    # allocation.  Maybe extend this to create multiple extents
+    # simultaneously? Or never update the table entry in block zero,
+    # which would treat each call to nextfreeblock as the first extent
+    # creation (though this would break pctincrease, since no last
+    # extent...)
+
   L_bigloop:
     while (1)
     {

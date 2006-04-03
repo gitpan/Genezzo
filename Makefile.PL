@@ -47,8 +47,11 @@ sub postamble { <<'END_POSTAMBLE'; }
 GENEZZO_SPECIAL: GENEZZO_HAVOK GENEZZO_SYSHOOK GENEZZO_SQL
 GENEZZO_HAVOK: lib/Genezzo/Havok.pm
 	$(PERLRUNINST) -MGenezzo::Havok -e 'print Genezzo::Havok::MakeSQL();' > lib/Genezzo/havok.sql
+	$(PERLRUNINST) -MGenezzo::Havok -e 'print Genezzo::Havok::MakeYML();' > lib/Genezzo/Havok.yml
+	$(PERLRUNINST) -MGenezzo::Havok::UserExtend -e 'print Genezzo::Havok::UserExtend::MakeYML();' > lib/Genezzo/Havok/UserExtend.yml
 GENEZZO_SYSHOOK: lib/Genezzo/Havok/SysHook.pm
 	$(PERLRUNINST) -MGenezzo::Havok::SysHook -e 'print Genezzo::Havok::SysHook::MakeSQL();' > lib/Genezzo/syshook.sql
+	$(PERLRUNINST) -MGenezzo::Havok::SysHook -e 'print Genezzo::Havok::SysHook::MakeYML();' > lib/Genezzo/Havok/SysHook.yml
   GENEZZO_SQL: lib/Genezzo/Parse/SQLGrammar.pl
 	($(PERLRUNINST) lib/Genezzo/Parse/SQLGrammar.pl ; mv SQL.pm lib/Genezzo/Parse)
 END_POSTAMBLE

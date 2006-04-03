@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/XEval/RCS/Prepare.pm,v 7.3 2005/11/26 01:55:53 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/XEval/RCS/Prepare.pm,v 7.5 2006/04/03 07:55:06 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -17,7 +17,7 @@ use Carp;
 our $VERSION;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 7.3 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.5 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -562,8 +562,22 @@ sub _sql_where
 
         if (exists($genTree->{function_name}))
         {
+            my $hash_args = 0;
+
             my $foundIt = 0;
             my $fn_name = 'Genezzo::GenDBI::'. $genTree->{function_name};
+
+            if ($genTree->{function_name} =~ m/^HavokUse$/i)
+            {
+                $fn_name = 'Genezzo::GenDBI::sql_func_HavokUse';
+            }
+
+            if (($genTree->{function_name} =~ m/^sql_func_HavokUse$/)
+                || ($genTree->{function_name} =~ m/^HavokUse$/i))
+            {
+                # pass a hash vs an array of args
+                $hash_args = 1;
+            }
 
             # look in GenDBI namespace first, then system
             for my $numtries (1..2)
@@ -600,6 +614,11 @@ sub _sql_where
             my $bigstr  = ' ' . $fn_name . '( ';
             
             # 
+            if ($hash_args)
+            {
+                $bigstr .= 'function_args => [ ';
+            }
+
 
             if (exists($genTree->{operands})
                 && (ref($genTree->{operands}) eq 'ARRAY')
@@ -633,6 +652,12 @@ sub _sql_where
                     }
                 }
             }
+
+            if ($hash_args)
+            {
+                $bigstr .= ' ], dict => $tc_dict,  dbh => $tc_dbh ';
+            }
+
             $bigstr .= ')';
             $genTree->{vx} = $bigstr;
         } # end function name

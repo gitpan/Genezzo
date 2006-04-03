@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 7.18 2006/03/11 06:48:39 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 7.19 2006/04/03 07:52:09 claude Exp claude $
 #
 # copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -49,11 +49,11 @@ BEGIN {
 	
 }
 
-our $VERSION   = '0.57';
+our $VERSION   = '0.58';
 our $RELSTATUS = 'Alpha'; # release status
 # grab the code check-in date and convert to YYYYMMDD
 our $RELDATE   = 
-    do { my @r = (q$Date: 2006/03/11 06:48:39 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
+    do { my @r = (q$Date: 2006/04/03 07:52:09 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
 
 our $errstr; # DBI errstr
 
@@ -2341,7 +2341,9 @@ sub SQLInsert
 
 
     my @iii =  ($self->{xeval}->SQLInsert(plan    => $tc,
-                                          dbh_ctx => $self->{dbh_ctx}
+                                          dbh_ctx => $self->{dbh_ctx},
+                                          dict    => $self->{dictobj},
+                                          magic_dbh => $self
                                           ));
 
     return undef
@@ -2385,6 +2387,7 @@ sub SQLInsert
 
 
     my ($key, $rownum, @vals, @selex_state);
+    my @padnulls;
 
     if (scalar(@got_vals))
     {
@@ -2416,9 +2419,17 @@ sub SQLInsert
 #        greet @sel_prep_info;
         # compare insert column list to select list
         # XXX XXX : need to fix here too
-        # XXX XXX : is too few cols legal?  pad remainder with nulls?
+        # XXX XXX : if too few cols  pad remainder with nulls
         my $comp = ($colcnt <=> scalar(@{$sel_prep_info[2]}));
-        unless (0 == $comp) # should be zero if match
+
+        if (1 == $comp)
+        {
+            # extend an array of nulls
+            $padnulls[($colcnt - scalar(@{$sel_prep_info[2]})) - 1] = undef;
+        }
+
+        if (-1 == $comp) # should be zero if match
+#        unless (0 == $comp) # should be zero if match
         {
             my $msg = "Cannot insert: too " . (($comp == -1) ? "many": "few") .
             " columns in SELECT list\n";
@@ -2453,6 +2464,8 @@ sub SQLInsert
 #            greet $key, $rownum,  @vals;
 
             push @outi, @vals;
+            push @outi, @padnulls
+                if (scalar(@padnulls));
 #            last
 #                unless ($fetchall); XXX XXX : doesn't work right...
         }
@@ -2487,6 +2500,9 @@ sub SQLInsert
                 unless (defined($key));
 
             push @outi, @vals;
+            push @outi, @padnulls
+                if (scalar(@padnulls));
+
         }
 
         my $istat2 = $self->Kgnz_Insert2(@outi);
@@ -3184,7 +3200,9 @@ sub SelectExecute
 
 
         my %nargs = (
-                     GZERR     => $self->{GZERR}
+                     GZERR     => $self->{GZERR},
+                     dict      => $dictobj,
+                     magic_dbh => $self
                      );
 
         if (!$use_joina)
@@ -4087,6 +4105,27 @@ sub Kgnz_BigStatement
     }
     return 0;
 }
+
+#########################
+# SQL FUNCTIONS - start #
+#########################
+sub sql_func_now
+{
+    return Genezzo::Dict::time_iso8601();
+}
+
+sub sql_func_sysdate
+{
+    return Genezzo::Dict::time_iso8601();
+}
+
+sub sql_func_HavokUse
+{
+    return Genezzo::Dict::HavokUse(@_);
+}
+#########################
+# SQL FUNCTIONS - end   #
+#########################
 
 # check preferences for automatic mount
 sub automountcheck

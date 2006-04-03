@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/XEval.pm,v 7.4 2005/11/26 01:57:30 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/XEval.pm,v 7.5 2006/03/30 07:21:36 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -20,7 +20,7 @@ use Carp;
 our $VERSION;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 7.4 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.5 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -325,7 +325,9 @@ sub SQLInsert
     my $self = shift;
 
     my %required = (
-                    plan => "no plan!"
+                    plan => "no plan!",
+                    dict => "no dictionary!",
+                    magic_dbh => "no dbh!"
                     );
 
     my %args = ( # %optional,
@@ -336,7 +338,9 @@ sub SQLInsert
     return undef
         unless (Validate(\%args, \%required));
 
-    my $alg = $args{plan};
+    my $alg     = $args{plan};
+    my $dictobj = $args{dict};
+    my $dbh     = $args{magic_dbh};
 
     unless (exists($alg->{sql_insert}) &&
             exists($alg->{sql_insert}->[1]->{insert_values}))
@@ -418,6 +422,8 @@ sub SQLInsert
         
         my %nargs = (
                      GZERR       => $self->{GZERR},
+                     dict        => $dictobj,
+                     magic_dbh   => $dbh,
                      rs          => $rsd_tv,
                      select_list => \@sel_list,
                      # NOTE: alias is now a required argument for

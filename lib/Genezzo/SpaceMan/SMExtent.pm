@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/SpaceMan/RCS/SMExtent.pm,v 1.15 2006/03/11 07:49:50 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/SpaceMan/RCS/SMExtent.pm,v 1.16 2006/03/14 08:20:39 claude Exp claude $
 #
 # copyright (c) 2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -22,7 +22,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 1.15 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.16 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
     @EXPORT      = ( ); # qw(&NumVal);
@@ -34,6 +34,46 @@ BEGIN {
     @EXPORT_OK   = (); 
 
 }
+
+our $GZERR = sub {
+    my %args = (@_);
+
+    return 
+        unless (exists($args{msg}));
+
+    if (exists($args{self}))
+    {
+        my $self = $args{self};
+        if (defined($self) && exists($self->{GZERR}))
+        {
+            my $err_cb = $self->{GZERR};
+            return &$err_cb(%args);
+        }
+    }
+
+    my $warn = 0;
+    if (exists($args{severity}))
+    {
+        my $sev = uc($args{severity});
+        $sev = 'WARNING'
+            if ($sev =~ m/warn/i);
+
+        # don't print 'INFO' prefix
+        if ($args{severity} !~ m/info/i)
+        {
+            printf ("%s: ", $sev);
+            $warn = 1;
+        }
+
+    }
+    # XXX XXX XXX
+    print __PACKAGE__, ": ",  $args{msg};
+#    print $args{msg};
+#    carp $args{msg}
+#      if (warnings::enabled() && $warn);
+    
+};
+
 
 sub _init
 {
@@ -81,7 +121,6 @@ sub _init
         my $rowd = _get_rowd($self, $blockno);
         unless (defined($rowd))
         {
-            whisper "bad fh tie";
             return (undef);
         }
 
@@ -116,7 +155,6 @@ sub _init
             $rowd = _get_rowd($self, $blockno);
             unless (defined($rowd))
             {
-                whisper "bad fh tie";
                 return (undef);
             }
 
@@ -132,7 +170,6 @@ sub _init
         $rowd = _get_rowd($self, 0);
         unless (defined($rowd))
         {
-            whisper "bad fh tie";
             return (undef);
         }
     }
@@ -152,6 +189,15 @@ sub new
     return undef
         unless (_init($self,%args));
 
+    if ((exists($args{GZERR}))
+        && (defined($args{GZERR}))
+        && (length($args{GZERR})))
+    {
+        # NOTE: don't supply our GZERR here - will get
+        # recursive failure...
+        $self->{GZERR} = $args{GZERR};
+    }
+
     my $blessref = bless $self, $class;
 
     return $blessref;
@@ -170,12 +216,30 @@ sub _get_rowd # private
     unless ($self->{smf}->_tiefh($bc, $blockno))
     {
         whisper "bad fh tie";
+        my $msg = "bad fh tie\n";
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'warn');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return (undef);
     }
     my $fileheader = $bc->{fileheader};
     
     my $rowd = $fileheader->{RealTie};
 
+    unless (defined($rowd))
+    {
+        whisper "bad fh real tie";
+        my $msg = "bad fh real tie\n";
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'warn');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
+    }
     return $rowd;
 }
 
@@ -240,7 +304,6 @@ sub _update_segment_hdr
         $rowd = $self->_get_rowd($self->{current_seghdr});
         unless (defined($rowd))
         {
-            whisper "bad fh tie";
             return (undef);
         }
         # get meta data for the segment header
@@ -257,7 +320,6 @@ sub _update_segment_hdr
             $rowd = $self->_get_rowd($blockno);
             unless (defined($rowd))
             {
-                whisper "bad fh tie";
                 return (undef);
             }
             
@@ -271,7 +333,6 @@ sub _update_segment_hdr
             $rowd = $self->_get_rowd($self->{current_seghdr});
             unless (defined($rowd))
             {
-                whisper "bad fh tie";
                 return (undef);
             }
         } # end if make overflow
@@ -375,9 +436,13 @@ sub _update_extent_hdr
 
     if (! (defined($row) && scalar(@{$row})))
     {
-        # XXX XXX: ERROR
-        print "bad extent header\n";
-        whisper "bad extent header";
+        my $msg = "bad extent header\n";
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'warn');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return undef;
     }
 
@@ -425,15 +490,20 @@ sub _find_extent_hdr
     my $rowd = $self->_get_rowd($blockno);
     unless (defined($rowd))
     {
-        whisper "bad fh tie";
         return (undef);
     }
     # get meta data for the position
     my $row = $rowd->_get_meta_row("XHP");
+
     unless (defined($row))
     {
-        # XXX XXX: error
-        print "no position!";
+        my $msg = "no position!\n";
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'warn');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         return undef;
     }
     my $posn        = $row->[0];
@@ -474,7 +544,6 @@ sub _file_nextfreeblock
     my $rowd = $self->_get_rowd($blockno);
     unless (defined($rowd))
     {
-        whisper "bad fh tie";
         return (undef);
     }
 
@@ -514,8 +583,13 @@ sub _file_nextfreeblock
 
             unless (scalar(@ggg) > 1)
             {
-                # XXX XXX: ERROR
-                print "could not find extent header!\n";
+                my $msg = "could not find extent header!\n";
+                my %earg = (self => $self, msg => $msg,
+                            severity => 'warn');
+        
+                &$GZERR(%earg)
+                    if (defined($GZERR));
+
                 return undef;
             }
             # set info for previous block
@@ -526,7 +600,6 @@ sub _file_nextfreeblock
             $rowd = $self->_get_rowd($blockno);
             unless (defined($rowd))
             {
-                whisper "bad fh tie";
                 return (undef);
             }
  
@@ -547,15 +620,19 @@ sub _file_nextfreeblock
             $rowd = $self->_get_rowd($blockno - $posn);
             unless (defined($rowd))
             {
-                whisper "bad fh tie";
                 return (undef);
             }
             my $old_posn = $self->{extent_posn} - 1;
             # update previous position as 100% used...
             unless ($self->_update_extent_hdr($rowd, $old_posn, 100))
             {
-                # XXX XXX: ERROR
-                print "bad!!";
+                my $msg = "could not update extent header\n";
+                my %earg = (self => $self, msg => $msg,
+                            severity => 'warn');
+        
+                &$GZERR(%earg)
+                    if (defined($GZERR));
+
                 return undef;
             }
         }
@@ -581,8 +658,13 @@ sub _file_nextfreeblock
             # set meta data for the segment header in this file
             unless ($self->_create_segment_hdr($rowd, $blockno, $extent_size))
             {
-                # XXX XXX: ERROR
-                print "bad!!";
+                my $msg = "could not create segment header\n";
+                my %earg = (self => $self, msg => $msg,
+                            severity => 'warn');
+        
+                &$GZERR(%earg)
+                    if (defined($GZERR));
+
                 return undef;
             }
         }
@@ -594,8 +676,13 @@ sub _file_nextfreeblock
         # set meta data for the extent header
         unless ($self->_create_extent_hdr($rowd, $extent_size))
         {
-            # XXX XXX: ERROR
-            print "bad!!";
+            my $msg = "could not create extent header\n";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+        
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
             return undef;
         }
 
@@ -609,7 +696,6 @@ sub _file_nextfreeblock
     $rowd = $self->_get_rowd(0);
     unless (defined($rowd))
     {
-        whisper "bad fh tie";
         return (undef);
     }
 

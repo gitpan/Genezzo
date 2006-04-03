@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSJoinA.pm,v 1.5 2005/11/26 02:09:25 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSJoinA.pm,v 1.6 2006/03/30 07:20:30 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -63,7 +63,9 @@ sub _init
     my $self      =  shift;
 
     my %required  =  (
-                      rs_list => "no rowsource list!"
+                      rs_list => "no rowsource list!",
+                      dict    => "no dictionary!",
+                      magic_dbh => "no dbh!"
                       );
     
     my %args = (@_);
@@ -72,6 +74,8 @@ sub _init
         unless (Validate(\%args, \%required));
 
     $self->{rs_list} = $args{rs_list};
+    $self->{dict}    = $args{dict};
+    $self->{dbh}     = $args{magic_dbh};
 
     if (defined($args{select_list}))
     {
@@ -404,8 +408,11 @@ sub SQLPrepare # get a DBI-style statement handle
 {
     my $self = shift;
     my %args = @_;
-    $args{pushhash} = $self;
-    $args{rs_list}       = $self->{rs_list};
+    $args{pushhash}  = $self;
+    $args{rs_list}   = $self->{rs_list};
+    $args{dict}      = $self->{dict};
+    $args{magic_dbh} = $self->{dbh};
+
     if (defined($self->{select_list}))
     {
         $args{select_list} = $self->{select_list};
@@ -436,6 +443,8 @@ sub _init
     return 0
         unless (defined($args{pushhash}));
     $self->{pushhash} = $args{pushhash};
+    $self->{dict}     = $args{dict};
+    $self->{dbh}      = $args{magic_dbh};
 
     return 0
         unless (defined($args{rs_list}));
@@ -531,7 +540,8 @@ sub SQLFetch
 #    whoami;
 
     my $tc_rownum = $self->{rownum} + 1;
-
+    my $tc_dict   = $self->{dict};
+    my $tc_dbh    = $self->{dbh};
 #    my ($tc_rid, $vv) = $rs->SQLFetch(@_);
 
     my ($rid, $vv);

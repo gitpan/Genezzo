@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSFile.pm,v 7.10 2006/03/11 07:50:16 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSFile.pm,v 7.11 2006/03/14 08:21:32 claude Exp claude $
 #
 # copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -22,6 +22,45 @@ use Carp;
 use warnings::register;
 
 our @ISA = qw(Genezzo::PushHash::HPHRowBlk) ;
+
+our $GZERR = sub {
+    my %args = (@_);
+
+    return 
+        unless (exists($args{msg}));
+
+    if (exists($args{self}))
+    {
+        my $self = $args{self};
+        if (defined($self) && exists($self->{GZERR}))
+        {
+            my $err_cb = $self->{GZERR};
+            return &$err_cb(%args);
+        }
+    }
+
+    my $warn = 0;
+    if (exists($args{severity}))
+    {
+        my $sev = uc($args{severity});
+        $sev = 'WARNING'
+            if ($sev =~ m/warn/i);
+
+        # don't print 'INFO' prefix
+        if ($args{severity} !~ m/info/i)
+        {
+            printf ("%s: ", $sev);
+            $warn = 1;
+        }
+
+    }
+    # XXX XXX XXX
+    print __PACKAGE__, ": ",  $args{msg};
+#    print $args{msg};
+#    carp $args{msg}
+#      if (warnings::enabled() && $warn);
+    
+};
 
 our $ROW_DIR_BLOCK_CLASS  = 'Genezzo::Row::RSBlock';
 
@@ -75,6 +114,15 @@ sub _init
                  object_id  => $args{object_id}
                  );
 
+    if ((exists($args{GZERR}))
+        && (defined($args{GZERR}))
+        && (length($args{GZERR})))
+    {
+        # NOTE: don't supply our GZERR here - will get
+        # recursive failure...
+        $nargs{GZERR} = $args{GZERR};
+    }
+
     $self->{smf} = Genezzo::SpaceMan::SMExtent->new(%nargs);
 
     return 0
@@ -117,6 +165,15 @@ sub TIEHASH
     my %args = (@_);
     return undef
         unless (_init($self,%args));
+
+    if ((exists($args{GZERR}))
+        && (defined($args{GZERR}))
+        && (length($args{GZERR})))
+    {
+        # NOTE: don't supply our GZERR here - will get
+        # recursive failure...
+        $self->{GZERR} = $args{GZERR};
+    }
 
     return bless $self, $class;
 

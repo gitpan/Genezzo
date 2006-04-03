@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/UserExtend.pm,v 7.2 2005/12/12 09:14:17 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/UserExtend.pm,v 7.4 2006/03/31 06:21:30 claude Exp $
 #
-# copyright (c) 2004, 2005 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2004, 2005, 2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 package Genezzo::Havok::UserExtend;
@@ -13,6 +13,53 @@ use warnings;
 use warnings::register;
 
 use Carp;
+
+our $VERSION;
+our $MAKEDEPS;
+
+BEGIN {
+    $VERSION = do { my @r = (q$Revision: 7.4 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+
+    my $pak1  = __PACKAGE__;
+    $MAKEDEPS = {
+        'NAME'     => $pak1,
+        'ABSTRACT' => ' ',
+        'AUTHOR'   => 'Jeffrey I Cohen (jcohen@cpan.org)',
+        'LICENSE'  => 'gpl',
+        'VERSION'  =>  $VERSION,
+#        'UPDATED'  => Genezzo::Dict::time_iso8601()
+        }; # end makedeps
+
+    $MAKEDEPS->{'PREREQ_HAVOK'} = {
+        'Genezzo::Havok' => '0.0',
+    };
+
+    # DML is an array, not a hash
+
+#    my $now = Genezzo::Dict::time_iso8601()
+    my $now = 
+    do { my @r = (q$Date: 2006/03/31 06:21:30 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
+
+    my $dml =
+        [
+         "i havok 2 $pak1 SYSTEM $now 0 $VERSION"
+         ];
+
+    my %tabdefs = 
+        ('user_extend' =>  {
+            create_table =>  
+                'xid=n xtype=c xname=c args=c owner=c creationdate=c version=c',            dml => $dml
+            }
+         );
+    $MAKEDEPS->{'TABLEDEFS'} = \%tabdefs;
+
+    $MAKEDEPS->{'DML'} = [
+                          { check => [],
+                            install => [] }
+                          ];
+
+#    print Data::Dumper->Dump([$MAKEDEPS]);
+}
 
 our $GZERR = sub {
     my %args = (@_);
@@ -34,6 +81,18 @@ our $GZERR = sub {
         if warnings::enabled();
     
 };
+
+sub MakeYML
+{
+    use Genezzo::Havok;
+
+    my $makedp = $MAKEDEPS;
+
+#    $makedp->{'UPDATED'}  = Genezzo::Dict::time_iso8601();
+
+    return Genezzo::Havok::MakeYML($makedp);
+}
+
 
 sub HavokInit
 {
@@ -316,7 +375,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 
 L<perl(1)>.
 
-Copyright (c) 2004, 2005 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2004, 2005, 2006 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

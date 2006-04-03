@@ -1,5 +1,10 @@
 Revision history for Perl extension Genezzo
 
+0.58 Mon Apr  3 00:48:51 2006
+        - Havok: new HavokUse function to load Havok modules.  
+        - INSERT SELECT: fix null padding for insufficient columns
+        - add DUAL table 
+
 0.57 Fri Mar 10 22:49:16 2006
         - extent management in table segments - preliminary work.
         - restrict buffer cache to 100 open files.

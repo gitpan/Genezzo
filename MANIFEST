@@ -49,8 +49,11 @@ lib/Genezzo/BufCa/PinScalar.pm
 lib/Genezzo/Dict.pm
 lib/Genezzo/dict.sql
 lib/Genezzo/Havok.pm
+lib/Genezzo/Havok.yml
 lib/Genezzo/Havok/SysHook.pm
+lib/Genezzo/Havok/SysHook.yml
 lib/Genezzo/Havok/UserExtend.pm
+lib/Genezzo/Havok/UserExtend.yml
 lib/Genezzo/Havok/Basic.pm
 lib/Genezzo/Havok/Examples.pm
 lib/Genezzo/Havok/OO_Examples.pm

@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/SysHook.pm,v 7.4 2005/12/12 09:14:17 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/SysHook.pm,v 7.6 2006/04/03 07:53:46 claude Exp claude $
 #
-# copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2005, 2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 package Genezzo::Havok::SysHook;
@@ -22,10 +22,52 @@ our %SysHookOriginal; # save original value of all hooks for posterity
 our %ReqObjList;      # Object-Oriented Require
 our %ReqObjMethod;    # Object-Oriented Meth
 
+our $MAKEDEPS;
+
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 7.4 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.6 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     $Got_Hooks = 0;
+
+    my $pak1  = __PACKAGE__;
+    $MAKEDEPS = {
+        'NAME'     => $pak1,
+        'ABSTRACT' => ' ',
+        'AUTHOR'   => 'Jeffrey I Cohen (jcohen@cpan.org)',
+        'LICENSE'  => 'gpl',
+        'VERSION'  =>  $VERSION,
+#        'UPDATED'  => Genezzo::Dict::time_iso8601()
+        }; # end makedeps
+
+    $MAKEDEPS->{'PREREQ_HAVOK'} = {
+        'Genezzo::Havok' => '0.0',
+    };
+
+    # DML is an array, not a hash
+
+    my $now = 
+    do { my @r = (q$Date: 2006/04/03 07:53:46 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
+
+    my $dml =
+        [
+         "i havok 3 $pak1 SYSTEM $now 0 $VERSION"
+         ];
+
+    my %tabdefs = 
+        ('sys_hook' =>  {
+            create_table =>  
+                'xid=n pkg=c hook=c replace=c xtype=c xname=c args=c owner=c creationdate=c version=c',
+                dml => $dml
+            }
+         );
+    $MAKEDEPS->{'TABLEDEFS'} = \%tabdefs;
+
+    $MAKEDEPS->{'DML'} = [
+                          { check => [],
+                            install => [] }
+                          ];
+
+#    print Data::Dumper->Dump([$MAKEDEPS]);
 }
 
 our $GZERR = sub {
@@ -49,15 +91,27 @@ our $GZERR = sub {
     
 };
 
+sub MakeYML
+{
+    use Genezzo::Havok;
+
+    my $makedp = $MAKEDEPS;
+
+#    $makedp->{'UPDATED'}  = Genezzo::Dict::time_iso8601();
+
+    return Genezzo::Havok::MakeYML($makedp);
+}
+
+# XXX XXX: Note: This method and the associated SQL script are
+# deprecated, since all the work is done in HavokUse
 sub MakeSQL
 {
     my $bigSQL; 
     ($bigSQL = <<EOF_SQL) =~ s/^\#//gm;
-#REM Copyright (c) 2005 Jeffrey I Cohen.  All rights reserved.
+#REM Copyright (c) 2005, 2006 Jeffrey I Cohen.  All rights reserved.
 #REM
 #REM 
-#ct sys_hook xid=n pkg=c hook=c replace=c xtype=c xname=c args=c owner=c creationdate=c version=c
-#i havok 3 Genezzo::Havok::SysHook SYSTEM TODAY 0 HAVOK_VERSION
+#select HavokUse('Genezzo::Havok::SysHook') from dual
 #
 #REM HAVOK_EXAMPLE
 #i sys_hook 1 Genezzo::Dict dicthook1 Howdy_Hook require Genezzo::Havok::Examples Howdy SYSTEM TODAY 0
@@ -495,7 +549,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 
 L<perl(1)>.
 
-Copyright (c) 2005 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2005, 2006 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

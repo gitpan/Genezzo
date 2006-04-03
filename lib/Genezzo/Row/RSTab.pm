@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSTab.pm,v 7.3 2005/11/26 02:08:07 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSTab.pm,v 7.4 2006/03/14 08:21:14 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -237,6 +237,12 @@ sub _make_new_chunk # override the hph method
                 bufcache  => $self->{bc},
                 tso       => $self->{tso}
                 );
+
+    if (exists($self->{GZERR}) &&
+        defined($self->{GZERR}))
+    {
+        $args{GZERR} = $self->{GZERR};
+    }
 
 #    if ($MAXCOUNT > 1)
  #   {

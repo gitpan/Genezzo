@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 7.14 2006/02/12 07:56:17 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 7.15 2006/03/30 07:25:08 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -19,7 +19,7 @@ use Genezzo::Havok;
 
 BEGIN {
     our $VERSION;
-    $VERSION = do { my @r = (q$Revision: 7.14 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.15 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -166,6 +166,41 @@ sub time_iso8601
                         ($year + 1900) , $mon + 1, $mday, $hour, $min, $sec);
     return $tstr;
 }
+
+sub HavokUse
+{
+    my %required = (
+                    function_args => "no args!",
+                    dict => "no dict!",
+                    dbh => "no dbh!"
+                    );
+
+    my %args = ( # %optional,
+                @_);
+
+    return undef
+        unless (Validate(\%args, \%required));
+
+    my $fn_arg = $args{function_args};
+
+    my %nargs;
+
+    return undef
+        unless (defined($fn_arg) && scalar(@{$fn_arg}));
+
+    my $mod   = $fn_arg->[0];
+    my $phase = $fn_arg->[1];
+    my $dict  = $args{dict};
+    my $dbh   = $args{dbh};
+
+    $nargs{module} = $mod;
+    $nargs{phase}  = $phase if (defined($phase));
+    $nargs{dict}   = $dict;
+    $nargs{dbh}    = $dbh;
+
+    return Genezzo::Havok::HavokUse(%nargs);
+}
+
 
 # make all your functions, whether exported or not;
 
@@ -466,6 +501,18 @@ sub new
     return $newdict;
 
 } # end new
+
+
+sub GetDBH
+{
+    my $self = shift;
+
+    return undef
+        unless (exists($self->{dbh})
+                && defined($self->{dbh}));
+
+    return $self->{dbh};
+}
 
 sub SetDBH
 {
