@@ -26,6 +26,7 @@ t/PTPrep1.t
 t/PushHash1.t
 t/Row1.t
 t/Util1.t
+lib/Genezzo.pm
 lib/Genezzo/bigdb.sql
 lib/Genezzo/havok.sql
 lib/Genezzo/syshook.sql
@@ -50,10 +51,14 @@ lib/Genezzo/Dict.pm
 lib/Genezzo/dict.sql
 lib/Genezzo/Havok.pm
 lib/Genezzo/Havok.yml
+lib/Genezzo/Havok/SQLScalar.pm
+lib/Genezzo/Havok/SQLScalar.yml
 lib/Genezzo/Havok/SysHook.pm
 lib/Genezzo/Havok/SysHook.yml
 lib/Genezzo/Havok/UserExtend.pm
 lib/Genezzo/Havok/UserExtend.yml
+lib/Genezzo/Havok/UserFunctions.pm
+lib/Genezzo/Havok/UserFunctions.yml
 lib/Genezzo/Havok/Basic.pm
 lib/Genezzo/Havok/Examples.pm
 lib/Genezzo/Havok/OO_Examples.pm

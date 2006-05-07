@@ -1,5 +1,12 @@
 Revision history for Perl extension Genezzo
 
+0.59 Sun May  7 00:20:50 2006
+        - top-level Genezzo.pm
+        - Havok: rename UserExtend to UserFunctions.
+        - Havok: add scalar SQL functions
+        - fix ECOUNT parsing in select 
+        - rectify database initialization chattiness
+
 0.58 Mon Apr  3 00:48:51 2006
         - Havok: new HavokUse function to load Havok modules.  
         - INSERT SELECT: fix null padding for insufficient columns

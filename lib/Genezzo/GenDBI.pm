@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 7.19 2006/04/03 07:52:09 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 7.22 2006/05/07 06:34:06 claude Exp claude $
 #
 # copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -15,6 +15,7 @@ require Exporter;
 
 use Carp;
 use Data::Dumper ;
+use Genezzo;
 use Genezzo::Plan;
 use Genezzo::XEval;
 use Genezzo::Dict;
@@ -49,11 +50,11 @@ BEGIN {
 	
 }
 
-our $VERSION   = '0.58';
+our $VERSION   = $Genezzo::VERSION;
 our $RELSTATUS = 'Alpha'; # release status
 # grab the code check-in date and convert to YYYYMMDD
 our $RELDATE   = 
-    do { my @r = (q$Date: 2006/04/03 07:52:09 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
+    do { my @r = (q$Date: 2006/05/07 06:34:06 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
 
 our $errstr; # DBI errstr
 
@@ -112,6 +113,15 @@ our $dbi_gzerr = sub {
             printf ("%s: ", $sev);
             $warn = 1;
         }
+        else
+        {
+            if (exists($args{no_info}))
+            {
+                # don't print info if no_info set...
+                return;
+            }
+        }
+
     }
     # XXX XXX XXX
 #    print STDERR __PACKAGE__, ": ",  $args{msg};
@@ -151,6 +161,40 @@ $Genezzo::Util::USECARP       = 0;
 
 # Preloaded methods go here.
 
+sub _build_gzerr_wrapper 
+{
+    my $gzerr_cb = shift;
+
+    # build a closure to control printing of "INFO" status messages...
+    my $gzerr_print_info = 1;
+    my $gzerr_closure = sub {
+
+        my %nargs = @_;
+
+        if (exists($nargs{get_status}))
+        {
+###            print "\n\nget status !!\n";
+            return $gzerr_print_info;
+        }
+        if (exists($nargs{set_status}))
+        {
+###            print "\n\nset status $nargs{set_status} !!\n";
+            $gzerr_print_info = $nargs{set_status};
+        }
+
+        if ($gzerr_print_info == 0)
+        {
+            $nargs{no_info} = 1;
+        }
+
+        return &$gzerr_cb(%nargs);
+
+    };
+
+    return $gzerr_closure;
+}
+
+
 sub _init
 {
     my $self = shift;
@@ -185,9 +229,9 @@ sub _init
 #    print "$self->{gnz_home}\n";
 
     my %nargs;
-    if (exists($args{GZERR})) # pass the error reporting routine
+    if (exists($self->{GZERR})) # pass the error reporting routine
     {
-        $nargs{GZERR} = $args{GZERR};
+        $nargs{GZERR} = $self->{GZERR};
     }
     $self->{plan}  = Genezzo::Plan->new(%nargs);    # build a real parser 
     return 0
@@ -285,9 +329,9 @@ sub _init
         $dictargs{fhdefs} = $args{fhdefs};
     }
 
-    if (exists($args{GZERR})) # pass the error reporting routine
+    if (exists($self->{GZERR})) # pass the error reporting routine
     {
-        $dictargs{GZERR} = $args{GZERR};
+        $dictargs{GZERR} = $self->{GZERR};
     }
 
     $self->{dbh_ctx} = {}; # database handle context
@@ -388,7 +432,10 @@ sub connect # DBI
             }
         };
 
-        my $l_errstr = $args{msg} . "\n";
+        my $l_errstr = $args{msg};
+        # add a newline if necessary
+        $l_errstr .= "\n" unless $l_errstr=~/\n$/;
+
         $self->{errstr} = $l_errstr;
 
         warn $l_errstr
@@ -414,7 +461,7 @@ sub connect # DBI
         && (defined($nargs{GZERR}))
         && (length($nargs{GZERR})))
     {
-        $self->{GZERR} = $nargs{GZERR};
+        $self->{GZERR} = _build_gzerr_wrapper($nargs{GZERR});
         my $err_cb     = $self->{GZERR};
         # capture all standard error messages
         $Genezzo::Util::UTIL_EPRINT = 
@@ -456,7 +503,13 @@ sub new
     {
         # NOTE: don't supply our GZERR here - will get
         # recursive failure...
-        $self->{GZERR} = $args{GZERR};
+        $self->{GZERR} = _build_gzerr_wrapper($args{GZERR});
+    }
+    else
+    {
+        $self->{GZERR} = _build_gzerr_wrapper($dbi_gzerr);
+    }
+    {
         my $err_cb     = $self->{GZERR};
         # capture all standard error messages
         $Genezzo::Util::UTIL_EPRINT = 
@@ -497,10 +550,10 @@ sub build_dict_dbh
         $self->{GZERR} = $old_self->{GZERR};
     }
     $self->{gnz_home} = $old_self->{gnz_home};
-    $self->{plan} = $old_self->{plan};
-    $self->{xeval} = $old_self->{xeval};
-    $self->{dbh_ctx} = {}; # database handle context
-    $self->{dictobj} = $old_self->{dictobj};
+    $self->{plan}     = $old_self->{plan};
+    $self->{xeval}    = $old_self->{xeval};
+    $self->{dbh_ctx}  = {}; # database handle context
+    $self->{dictobj}  = $old_self->{dictobj};
 
     # CLONE the database handle
     my $foo = bless $self, $class;
@@ -3400,6 +3453,25 @@ sub SelectPrint
 
         my $got_select_list = $tv->SelectList();
 
+        my $rownum = 0;
+        if (defined($GZERR) &&
+            !(Genezzo::Util::get_gzerr_status(GZERR => $GZERR,
+                                              self  => $self)))
+        {
+            # be quiet if necessary
+            while (1)
+            {
+###                print "shh!!\n";
+                my ($kk, $vv) = $sth->SQLFetch();
+                
+                last
+                    unless (defined($kk));
+                $rownum++;
+            }
+            return $rownum;
+        }
+
+
 
         # print column name headers
         foreach my $coldef (@{$collist})
@@ -3418,7 +3490,6 @@ sub SelectPrint
 
 	# use "each" to get pairs versus "keys", which prefetches
 	# entire hash
-        my $rownum = 0;
 
         while (1)
         {
@@ -3651,6 +3722,15 @@ addfile, af : add a file to a tablespace.  Type "addfile help" for more
     details.
 
 alter : SQL alter
+        ALTER TABLE tablename 
+              ADD [CONSTRAINT constraint_name] 
+                  PRIMARY KEY (colname [, colname ...]);
+        ALTER TABLE tablename 
+              ADD [CONSTRAINT constraint_name] 
+                  UNIQUE (colname [, colname ...]);
+        ALTER TABLE tablename 
+              ADD [CONSTRAINT constraint_name] 
+                  CHECK (conditional_expression);
 
 ci : create index.  Syntax - ci <index name> <table name> <column name>.
 
@@ -3674,10 +3754,12 @@ ct : create table.  Syntax -
 d : delete from a table.  Syntax - d <table-name> <rid> [<rid>...]
 
 delete : SQL Delete
+         DELETE FROM tablename [WHERE ...]
 
 describe, desc :  describe a table
 
 drop :  SQL Drop
+        DROP TABLE tablename
 
 dt : drop table.  Syntax - dt <table-name>
 
@@ -3691,6 +3773,10 @@ i : insert into a table.
     Syntax - i <tablename> <column-data> [<column-data>...]
 
 insert : SQL Insert
+         INSERT INTO tablename VALUES (expr [, expr ...]);
+         INSERT INTO tablename (colname [, colname ...]) 
+                               VALUES (expr [, expr ...]);
+         INSERT INTO tablename SELECT ... FROM ...
 
 password : password authentication [unused]
 
@@ -3708,6 +3794,10 @@ s : select from a table.
     Legal "pseudo-columns" are "rid", "rownum".
 
 select : SQL Select
+         SELECT expr [[AS] column_alias] [, expr [[AS] column_alias]]
+         FROM tablename [[AS] table_alias] [, tablename ...]
+         [WHERE ...]
+
    
 show :  License, warranty, and version information.  Type "show help"
         for more information.
@@ -3725,6 +3815,7 @@ u : update a table.
     Syntax - u <table-name> <rid> <column-value> [<column-value>...]
 
 update : SQL Update
+         UPDATE tablename SET colname = expr [, colname = expr ...] [WHERE ...]
 
 EOF_HELP
 

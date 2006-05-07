@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Parse/RCS/SQLGrammar.pl,v 7.6 2006/03/01 08:40:59 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Parse/RCS/SQLGrammar.pl,v 7.7 2006/05/07 06:48:00 claude Exp claude $
 #
 # copyright (c) 2005, 2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -113,7 +113,6 @@ my @res_word_rules = # list of all reserved words
 # function names and function-like subquery expressions
 # Note: special rule to handle COUNT (for COUNT(*)...)
 # XXX XXX: plus ECOUNT...
-# XXX XXX: what about TRIM, UPPER, etc??
 my @standard_funcs = qw(
                         MIN
                         MAX
@@ -128,6 +127,9 @@ my @standard_funcs = qw(
                         ALL
                         UNIQUE
                         LIKE
+                        TRIM
+                        UPPER
+                        LOWER
                         );
 
 my %std_funcs;

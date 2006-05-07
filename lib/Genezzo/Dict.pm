@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 7.15 2006/03/30 07:25:08 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 7.19 2006/05/07 06:32:49 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -19,7 +19,7 @@ use Genezzo::Havok;
 
 BEGIN {
     our $VERSION;
-    $VERSION = do { my @r = (q$Revision: 7.15 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.19 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -52,6 +52,14 @@ our $GZERR = sub {
         {
             printf ("%s: ", $sev);
             $warn = 1;
+        }
+        else
+        {
+            if (exists($args{no_info}))
+            {
+                # don't print info if no_info set...
+                return;
+            }
         }
 
     }
@@ -198,7 +206,26 @@ sub HavokUse
     $nargs{dict}   = $dict;
     $nargs{dbh}    = $dbh;
 
-    return Genezzo::Havok::HavokUse(%nargs);
+    my $stat;
+    my $gzerr_info_state = 1;
+
+    $gzerr_info_state = Genezzo::Util::get_gzerr_status(GZERR => $GZERR,
+                                                        self  => $dict)
+        if (defined($GZERR));
+    Genezzo::Util::set_gzerr_status(GZERR  => $GZERR, 
+                                    status => 0,
+                                    self   => $dict
+                                    )
+        if (defined($GZERR));
+
+    $stat = Genezzo::Havok::HavokUse(%nargs);
+
+    Genezzo::Util::set_gzerr_status(GZERR  => $GZERR, 
+                                    status => $gzerr_info_state,
+                                    self   => $dict)
+        if (defined($GZERR));
+
+    return $stat;
 }
 
 
@@ -371,31 +398,44 @@ sub _init
 
     $self->{phase_three} = 0;
 
+    my $gzerr_info_state = 1;
+
+    $gzerr_info_state = Genezzo::Util::get_gzerr_status(GZERR => $GZERR,
+                                                        self  => $self)
+        if (defined($GZERR));
+    Genezzo::Util::set_gzerr_status(GZERR => $GZERR, status => 0,
+                                    self  => $self)
+        if (defined($GZERR));
+
+    my $clean_init = 1;
+
     if (defined($args{init_db}) && ($args{init_db} > 0))
     {
+        $clean_init = 0;
+
         $self->{started}  = 1; # Note: pretend dictionary already started
         $self->{dictinit} = 1;
 
         # PHASE 0: create the basic dictionary tables
 
-        return 0 
+        goto L_bad_init_db 
             unless ($self->_DictDBInit());
-        return 0 
+        goto L_bad_init_db 
             unless ($self->DictSave());
-        return 0 
+        goto L_bad_init_db 
             unless ($self->_loadDictMemStructs ());
 
         if ($self->{dictinit})
         {
             # PHASE 1: create allfileused to register dict tables in
             # SYSTEM tablespace
-            return 0 
+            goto L_bad_init_db 
                 unless ($self->_DictDBDefineTable(\%p1_tab));
 
             # add all current dictionary tables to allfileused
             while (my ($kk, $vv) = each (%{$self->{dict_tables}}))
             {
-                return 0
+                goto L_bad_init_db
                     unless $self->DictTableAllTab(operation  => "usefile",
                                                   tname      => $kk,
                                                   filenumber => 1)
@@ -422,7 +462,7 @@ sub _init
                  ind1_cols  => "iid=n tid=n colidx=n position=n",
                  );
             
-            return 0 
+            goto L_bad_init_db 
                 unless ($self->_DictDBDefineTable(\%p2_tab));
 
             # Phase 3: Havok Table
@@ -432,25 +472,40 @@ sub _init
 #                (
 #                 havok => $havok_def
 #                 );
-#            return 0 
+#            goto L_bad_init_db 
 #                unless ($self->_DictDBDefineTable(\%p3_tab));
 
             # define constraints on all tables
-            return 0 
+            goto L_bad_init_db 
                 unless ($self->dictp2_define_cons());
 
 
         } # end self->dictinit
-        return 0 
+        goto L_bad_init_db 
             unless ($self->DictSave());
 
         $self->{phase_three} = 1;
 
+        $clean_init = 1;
+
+      L_bad_init_db:
+        # skip the clean_init
+
     } # end defined init_db
+
+    Genezzo::Util::set_gzerr_status(GZERR => $GZERR, 
+                                    status => $gzerr_info_state,
+                                    self  => $self)
+        if (defined($GZERR));
+    
+    return 0
+        unless ($clean_init);
 
     $self->{started} = 0;
 
     return ($self->doDictPreLoad ());
+
+
 }
 
 
@@ -587,6 +642,17 @@ sub SetDBH
         
         if (1)
         {
+            my ($msg, %earg);
+            my $gzerr_info_state = 1;
+
+            $gzerr_info_state = 
+                Genezzo::Util::get_gzerr_status(GZERR => $GZERR, 
+                                                self  => $self)
+                if (defined($GZERR));
+            Genezzo::Util::set_gzerr_status(GZERR => $GZERR, status => 0,
+                                            self  => $self)
+                if (defined($GZERR));
+
             my $prev_line = undef;  # accumulated input of 
                                     # multi-line statement
 
@@ -623,6 +689,11 @@ sub SetDBH
                 $prev_line = undef;
             } # end big while
             close ($dict_fh);
+
+            Genezzo::Util::set_gzerr_status(GZERR  => $GZERR, 
+                                            status => $gzerr_info_state,
+                                            self   => $self)
+                if (defined($GZERR));
         } # end 
 
         $self->DictShutdown();

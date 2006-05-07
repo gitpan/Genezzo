@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Plan/RCS/TypeCheck.pm,v 7.14 2006/03/11 08:03:07 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Plan/RCS/TypeCheck.pm,v 7.15 2006/05/07 06:48:58 claude Exp claude $
 #
 # copyright (c) 2005,2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -17,7 +17,7 @@ use Carp;
 our $VERSION;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 7.14 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.15 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -62,6 +62,7 @@ sub _init
            MEAN     1
            STDDEV   1
            COUNT    1
+           ECOUNT   1
            );
 
     $self->{aggregate_functions} = \%valid_aggs;

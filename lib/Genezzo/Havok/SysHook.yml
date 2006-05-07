@@ -1,4 +1,4 @@
-# havok version=7.09
+# havok version=7.11
 ABSTRACT:     
 AUTHOR:    Jeffrey I Cohen (jcohen@cpan.org)
 DML:    
@@ -22,5 +22,5 @@ TABLEDEFS:
 
 
 
-UPDATED:    2006-04-03T00:56:07
+UPDATED:    2006-05-07T00:16:39
 VERSION:    7.06

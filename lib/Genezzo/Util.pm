@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Util.pm,v 7.11 2006/03/10 08:23:54 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Util.pm,v 7.13 2006/05/07 06:45:31 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -20,14 +20,16 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 7.11 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.13 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
     @EXPORT      = qw(&whisper &whoami &greet 
                       &Validate &FlatSave &FlatLoad 
                       &HumanNum &NumVal &checkKeyVal
                       &PackRowCheck &PackRow &UnPackRow &PackRow2
-                      &getUseRaw &setUseRaw &gzn_read &gnz_write);
+                      &getUseRaw &setUseRaw &gzn_read &gnz_write
+                      &get_gzerr_status &set_gzerr_status
+                      );
     %EXPORT_TAGS = ( );     # eg: TAG => [ qw!name1 name2! ],
 
     # your exported package globals go here,
@@ -1825,7 +1827,58 @@ sub CheckMail
 
 } # end checkmail
 
+sub get_gzerr_status
+{
+    my %required = (
+                    GZERR => "no gzerr!",
+                    self  => "no self!"
+                    );
+#    my %optional = (
+#                    );
 
+    my %args = (
+#                %optional,
+		@_);
+
+    return undef
+        unless (Validate(\%args, \%required));
+
+    my $gzerr_cb = $args{GZERR};
+
+    my $msg = "get status: 1\n";
+    my %earg = (self => $args{self}, msg => $msg, severity => 'info', 
+                no_info => 1,
+                get_status => 1);
+
+    return &$gzerr_cb(%earg);
+    
+}
+sub set_gzerr_status
+{
+    my %required = (
+                    GZERR => "no gzerr!",
+                    status => "no status!",
+                    self  => "no self!"
+                    );
+#    my %optional = (
+#                    );
+
+    my %args = (
+#                %optional,
+		@_);
+
+    return undef
+        unless (Validate(\%args, \%required));
+
+    my $gzerr_cb = $args{GZERR};
+
+    my $msg = "set status: $args{status}\n";
+    my %earg = (self => $args{self}, msg => $msg, severity => 'info', 
+                no_info => 1,
+                set_status => $args{status});
+
+    return &$gzerr_cb(%earg);
+}
 
 END { }       # module clean-up code here (global destructor)
 

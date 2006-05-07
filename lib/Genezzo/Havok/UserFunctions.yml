@@ -1,0 +1,26 @@
+# havok version=7.11
+ABSTRACT:     
+AUTHOR:    Jeffrey I Cohen (jcohen@cpan.org)
+DML:    
+  -    
+    check:    
+
+    install:    
+
+
+
+LICENSE:    gpl
+NAME:    Genezzo::Havok::UserFunctions
+PREREQ_HAVOK:    
+  Genezzo::Havok:    0.0
+
+TABLEDEFS:    
+  user_functions:    
+    create_table:    xid=n xtype=c xname=c args=c owner=c creationdate=c version=c argstyle=c sqlname=c typecheck=c
+    dml:    
+      -    i havok 2 Genezzo::Havok::UserFunctions SYSTEM 2006-05-07T06:43:05 0 1.02
+
+
+
+UPDATED:    2006-05-07T00:16:36
+VERSION:    1.02

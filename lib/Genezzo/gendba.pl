@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/gendba.pl,v 7.6 2006/01/06 08:50:46 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/gendba.pl,v 7.7 2006/04/24 06:23:06 claude Exp claude $
 #
 # copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -270,6 +270,14 @@ our $GZERR = sub {
         {
             printf ("%s: ", $sev);
             $warn = 1;
+        }
+        else
+        {
+            if (exists($args{no_info}))
+            {
+                # don't print info if no_info set...
+                return;
+            }
         }
 
     }

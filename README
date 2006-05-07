@@ -602,9 +602,34 @@ NEW FEATURES - HavokUse function for System/User Extensibility
   initialization -- it is still necessary to commit, shutdown and
   restart to activate the new Havok modules.
 
+NEW FEATURES - Havok::UserFunctions, standard SQL scalar functions
+
+  Previously, all standard perl functions could be invoked in a SQL
+  statement, and additional SQL functions were optionally added via
+  Havok::UserExtend.  In version 0.59, Havok::UserExtend has been
+  deprecated and replaced with Havok::UserFunctions, and Genezzo only
+  supports functions defined in the new user_functions table.  This
+  table is preloaded when the database is created with many common
+  perl and sql functions.
+
+  The perl functions which are available in SQL are:
+
+    chomp, chop, chr, crypt, index, lc, lcfirst, length, ord, pack,
+    reverse, rindex, sprintf, substr, uc, ucfirst, abs, atan2, cos, exp,
+    hex, int, log10 (to avoid confusion between natural log and base10),
+    oct, rand, sin, sqrt, srand, and perl_join (which is renamed to
+    avoid a conflict with the SQL JOIN operation).
+
+  The SQL string functions are concat, greatest, initcap, least, lower,
+  and upper.  The SQL math functions are cosh, ceil, floor, ln, sinh, tan, 
+  and tanh (also note many standard SQL math functions are identical to their
+  perl counterparts, which are listed above).  The SQL conversion
+  functions are ascii, instr, and nvl.
+
+
 INCOMPATIBLE CHANGES
 
-  Version 0.58 dictionary and block format is incompatible with
+  Version 0.59 dictionary and block format is incompatible with
   previous releases.  No upgrade path is supported.
   Version 0.48 thru 0.50 are compatible.
 

@@ -6,7 +6,7 @@ WriteMakefile(
     'ABSTRACT'          => 'extensible database system',
     'AUTHOR'            => 'Jeffrey I Cohen (jcohen@cpan.org)',
 #    'LICENSE'           => 'gpl',
-    'VERSION_FROM'	=> 'lib/Genezzo/GenDBI.pm', # finds $VERSION
+    'VERSION_FROM'	=> 'lib/Genezzo.pm', # finds $VERSION
     'PREREQ_PM'		=> {
         'Text::ParseWords' => '0.0',
         'Term::ReadLine'   => '0.0',
@@ -49,6 +49,8 @@ GENEZZO_HAVOK: lib/Genezzo/Havok.pm
 	$(PERLRUNINST) -MGenezzo::Havok -e 'print Genezzo::Havok::MakeSQL();' > lib/Genezzo/havok.sql
 	$(PERLRUNINST) -MGenezzo::Havok -e 'print Genezzo::Havok::MakeYML();' > lib/Genezzo/Havok.yml
 	$(PERLRUNINST) -MGenezzo::Havok::UserExtend -e 'print Genezzo::Havok::UserExtend::MakeYML();' > lib/Genezzo/Havok/UserExtend.yml
+	$(PERLRUNINST) -MGenezzo::Havok::UserFunctions -e 'print Genezzo::Havok::UserFunctions::MakeYML();' > lib/Genezzo/Havok/UserFunctions.yml
+	$(PERLRUNINST) -MGenezzo::Havok::SQLScalar -e 'print Genezzo::Havok::SQLScalar::MakeYML();' > lib/Genezzo/Havok/SQLScalar.yml
 GENEZZO_SYSHOOK: lib/Genezzo/Havok/SysHook.pm
 	$(PERLRUNINST) -MGenezzo::Havok::SysHook -e 'print Genezzo::Havok::SysHook::MakeSQL();' > lib/Genezzo/syshook.sql
 	$(PERLRUNINST) -MGenezzo::Havok::SysHook -e 'print Genezzo::Havok::SysHook::MakeYML();' > lib/Genezzo/Havok/SysHook.yml

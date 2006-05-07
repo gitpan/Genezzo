@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Havok.pm,v 7.9 2006/04/03 07:52:50 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Havok.pm,v 7.11 2006/05/02 07:56:19 claude Exp claude $
 #
 # copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -19,7 +19,7 @@ our $VERSION;
 our $MAKEDEPS;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 7.9 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.11 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     my $pak1  = __PACKAGE__;
     $MAKEDEPS = {
@@ -41,7 +41,7 @@ BEGIN {
 
 #    my $now = Genezzo::Dict::time_iso8601()
     my $now = 
-    do { my @r = (q$Date: 2006/04/03 07:52:50 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
+    do { my @r = (q$Date: 2006/05/02 07:56:19 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
 
     my $dml =
         [
@@ -240,6 +240,71 @@ sub HavokUse
             }
         }
     } # end if defined tdefs
+
+
+    if (exists($refthing->{DML})
+        && defined($refthing->{DML}))
+    {
+        my $bigdml = $refthing->{DML};
+
+        for my $d1 (@{$bigdml})
+        {
+            my $do_install;
+
+            $do_install = 0;
+
+            if (exists($d1->{check})
+                && defined($d1->{check}))
+            {
+                $do_install = 1;
+                for my $c1 (@{$d1->{check}})
+                {
+                    if ($c1 =~ m/^select/i)
+                    {
+                        my $sth = $dbh->prepare($c1);
+    
+                        return undef unless ($sth->execute());
+
+                        my @ftchary = $sth->fetchrow_array();
+                        # check must be false, ie no rows
+                        if (scalar(@ftchary))
+                        {
+                            $do_install = 0;
+                            last;
+                        }
+                        
+                    }
+                }
+                
+                if ($do_install)
+                {
+                    if (exists($d1->{install})
+                        && defined($d1->{install}))
+                    {
+                        for my $stmt (@{$d1->{install}})
+                        {
+                            unless ($dbh->do($stmt))
+                            {
+                                my %earg = (#self => $self,
+                                            severity => 'warn',
+                                            msg => "failure on statement: $stmt");
+
+                                &$GZERR(%earg)
+                                    if (defined($GZERR));
+                                return undef;
+                    
+                            }
+                        }
+                    }
+
+                }
+            }
+
+        }
+        
+
+    }
+
 
     if ($do_dml)
     {

@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/XEval/RCS/Prepare.pm,v 7.5 2006/04/03 07:55:06 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/XEval/RCS/Prepare.pm,v 7.6 2006/05/07 06:50:42 claude Exp claude $
 #
-# copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2005, 2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 package Genezzo::XEval::Prepare;
@@ -17,7 +17,7 @@ use Carp;
 our $VERSION;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 7.5 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.6 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -565,11 +565,24 @@ sub _sql_where
             my $hash_args = 0;
 
             my $foundIt = 0;
-            my $fn_name = 'Genezzo::GenDBI::'. $genTree->{function_name};
+            my $fn_name;
 
             if ($genTree->{function_name} =~ m/^HavokUse$/i)
             {
                 $fn_name = 'Genezzo::GenDBI::sql_func_HavokUse';
+            }
+            else
+            {
+                if ($genTree->{function_name} =~ m/^sql_func/)
+                {
+                    $fn_name = 'Genezzo::GenDBI::'
+                        . ($genTree->{function_name});
+                }
+                else
+                {
+                    $fn_name = 'Genezzo::GenDBI::sql_func_'
+                        . lc($genTree->{function_name});
+                }
             }
 
             if (($genTree->{function_name} =~ m/^sql_func_HavokUse$/)
@@ -579,7 +592,7 @@ sub _sql_where
                 $hash_args = 1;
             }
 
-            # look in GenDBI namespace first, then system
+            # look in GenDBI namespace 
             for my $numtries (1..2)
             {
                 # check if function exists
@@ -588,13 +601,21 @@ sub _sql_where
                     $foundIt = 1;
                     last;
                 } 
-                last
-                    if ($numtries > 1);
-                $fn_name = $genTree->{function_name};
-                # XXX XXX XXX XXX: how to do check for MAIN functions?
-                $foundIt = 1;
-                last; # XXX XXX XXX XXX: how to do check for MAIN functions?
-                # XXX XXX XXX also min, max, count, in, any, etc
+                if ($genTree->{function_name} !~ m/^sql_func/)
+                {
+                    $fn_name = 'Genezzo::GenDBI::'
+                        . ($genTree->{function_name});
+                }
+                
+            }
+
+            if (!$foundIt)
+            {
+                # XXX XXX: fix for COUNT/ECOUNT
+                if ($genTree->{function_name} =~ m/^(ecount|count)$/i)
+                {
+                    $foundIt = 1;
+                }
             }
 
             unless ($foundIt)
@@ -721,6 +742,8 @@ use Genezzo::Plan::TypeCheck;
 
 =over 4
 
+=item sql_where: function name processing -- drive from user_function, use type-checking functions.
+
 =item update pod
 
 =item need to handle FROM clause subqueries -- some tricky column type issues.
@@ -749,7 +772,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 
 L<perl(1)>.
 
-Copyright (c) 2005 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2005, 2006 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

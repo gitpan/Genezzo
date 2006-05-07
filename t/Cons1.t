@@ -8,7 +8,7 @@
 # Change 1..1 below to 1..last_test_to_print .
 # (It may become useful if the test is moved to ./t subdirectory.)
 
-BEGIN { $| = 1; print "1..27\n"; }
+BEGIN { $| = 1; print "1..21\n"; }
 END {print "not ok 1\n" unless $loaded;}
 use Genezzo::GenDBI;
 $loaded = 1;
@@ -337,104 +337,7 @@ our $GZERR = sub {
     }
 
 
-
-
-    if ($dbh->do("drop table aaa_ix "))
-    {       
-        ok();
-    }
-    else
-    {
-        not_ok ("could not drop index");
-
-    }
-    if ($dbh->do("drop table aaa_cons "))
-    {       
-        ok();
-    }
-    else
-    {
-        not_ok ("could not drop table");
-    }
-
-    if ($dbh->do("commit"))
-    {       
-        ok();
-    }
-    else
-    {
-        not_ok ("could not commit");
-    }
-
-    # 4 constraints on aaa_cons
-    $sth = $dbh->prepare("select * from cons1 where tid = $aaa_tid");
-
-    print $sth->execute(), "\n";
-
-    while (1)
-    {
-        my $ggg = $sth->fetchrow_hashref();
-    
-        greet $ggg;
-        last
-            unless (defined($ggg));
-    }
-    $cons_cnt = $sth->rows();
-    if (0 == $cons_cnt)
-    {
-        ok();
-    }
-    else
-    {
-        not_ok ("$cons_cnt != 0");
-    }
-
-    # 3 indexes on aaa_cons
-    $sth = $dbh->prepare("select * from ind1 where tid = $aaa_tid");
-
-    print $sth->execute(), "\n";
-
-    while (1)
-    {
-        my $ggg = $sth->fetchrow_hashref();
-    
-        greet $ggg;
-        last
-            unless (defined($ggg));
-    }
-    $cons_cnt = $sth->rows();
-    if (0 == $cons_cnt)
-    {
-        ok();
-    }
-    else
-    {
-        not_ok ("$cons_cnt != 0");
-    }
-
-    # 4 tables
-    $sth = $dbh->prepare("select * from _tab1 where tid >= $aaa_tid");
-
-    print $sth->execute(), "\n";
-
-    while (1)
-    {
-        my $ggg = $sth->fetchrow_hashref();
-    
-        greet $ggg;
-        last
-            unless (defined($ggg));
-    }
-    $cons_cnt = $sth->rows();
-    if (0 == $cons_cnt)
-    {
-        ok();
-    }
-    else
-    {
-        not_ok ("$cons_cnt != 0");
-    }
-
+    #### see Cons Zero    
 
 
     if ($dbh->do("shutdown"))

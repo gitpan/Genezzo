@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/UserExtend.pm,v 7.4 2006/03/31 06:21:30 claude Exp $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/UserExtend.pm,v 7.5 2006/05/07 06:44:09 claude Exp claude $
 #
 # copyright (c) 2004, 2005, 2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -18,7 +18,7 @@ our $VERSION;
 our $MAKEDEPS;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 7.4 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.5 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     my $pak1  = __PACKAGE__;
     $MAKEDEPS = {
@@ -38,7 +38,7 @@ BEGIN {
 
 #    my $now = Genezzo::Dict::time_iso8601()
     my $now = 
-    do { my @r = (q$Date: 2006/03/31 06:21:30 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
+    do { my @r = (q$Date: 2006/05/07 06:44:09 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
 
     my $dml =
         [
@@ -285,6 +285,8 @@ insert into havok values (1, "Genezzo::Havok::UserExtend", "SYSTEM",
 
 
 =head1 DESCRIPTION
+
+NOTE: this module is now deprecated and will be replaced by L<Genezzo::Havok::UserFunctions>.
 
 Basic Havok module - load the UserExtend table
 
