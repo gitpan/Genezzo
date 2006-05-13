@@ -626,10 +626,15 @@ NEW FEATURES - Havok::UserFunctions, standard SQL scalar functions
   perl counterparts, which are listed above).  The SQL conversion
   functions are ascii, instr, and nvl.
 
+NEW FEATURES - improved genexp.pl
+ 
+  The version 0.60 database export (genexp.pl) now correctly handles table
+  constraints and indexes.
+
 
 INCOMPATIBLE CHANGES
 
-  Version 0.59 dictionary and block format is incompatible with
+  Version 0.60 dictionary and block format is incompatible with
   previous releases.  No upgrade path is supported.
   Version 0.48 thru 0.50 are compatible.
 

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/SQLScalar.pm,v 1.4 2006/05/07 06:43:55 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/SQLScalar.pm,v 1.6 2006/05/13 05:58:49 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -57,6 +57,11 @@ require Exporter;
              &sql_func_ascii
              &sql_func_instr        
              &sql_func_nvl         
+
+             &sql_func_quurl
+             &sql_func_quurl2
+             &sql_func_unquurl
+
              );
 
 use Genezzo::Util;
@@ -70,7 +75,7 @@ our $VERSION;
 our $MAKEDEPS;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 1.4 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.6 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     my $pak1  = __PACKAGE__;
     $MAKEDEPS = {
@@ -88,7 +93,7 @@ BEGIN {
     # DML is an array, not a hash
 
     my $now = 
-    do { my @r = (q$Date: 2006/05/07 06:43:55 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
+    do { my @r = (q$Date: 2006/05/13 05:58:49 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
 
 
     my %tabdefs = ();
@@ -147,6 +152,13 @@ BEGIN {
                        instr
                        nvl
                        );
+
+    my @gnz_funcs = qw(
+                       quurl
+                       quurl2
+                       unquurl
+                       );
+
     my @ins1;
     my $ccnt = 1;
     for my $pfunc (@perl_funcs)
@@ -165,6 +177,14 @@ BEGIN {
         {
             $bigstr .= " HASH";
         }
+
+        push @ins1, $bigstr;
+        $ccnt++;
+    }
+    for my $pfunc (@gnz_funcs)
+    {
+        my $bigstr = "i user_functions $ccnt require $pak1 " 
+            . "sql_func_" . $pfunc . " SYSTEM $now 0";
 
         push @ins1, $bigstr;
         $ccnt++;
@@ -499,6 +519,39 @@ sub sql_func_nvl
     }
     return $s2;
 }
+
+# Genezzo custom functions
+
+# only allow alphanums, and quote all other chars as hex string
+sub sql_func_quurl
+{
+    my $str = shift;
+
+    $str =~ s/([^a-zA-Z0-9])/uc(sprintf("%%%02lx",  ord $1))/eg;
+    return $str;
+}
+
+# more "relaxed" version of quurl function -- allow basic punctuation
+# with the exception of "%" and quote characters
+sub sql_func_quurl2
+{
+    my $str = shift;
+
+    my $pat1 = '[^a-zA-Z0-9' .
+        quotemeta(' ~!@#$^&*()-_=+{}|[]:;<>,.?/') . ']';
+    $str =~ s/($pat1)/uc(sprintf("%%%02lx",  ord $1))/eg;
+    return $str;
+}
+
+# unconvert quoted strings 
+sub sql_func_unquurl
+{
+    my $str = shift;
+
+    $str =~ s/\%([A-Fa-f0-9]{2})/pack('C', hex($1))/seg;
+    return $str;
+}
+
 
 END { }       # module clean-up code here (global destructor)
 

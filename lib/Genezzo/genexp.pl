@@ -1,12 +1,13 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/genexp.pl,v 7.2 2005/12/27 01:13:05 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/genexp.pl,v 7.4 2006/05/13 05:56:04 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 #use strict;
 use Genezzo::GenDBI;
+use Genezzo::Havok::SQLScalar;
 use Data::Dumper;
 use Getopt::Long;
 use Pod::Usage;
@@ -114,6 +115,14 @@ our $GZERR = sub {
             printf ("%s: ", $sev);
             $warn = 1;
         }
+        else
+        {
+            if (exists($args{no_info}))
+            {
+                # don't print info if no_info set...
+                return;
+            }
+        }
 
     }
     print $args{msg};
@@ -202,9 +211,24 @@ my $stat = 0;
     }
 
 
-    # tid = 10 for last dict table
-    my $sth = 
-        $dbh->prepare("select tid, tname from _tab1 where tid > 10 and object_type='TABLE'");
+    my $sth;
+    $sth = 
+        $dbh->prepare("select pref_value from  _pref1  where pref_key=\'export_start_tid\'");
+
+    $sth->execute();
+    
+    my @lastfetch = $sth->fetchrow_array();
+    
+    my $last_dict_tid;
+
+    if (scalar(@lastfetch))
+    {
+        $last_dict_tid = ($lastfetch[0]);
+    }
+
+
+    $sth =
+        $dbh->prepare("select tid, tname from _tab1 where tid > $last_dict_tid and object_type='TABLE'");
 
 #    print $sth->execute(), " rows \n";
     $sth->execute();
@@ -268,9 +292,10 @@ my $stat = 0;
     for my $tabi (@tabs)
     {
         my $tname = $tabi->[1];
+        my $tid = $tabi->[0];
 
         my $sql = 
-            "select * from $tname ";
+            "select colidx, colname, coltype, tid, tname from _col1 where tid = $tid";
         $sth = 
             $dbh->prepare($sql);
 
@@ -281,12 +306,32 @@ my $stat = 0;
 
         while (1)
         {
-            local $Data::Dumper::Terse = 1;
+            my @ggg = $sth->fetchrow_array();
+        
+#            print Dumper (@ggg), "\n";
+        
+            last
+                unless (scalar(@ggg));
+            
+            my $colidx = shift @ggg;
 
+            $cols[$colidx] = [@ggg];
+        }
+
+
+        $sql = 
+            "select * from $tname ";
+        $sth = 
+            $dbh->prepare($sql);
+
+#    print $sth->execute(), " rows \n";
+        $sth->execute();
+
+        while (1)
+        {
             my $firsttime;
             my @fff = $sth->fetchrow_array();
-            my @ggg = Dumper(@fff);
-#            my @ggg = @fff;
+            my @ggg = @fff;
 
 #            print Dumper (@ggg), "\n";
         
@@ -303,9 +348,18 @@ my $stat = 0;
                 if (defined($fff[$colcnt-1]))
                 {
                     my $outi = $ggg[$colcnt-1];
-                    $outi =~ s/\n$//;
+
 #                    print  "'",$outi,"'";
-                    print $outi;
+
+                    if ($outi =~ m/([^A-Za-z0-9])+/)
+                    {
+                        print "unquurl(\'", sql_func_quurl2($outi),"\')";
+                    }
+                    else
+                    {
+                        print "\'",$outi,"\'";
+                    }
+
                 }
                 else
                 {
@@ -320,6 +374,172 @@ my $stat = 0;
 
     }
 
+    $sth =
+        $dbh->prepare("select cons_name, cons_type, tid, check_text,check2 from cons1");
+
+#    print $sth->execute(), " rows \n";
+    $sth->execute();
+
+    while (1)
+    {
+        my @ggg = $sth->fetchrow_array();
+
+        last
+            unless (scalar(@ggg));
+
+#            print Dumper (@ggg), "\n";
+
+        my ($c_name, $c_type, $tid, $c_text, $check2) = @ggg;
+
+        $c_name = undef
+            if ($c_name =~ m/^SYS_/);
+
+
+        if ($c_type =~ m/(IK|PK|UQ)/)
+        {
+            my ($i_name, $iid) = split(":", $c_text, 2);
+         
+            next
+                unless ($iid > $last_dict_tid);
+
+            my @iinfo = get_index_info($dbh, $tid, $iid);
+            my $tname = get_tname_by_tid($dbh, $tid);
+
+            if ($c_type =~ m/IK/)
+            {
+                my $iname = shift(@iinfo);
+
+                print "CREATE INDEX $iname on ";
+                print "$tname (";
+            }
+            if ($c_type =~ m/PK|UQ/)
+            {
+                my $iname = shift(@iinfo);
+
+                print "ALTER TABLE $tname ADD ";
+
+                print "CONSTRAINT $c_name "
+                    if (defined($c_name));
+
+                my $tt1 = ($c_type =~ m/UQ/) ? "UNIQUE (" : "PRIMARY KEY (";
+                print $tt1;
+
+            }
+
+            print join(", ", @iinfo);
+            print ");\n";
+            
+            
+        }
+        else
+        {
+            if ($c_type =~ m/(CK)/)
+            {
+                my $tname = get_tname_by_tid($dbh, $tid);
+
+                print "ALTER TABLE $tname ADD " ;
+
+                print "CONSTRAINT $c_name "
+                    if (defined($c_name));
+
+                print "CHECK ($check2);\n";
+
+            }
+        }
+
+    } # end while 1
+
+}
+
+sub get_tname_by_tid
+{
+    my ($dbh, $tid) = @_;
+    my $sth;
+    $sth = 
+        $dbh->prepare("select tname from _tab1 where tid = $tid");
+
+    $sth->execute();
+    
+    my @lastfetch = $sth->fetchrow_array();
+
+    return undef 
+        unless scalar(@lastfetch);
+
+    my $tname = $lastfetch[0];
+
+    return $tname;
+}
+
+sub get_cname_by_idx
+{
+    my ($dbh, $tid, $col_idx) = @_;
+
+#    print "d2 ",Dumper ([$tid, $col_idx]), "\n";
+
+    my $sth;
+    $sth = 
+        $dbh->prepare(
+"select colname from _col1  where tid = $tid and colidx = $col_idx");
+
+    $sth->execute();
+    
+    my @lastfetch = $sth->fetchrow_array();
+
+    return undef 
+        unless scalar(@lastfetch);
+
+    my $cname = $lastfetch[0];
+
+    return $cname;
+}
+
+sub get_index_info
+{
+    my ($dbh, $tid, $iid) = @_;
+    my $sth;
+    $sth = 
+        $dbh->prepare("select iname from ind1 where iid = $iid");
+
+    $sth->execute();
+    
+    my @lastfetch = $sth->fetchrow_array();
+
+    return undef 
+        unless scalar(@lastfetch);
+
+    my $iname = $lastfetch[0];
+
+    $sth = 
+        $dbh->prepare("select colidx, posn from ind1_cols where iid = $iid and tid = $tid");
+
+    $sth->execute();
+    
+    my @cols;
+
+    @lastfetch = $sth->fetchrow_array();
+
+    while (scalar(@lastfetch))
+    {
+        my ($cidx, $iposn) = @lastfetch;
+
+#            print "d1 ", Dumper (@lastfetch), "\n";
+
+        my $cname = get_cname_by_idx($dbh, $tid, $cidx);
+
+        return undef
+            unless (defined($cname));
+
+        $cols[$iposn] = $cname;
+
+        @lastfetch = $sth->fetchrow_array();
+    }
+
+    return undef 
+        unless scalar(@cols);
+
+    $cols[0] = $iname;
+
+    return @cols;
 }
 
 exit($stat) 

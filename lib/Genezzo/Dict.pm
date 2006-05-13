@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 7.19 2006/05/07 06:32:49 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 7.21 2006/05/13 05:57:32 claude Exp claude $
 #
-# copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 package Genezzo::Dict;  # assumes Some/Module.pm
@@ -19,7 +19,7 @@ use Genezzo::Havok;
 
 BEGIN {
     our $VERSION;
-    $VERSION = do { my @r = (q$Revision: 7.19 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.21 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -453,13 +453,15 @@ sub _init
                 "iid=n tsid=n iname=c owner=c creationdate=c " .
                 "numcols=n tid=n tname=c unique=c cons_id=n";
 
+
+            # use "posn" vs "position", which is a SQL reserved word...
             my %p2_tab = 
                 (
                  cons1      => $cons1_def,
-                 cons1_cols => "cons_id=n tid=n colidx=n position=n",
+                 cons1_cols => "cons_id=n tid=n colidx=n posn=n",
 
                  ind1       => $ind1_def,
-                 ind1_cols  => "iid=n tid=n colidx=n position=n",
+                 ind1_cols  => "iid=n tid=n colidx=n posn=n",
                  );
             
             goto L_bad_init_db 
@@ -690,11 +692,38 @@ sub SetDBH
             } # end big while
             close ($dict_fh);
 
+
+            # update the pref1 export_start_tid 
+
+            my $last_dict_tid;
+            {
+                my $sth;
+                $sth = $dbh->prepare("select count(*) from _tab1");
+
+                $sth->execute();
+
+                my @lastfetch = $sth->fetchrow_array();
+    
+                if (scalar(@lastfetch))
+                {
+                    $last_dict_tid = ($lastfetch[0]);
+                }
+                
+                $sth = 
+                    $dbh->prepare("update _pref1 set pref_value=$last_dict_tid where pref_key=\'export_start_tid\'");
+
+                $sth->execute();
+                
+                ($self->DictSave());
+            }
+
             Genezzo::Util::set_gzerr_status(GZERR  => $GZERR, 
                                             status => $gzerr_info_state,
                                             self   => $self)
                 if (defined($GZERR));
+
         } # end 
+
 
         $self->DictShutdown();
         $self->{phase_three} = 0;
@@ -1113,7 +1142,8 @@ sub _DictDefineCoreTabs
                           default_file => $deffile,
                           bc_size      => 40,
                           automount    => "TRUE", # "FALSE",
-                          genezzo_version  => $Genezzo::GenDBI::VERSION
+                          genezzo_version  => $Genezzo::GenDBI::VERSION,
+                          export_start_tid => 1
                           );
 
         whisper "create _pref1...\n";
@@ -5203,7 +5233,7 @@ sub _make_cons_pk_check
             unless ($consid == $vv->[$getcol->{cons_id}]);
 
         my $colidx = $vv->[$getcol->{colidx}];
-        my $posn   = $vv->[$getcol->{position}];
+        my $posn   = $vv->[$getcol->{posn}];
 
         $pkey_cols[$posn-1] = $colidx;
     }
@@ -5865,7 +5895,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 
 perl(1).
 
-Copyright (c) 2003, 2004, 2005 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2003, 2004, 2005, 2006 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Parse/RCS/SQLGrammar.pl,v 7.7 2006/05/07 06:48:00 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Parse/RCS/SQLGrammar.pl,v 7.8 2006/05/13 06:04:27 claude Exp claude $
 #
 # copyright (c) 2005, 2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -1646,6 +1646,8 @@ sub SQLPrecompile
 #=head1 TODO
 #
 #=over 4
+#
+#=item  alter table (elcaro MODIFY column NOT NULL) vs (sql3 ALTER COLUMN)...
 #
 #=item  Support for DDL, ANSI Interval, Date, Timestamp, etc.
 #
