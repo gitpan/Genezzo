@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Util.pm,v 7.15 2006/05/11 07:51:07 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Util.pm,v 7.16 2006/05/19 07:30:40 claude Exp claude $
 #
-# copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 package Genezzo::Util;  # assumes Some/Module.pm
@@ -13,6 +13,8 @@ use warnings;
 use Carp;
 use Data::Dumper ;
 
+##use bignum;
+
 BEGIN {
     use Exporter   ();
     our ($VERSION, @ISA, @EXPORT, @EXPORT_OK, %EXPORT_TAGS);
@@ -20,7 +22,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 7.15 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.16 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
     @EXPORT      = qw(&whisper &whoami &greet 
@@ -402,22 +404,6 @@ sub HumanNum
     return $val
         if ($val =~ m/$numregexp/);
 
-    if ($val =~ m/^\d+(\.\d*)?[pezy]$/i)
-    {
-        my @ggg = ($val =~ m/(\d+(\.\d*)?)([kmgtpezy])/i);
-
-        my $ll = scalar(@ggg) - 1;
-
-        $emsg = "$nam ($val) too large - ";
-
-        #        Peta                              bytes 
-        $emsg .= $unitsprefix{uc($ggg[$ll])}->[1] . $args{units};
-
-        #          (2^50) > 2^49
-        $emsg .= " (2^" . $unitsprefix{uc($ggg[$ll])}->[0];
-        $emsg .= ") not supported";
-    }
-    else
     {
         if ($val =~ m/^\d+(\.\d*)?[kmgtpezy]$/i)
         {
@@ -432,8 +418,34 @@ sub HumanNum
                 shift @ggg;
             }
 
-            $outi *= (2**($unitsprefix{uc($ggg[1])}->[0]))
-                if (scalar(@ggg) > 1);
+            if (scalar(@ggg) > 1)
+            {
+                my $suffix = (2**($unitsprefix{uc($ggg[1])}->[0]));
+
+                # check the suffix for exponential notation to see if
+                # we lose precision, eg: 2**50 = 1125899906842624 with
+                # bignum else it returns 1.12589990684262e+15
+
+                if ($suffix !~ m/e/i) 
+                {
+                    # if suffix is still an integer then multiply
+
+                    $outi *= $suffix;
+                }
+                else
+                {
+
+                    $emsg = "$nam ($val) too large - ";
+
+                    #        Peta                              bytes 
+                    $emsg .= $unitsprefix{uc($ggg[1])}->[1] . $args{units};
+                    
+                    #          (2^50) > 2^49
+                    $emsg .= " (2^" . $unitsprefix{uc($ggg[1])}->[0];
+                    $emsg .= ") not supported";
+
+                }
+            }
 
         }
         else
@@ -1925,7 +1937,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 
 L<perl(1)>.
 
-Copyright (c) 2003, 2004, 2005 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2003, 2004, 2005, 2006 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

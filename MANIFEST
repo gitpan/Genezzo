@@ -42,6 +42,8 @@ lib/Genezzo/Row/RSBlock.pm
 lib/Genezzo/Row/RSJoinA.pm
 lib/Genezzo/SpaceMan/SMExtent.pm
 lib/Genezzo/SpaceMan/SMFile.pm
+lib/Genezzo/SpaceMan/SMHook.pm
+lib/Genezzo/SpaceMan/SMHook.yml
 lib/Genezzo/BufCa/BCFile.pm
 lib/Genezzo/BufCa/BufCa.pm
 lib/Genezzo/BufCa/BufCaElt.pm

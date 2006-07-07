@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/genexp.pl,v 7.4 2006/05/13 05:56:04 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/genexp.pl,v 7.5 2006/05/19 07:29:34 claude Exp claude $
 #
-# copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2005, 2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 #use strict;
@@ -71,9 +71,20 @@ the B<'-gnz_home'> option, Genezzo stores dictionary and table
 information in the location specified by this variable.  If 
 GNZ_HOME is undefined, the default location is $HOME/gnz_home.
 
+=head1 TODO
+
+=over 4
+
+=item move most methods to separate .pm file
+
+=item need to distinguish "dictionary" havok routines vs
+post-dictionary havok tables
+
+=back 
+
 =head1 AUTHORS
 
-Copyright (c) 2005 Jeffrey I Cohen.  All rights reserved.  
+Copyright (c) 2005, 2006 Jeffrey I Cohen.  All rights reserved.  
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -158,7 +169,7 @@ BEGIN {
                'define=s'   => \%defs)
         or pod2usage(2);
 
-    $glob_id = "Genezzo Version $Genezzo::GenDBI::VERSION - $Genezzo::GenDBI::RELSTATUS $Genezzo::GenDBI::RELDATE\n\n"; 
+    $glob_id = "genexp.pl - Genezzo Version $Genezzo::GenDBI::VERSION - $Genezzo::GenDBI::RELSTATUS $Genezzo::GenDBI::RELDATE\n\n"; 
 
 
     if ($verzion)
@@ -191,8 +202,7 @@ my $dbh = Genezzo::GenDBI->new(exe => $0,
 unless (defined($dbh))
 {
     my $initmsg = 
-        "use \n\t$0 -init \n\nto create a default installation.\n";
-
+        "export failed -- no installation found at $glob_gnz_home\n";
 
     pod2usage(-exitstatus => 2, -verbose => 0, 
               -msg => $glob_id . $initmsg

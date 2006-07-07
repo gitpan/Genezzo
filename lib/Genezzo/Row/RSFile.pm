@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSFile.pm,v 7.11 2006/03/14 08:21:32 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSFile.pm,v 7.18 2006/07/04 07:36:18 claude Exp claude $
 #
 # copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -152,6 +152,11 @@ sub _init
     # current insertion point - (not necessarily the current block)
     $self->{current_chunk_for_insert} = (); 
 
+    # Contrib is the counterpart to the CPAN Genezzo::Contrib
+    # namespace.  Add hash keys according to your package name, e.g.
+    #   $self->{Contrib}->{Clustered} = 'foo' 
+    $self->{Contrib} = {}; 
+
     return 1;
 }
 
@@ -180,6 +185,12 @@ sub TIEHASH
 } # end new
 
 # private routines
+sub _get_smf
+{
+    my $self = shift;
+    return $self->{smf};
+}
+
 sub _buffered_blockno  # current buffered block, as distinct from currchunkno
 {
 #    whoami;
@@ -271,13 +282,7 @@ sub _get_current_chunk # override the hph method
         # clear out the current tied block if it's not current
         # insertion point
 
-        my $reftb     = $self->{reftiebufa};
-        $self->{rowd} = ();  # clear out to force reload
-
-        if (defined($reftb))
-        {
-            untie $reftb;
-        }
+        $self->_untie_block();
     } # buffered block didn't match
 
     unless (defined ($self->{rowd}))
@@ -307,12 +312,7 @@ sub _make_new_chunk # override the hph method
     my $gotnewextent = 0; # true if get new extent
 
     # release tied blocks
-    my $reftb = $self->{reftiebufa};
-    $self->{rowd} = ();
-    if (defined($reftb))
-    {
-        untie $reftb;
-    }
+    $self->_untie_block();
 
     my ($blockinfo, $blockno);
     for my $num_tries (1..2)
@@ -376,23 +376,8 @@ sub _make_new_chunk # override the hph method
 #    $smf->flush();
 #    greet $bce;
 
-    # BCE to RDBlock - please respond
-    my $mailbag = Genezzo::Util::AddMail(To => 'Genezzo::Block::RDBlock',
-                                         From => $bce,
-                                         Msg => 'RSVP');
-
-    my %tiebufa;
-    # tie array to buffer
-    $self->{rowd} = 
-        tie %tiebufa, $ROW_DIR_BLOCK_CLASS,
-        (RDBlock_Class => $self->{RDBlock_Class},
-         blocknum  => $blockno, 
-         refbufstr => $bce->{bigbuf}, 
-         blocksize => $bce->{blocksize},
-         MailBag   => $mailbag
-         ); # XXX XXX : get blocksize from bce!!
-    
-    $self->{reftiebufa} = \%tiebufa;
+    # tie the block -- set up the rowd and reftiebufa
+    $self->_tie_block($blockno, $bce);
 
     if ($gotnewextent)
     {
@@ -402,7 +387,7 @@ sub _make_new_chunk # override the hph method
 #        print "e:", $extent_size, "\n";
 
         # get meta data for the extent header
-        my $row = $self->{rowd}->_get_meta_row("XHD");
+        my $row = $self->{rowd}->_get_meta_row("XHA");
 
 #        if ($row && scalar(@{$row}) && ($row->[0] == $extent_size))
 #        {
@@ -422,7 +407,7 @@ sub _make_new_chunk # override the hph method
         $self->{extent_posn} += 1;
         my $posn = $self->{extent_posn};
         # get meta data for the extent header
-        my $row = $self->{rowd}->_get_meta_row("XP");
+        my $row = $self->{rowd}->_get_meta_row("XHP");
 
 #        if ($row && scalar(@{$row}) && ($row->[0] == $posn))
 #        {
@@ -560,12 +545,7 @@ sub _get_a_chunk # override the hph method
         return (undef);
     }
 
-    my $reftb = $self->{reftiebufa};
-    $self->{rowd} = ();
-    if (defined($reftb))
-    {
-        untie $reftb;
-    }
+    $self->_untie_block();
 
     $bc->{bceref} = 
         $self->{realbc}->ReadBlock(filenum  => $bc->{realbcfileno},
@@ -579,24 +559,10 @@ sub _get_a_chunk # override the hph method
 
     my $bce = ${$bc->{bceref}};
 
-    # BCE to RDBlock - please respond
-    my $mailbag = Genezzo::Util::AddMail(To => 'Genezzo::Block::RDBlock',
-                                         From => $bce,
-                                         Msg => 'RSVP');
-
-    my %tiebufa;
-    # tie array to buffer
-    $self->{rowd} = 
-        tie %tiebufa, $ROW_DIR_BLOCK_CLASS,
-         (RDBlock_Class => $self->{RDBlock_Class},
-          refbufstr => $bce->{bigbuf},
-          blocksize => $bce->{blocksize}, # XXX XXX : get blocksize from bce!!
-          blocknum  => $blocknum,
-          MailBag   => $mailbag
-          );
+    # tie the block -- set up the rowd and reftiebufa
+    $self->_tie_block($blocknum, $bce);
 
     $bc->{bufblockno} = $blocknum;    
-    $self->{reftiebufa} = \%tiebufa;
     
     return ($self->{rowd});
 
@@ -804,6 +770,80 @@ END {
 
 }
 
+sub _tie_block
+{
+    my ($self, $blocknum, $bce) = @_;
+
+    return undef
+        unless (defined($blocknum) && defined($bce));
+
+    # BCE to RDBlock - please respond
+    my $mailbag = Genezzo::Util::AddMail(To => 'Genezzo::Block::RDBlock',
+                                         From => $bce,
+                                         Msg => 'RSVP');
+
+    # RSFile to RDBlock - register in Contrib hash (for SMHook)
+    $mailbag = Genezzo::Util::AddMail(To => 'Genezzo::Block::RDBlock',
+                                      From => $self,
+                                      Msg  => 'RegisterSender',
+                                      MailBag => $mailbag);
+
+    my %tiebufa;
+    # tie array to buffer
+    $self->{rowd} = 
+        tie %tiebufa, $ROW_DIR_BLOCK_CLASS,
+         (RDBlock_Class => $self->{RDBlock_Class},
+          blocknum  => $blocknum,
+          refbufstr => $bce->{bigbuf},
+          blocksize => $bce->{blocksize}, # XXX XXX : get blocksize from bce!!
+          MailBag   => $mailbag
+          );
+
+    $self->{reftiebufa} = \%tiebufa;
+
+    if (defined(&tie_block_post_hook))
+    {
+        (tie_block_post_hook(self      => $self, 
+                             rowd      => $self->{rowd},
+                             blocknum  => $blocknum));
+    }
+
+    $self->{blocknum} = $blocknum;
+
+    return $self->{rowd};
+
+} # end tie_block
+
+sub _untie_block
+{
+    my $self = shift;
+
+    my $reftb     = $self->{reftiebufa};
+
+    if (defined(&untie_block_pre_hook))
+    {
+        (untie_block_pre_hook(self     => $self, 
+                              rowd     => $self->{rowd},
+                              blocknum => $self->{blocknum},
+                              filename   => $self->{filename},
+                              filenumber => $self->{filenumber}
+                              ));
+    }
+
+    $self->{rowd} = ();  # clear out to force reload
+
+    if (defined($reftb))
+    {
+        untie $reftb;
+    }
+
+    if (defined(&untie_block_post_hook))
+    {
+        (untie_block_post_hook(self     => $self,
+                               blocknum => $self->{blocknum}));
+    }
+
+}
 
 1;
 

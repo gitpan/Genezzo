@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BCFile.pm,v 7.8 2006/02/14 08:40:52 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BCFile.pm,v 7.9 2006/05/21 06:41:33 claude Exp claude $
 #
 # copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -390,7 +390,7 @@ sub _filereadblock
 #
 #    if (1) 
 #    {
-#        my $foo = $bce->GetInfo();
+#        my $foo = $bce->GetContrib();
 #        
 #        return 1
 #            unless (defined($foo));
@@ -546,9 +546,9 @@ sub ReadBlock
     $hitlist->{"BC:" . "$bcblocknum"} = $fileinfo;
 
     # get the hash of bce information and update with filenum, blocknum
-    my $infoh = $bce->GetInfo();
+    my $infoh = $bce->GetContrib();
 
-    # update the GetInfo *before* the fileread so locking code has some
+    # update the GetContrib *before* the fileread so locking code has some
     # place to look up the information
     $infoh->{filenum}  = $fnum;
     $infoh->{blocknum} = $bnum;
@@ -911,7 +911,7 @@ Currently requires 2 blocks per open file.
 
 =over 4
 
-=item  note that _fileread could just be part of GetInfo
+=item  note that _fileread could just be part of GetContrib
 
 =item  need to move TSExtendFile functionality here if want to overload
        syswrite with encryption

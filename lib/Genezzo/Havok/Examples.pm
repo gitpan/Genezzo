@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/Examples.pm,v 7.4 2005/09/18 07:50:09 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/Examples.pm,v 7.5 2006/05/21 06:41:01 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -109,7 +109,7 @@ sub magic_writeblock
 
     if (1) 
     {
-        my $foo = $bce->GetInfo();
+        my $foo = $bce->GetContrib();
         
         return 1
             unless (defined($foo));

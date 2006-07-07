@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 7.21 2006/05/13 05:57:32 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 7.22 2006/06/18 08:40:53 claude Exp claude $
 #
 # copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -19,7 +19,7 @@ use Genezzo::Havok;
 
 BEGIN {
     our $VERSION;
-    $VERSION = do { my @r = (q$Revision: 7.21 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.22 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -5840,6 +5840,10 @@ Checking for the existance of a table would be something like:
 =head1 TODO
 
 =over 4
+
+=item  pref1 - distinguish fixed/mutable parameters
+
+=item  cons1 - distinguish user constraint names from system-defined names
 
 =item  IDXTAB indexed tables don't give a constraint error, or primary
        key error.  They don't have constraints because they are themselves

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/SpaceMan/RCS/SMExtent.pm,v 1.16 2006/03/14 08:20:39 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/SpaceMan/RCS/SMExtent.pm,v 1.32 2006/07/06 07:37:59 claude Exp claude $
 #
 # copyright (c) 2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -22,7 +22,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 1.16 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.32 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
     @EXPORT      = ( ); # qw(&NumVal);
@@ -95,6 +95,8 @@ sub _init
     return undef
         unless (Validate(\%args, \%required));
 
+    $self->{filename} = $args{filename}; # save for error reporting
+
     my $smf = Genezzo::SpaceMan::SMFile->new($args{filename},
                                              $args{numbytes},
                                              $args{numblocks},
@@ -114,7 +116,7 @@ sub _init
 
     if (defined($blockno))
     {
-        $self->{first_extent}   = $blockno;
+        $self->{first_seghdr}   = $blockno;
         $self->{current_seghdr} = $blockno;
 
         # need to call this way because SELF isn't BLESSed yet...
@@ -141,7 +143,7 @@ sub _init
 
             my $nexthdr = $row2->[-1]; # check the end of the array
 
-            my @ggg = split(':', $nexthdr);
+            my @ggg = $self->_split_extent_descriptor($nexthdr);
 
             last 
                 unless (scalar(@ggg) > 1);
@@ -216,7 +218,8 @@ sub _get_rowd # private
     unless ($self->{smf}->_tiefh($bc, $blockno))
     {
         whisper "bad fh tie";
-        my $msg = "bad fh tie\n";
+        my $fn = $self->{filename};
+        my $msg = "bad fh tie for block $blockno, file $fn\n";
         my %earg = (self => $self, msg => $msg,
                     severity => 'warn');
         
@@ -257,6 +260,83 @@ sub SMGrowFile
     return $self->{smf}->SMGrowFile(@_);
 }
 
+# truncate a number to a certain length, or pad with leading zeros
+# Assumes $num is non-negative
+sub _trunc_or_pad
+{
+    use POSIX ; #  need some rounding
+
+    my ($num, $padlen) = @_;
+
+    # Note: outi must be an integer -- round down
+    my $outi = POSIX::floor($num);
+
+    if ($padlen == 2)
+    {
+        # common case
+        $outi = 99
+            if ($outi > 99);
+    }
+    else
+    {
+        # XXX XXX: need to test this...
+        $outi = (("9"x$padlen) + 0)
+            if ($outi > (10**$padlen));
+    }
+    $outi = 0
+        if ($outi < 1);
+
+    # kind of redundant...
+    $outi = substr($num, 0, $padlen)
+        if (length($num) > $padlen);
+
+    if (length($outi) < $padlen)
+    {
+        if ($padlen == 2)
+        {
+            # common case
+            $outi = "0".$outi;
+        }
+        else
+        {
+            # XXX XXX: need to test this...
+            my $plen = $padlen - length($outi);
+            $outi = ("0"x$plen).$outi
+        }
+    }
+    return $outi;
+}
+
+sub _make_extent_descriptor
+{
+    my ($self, $blockno, $extent_size, $total_pctused, 
+        $alloc_pctused, $num_free) = @_;
+
+    $total_pctused = 0 unless (defined($total_pctused));
+
+    $total_pctused = _trunc_or_pad($total_pctused, 2);
+
+    $alloc_pctused = $total_pctused unless (defined($alloc_pctused));
+    $alloc_pctused = _trunc_or_pad($alloc_pctused, 2);
+
+    $num_free = $extent_size unless (defined($num_free));
+    my $free_len = 0; # set to zero for zero free
+    $free_len = length($num_free)  # number of digits
+        if ($num_free > 0);
+    $free_len = 9 if ($free_len > 9);
+
+    return join(':', $blockno, $extent_size, $total_pctused,
+                $alloc_pctused, $free_len
+                );
+}
+
+sub _split_extent_descriptor
+{
+    my ($self, $extent_desc_str) = @_;
+
+    return split(':', $extent_desc_str);
+}
+
 sub _create_segment_hdr
 {
     my ($self, $rowd, $blockno, $extent_size, $parent) = @_;
@@ -264,22 +344,50 @@ sub _create_segment_hdr
     return undef
         unless (defined($rowd));
 
+    # X1A (eXtent FIRST _A_):
+    #   1 at start of segment (segment header/first extent), and 1 for
+    #   each overflow block of the segment header.  The segment header
+    #   starts as the first block of the first extent, and each
+    #   overflow block is a "subheader".
+    #
+    #   contains vacant/full flag, which indicates whether this piece
+    #   of the segment header has the maximum number of extent listings,
+    #   followed by a list of extent descriptors.
+
     $rowd->_set_meta_row("X1A", 
                          [
 # XXX XXX: remove seghdr
                           "seghdr", 
                           "V", # [V]acant, vs [F]ull
-                          join(':', $blockno, $extent_size, '0.0')
+                          $self->_make_extent_descriptor(
+                                                         $blockno, 
+                                                         $extent_size, 
+                                                         '0.0')
                           ]
                          );
 
     unless (defined($parent))
     {
         # should only be for very first allocated extent
-        $self->{first_extent}   = $blockno;
+        $self->{first_seghdr}   = $blockno;
         $self->{current_seghdr} = $blockno;
         $parent = $blockno;
     }
+
+    # X1B (eXtent FIRST _B_):
+    #   1 at start of segment (segment header/first extent), and 1 for
+    #   each overflow block of the segment header.
+    #
+    #   Initially, just has the block number for the previous segment
+    #   header (which is just the current blockno if this block is the
+    #   very first).  However, once the first extent is allocated for
+    #   this piece of the segment header, then this extent is
+    #   designated as the segment header overflow block, and the
+    #   extent descriptor is appended to the X1B row.
+    #
+    #   Note that the extent descriptor should describe the overall
+    #   status of all the extents managed beneath the overflow block,
+    #   not just the first extent in that block.
 
     # no "next" segment header, just list parent piece of seg hdr
     $rowd->_set_meta_row("X1B", [
@@ -290,7 +398,7 @@ sub _create_segment_hdr
     return $rowd;
 } # end _create_segment_hdr
 
-sub _update_segment_hdr
+sub _add_extent_to_segment_hdr
 {
     my ($self, $blockno, $extent_size) = @_;
 
@@ -313,7 +421,18 @@ sub _update_segment_hdr
         # then the new extent is allocated for that purpose
         if (defined($row2) && (scalar(@{$row2}) < 3)) # XXX XXX: remove segnxt
         {
-            push @{$row2}, join(':', $blockno, $extent_size, '0.0');
+            # X1B (eXtent FIRST _B_):
+            #
+            # add the extent descriptor for the overflow block.
+            #
+            # Note that the "extent_size" in this descriptor can vary,
+            # since it's an approximation of the total space allocated
+            # under the subheader.  However, we can keep the length of
+            # the extent_size approximation a constant 4 characters
+            # using standard space suffixes, eg: 100K, 1.2M, .99G
+            push @{$row2}, $self->_make_extent_descriptor($blockno, 
+                                                          $extent_size, 
+                                                          '0.0');
 
             $rowd->_set_meta_row("X1B", $row2);
 
@@ -345,7 +464,9 @@ sub _update_segment_hdr
             exit;
         }
 
-        my $new_ext = join(':', $blockno, $extent_size, '0.0');
+        my $new_ext = $self->_make_extent_descriptor($blockno,
+                                                     $extent_size, 
+                                                     '0.0');
 
         push @{$row}, $new_ext;
 
@@ -388,7 +509,7 @@ sub _update_segment_hdr
 
         my $nexthdr = $row2->[-1]; # check the end of the array
 
-        my @ggg = split(':', $nexthdr);
+        my @ggg = $self->_split_extent_descriptor($nexthdr);
 
         unless (scalar(@ggg) > 1)
         {
@@ -403,11 +524,58 @@ sub _update_segment_hdr
     } # end while
     
     return $rowd;
-} # end _update_segment_hdr
+} # end _add_extent_to_segment_hdr
+
+sub _update_extent_in_segment_hdr
+{
+    my ($self, $rowd, $ext_hdr_block, $extent_desc) = @_;
+
+    my $row = $rowd->_get_meta_row("X1A");
+
+    unless (defined($row))
+    {
+        croak "serious error 4!";
+        exit;
+    }
+
+    my $maxi = scalar(@{$row});
+
+    return undef
+        unless ($maxi);
+    # zero based
+    $maxi--;
+
+    for my $ii (0..$maxi)
+    {
+        my $xdsc = $row->[$ii];
+        print $xdsc, "\n";
+        my @ggg = $self->_split_extent_descriptor($xdsc);
+        next
+            unless (scalar(@ggg) > 4);
+        my ($curr_ext_hdr_block, $extent_size, $total_pctused,
+            $alloc_pctused, $free_len) = @ggg;
+
+        # update if they are different
+        if ($ext_hdr_block == $curr_ext_hdr_block)
+        {
+            if ($xdsc eq $extent_desc)
+            {
+                print "xdsc match - no update: $xdsc\n";
+            }
+            else
+            {
+                $row->[$ii] = $extent_desc;
+                return $rowd->_set_meta_row("X1A", $row); 
+            }
+            last;
+        }
+    }
+    return undef;
+} # end _update_extent_in_segment_hdr
 
 sub _create_extent_hdr
 {
-    my ($self, $rowd, $extent_size) = @_;
+    my ($self, $rowd, $extent_size, $seghdr) = @_;
 
     return undef
         unless (defined($rowd));
@@ -417,9 +585,18 @@ sub _create_extent_hdr
     my $numbits = Genezzo::Util::PackBits(2 * $extent_size);
     my $nullstr = pack("B*", "0"x$numbits);
 
-    $rowd->_set_meta_row("XHA", [$extent_size, $nullstr]);
-    # extent position is zero (1st block in extent)
-    $rowd->_set_meta_row("XHP", [0]);
+    # XHA (eXtent Header _A_): 
+    #   1 per extent.
+    #   contains the segment header, extent size and usage bitvec.
+    #
+    # XHP (eXtent Header Position): 
+    #   1 per block (including 0th block of extent).
+    #   contains the offset of the block in the extent,
+    #   and the percent used in 10% increments (eg 1 is 10%, 9 is 90%)
+
+    $rowd->_set_meta_row("XHA", [$seghdr, $extent_size, $nullstr]);
+    # extent position is zero (1st block in extent), initial %used is zero 
+    $rowd->_set_meta_row("XHP", [0, 0]);
 
     return $rowd;
 } # end _create_extent_hdr
@@ -446,13 +623,13 @@ sub _update_extent_hdr
         return undef;
     }
 
-    my ($extent_size, $bvec) = @{$row};
+    my ($seghdr, $extent_size, $bvec) = @{$row};
 
-    whisper "size, bv: $extent_size," , unpack("b*",$bvec), "\n";
+#    whisper "size, bv: $extent_size," , unpack("b*",$bvec), "\n";
 
     my ($bit1, $bit2) = (0, 0 ); # empty
 
-    if ($pct_used > 99)
+    if ($pct_used >= 90)
     {
         ($bit1, $bit2) = (1,1 ); # full
     }
@@ -465,16 +642,118 @@ sub _update_extent_hdr
         ($bit1, $bit2) = (0,1 );
     }
 
+    my @pct = $self->_xhdr_bv_to_pct($bvec, $extent_size);
+    my $extent_stats  = shift @pct;
+    my $avgpct        = $extent_stats->{avgpct};
+    my $prev_numempty = $extent_stats->{numempty};
+    my $allocpct      = $extent_stats->{allocpct};
+
     # use 2 bits per posn -- 00 is empty , 11 is full
     vec($bvec, (2*$posn),   1) = $bit1;
     vec($bvec, (2*$posn)+1, 1) = $bit2;
     whisper "size, bv: $extent_size," , unpack("b*",$bvec), "\n";
-    # update
-    $rowd->_set_meta_row("XHA", [$extent_size, $bvec]);
 
-    return $rowd;
+    @pct = $self->_xhdr_bv_to_pct($bvec, $extent_size);
+    $extent_stats     = shift @pct;
+    $avgpct           = $extent_stats->{avgpct};
+    my $curr_numempty = $extent_stats->{numempty};
+
+    # update
+    $rowd->_set_meta_row("XHA", [$seghdr, $extent_size, $bvec]);
+
+    # if this update causes the extent to transition from full to
+    # partially-empty, need to return a status so we can update the
+    # segment header
+
+    my @outi;
+
+    push @outi, $rowd;
+
+    if ((0 == $prev_numempty) && (0 != $curr_numempty))
+    {
+# XXX XXX XXX XXX
+        print "Emptied a block!!\n";
+        @outi = ($rowd, $seghdr, $extent_size, $bvec);
+#        return @outi;
+    }
+    return @outi;
     
 } # end _update_extent_hdr
+
+# convert a bitvec to an array of percentages
+sub _xhdr_bv_to_pct
+{
+    my ($self, $bvec, $extent_size) = @_;
+
+    my $bvstr = unpack("b*",$bvec);
+
+    my @bvfull = split(/ */, $bvstr);
+
+    my $bit1;
+    my @pct;
+    my $totpct   = 0;
+    my $numempty = 0;
+
+    # construct an array of percent usage for each block in the extent
+    for my $bitty (@bvfull)
+    {
+        if (!defined($bit1))
+        {
+            $bit1 = $bitty;
+            next;
+        }
+
+        my $bit2 = $bitty;
+        
+        my $blockpct;
+
+        if (0 == $bit1)
+        {
+            # b01 = d30, b00 = d0
+            $blockpct = ($bit2 ? 30: 0);
+        }
+        else
+        {
+            # b11 = d90, b10 = d60
+            $blockpct = ($bit2 ? 90: 60);
+        }
+        $numempty++ unless ($blockpct);
+        $totpct += $blockpct;
+        push @pct, $blockpct;
+
+        $bit1 = undef;
+        $extent_size--;
+        last unless ($extent_size);
+
+    } # end for
+    
+    # prefix the array of pct usage with avg usage and number of empty blocks
+    if (scalar(@pct))
+    {
+        $extent_size = scalar(@pct);
+        my %extent_stats;
+
+        # prefix array of percentages with avg pct used
+        my $avgpct   = $totpct/$extent_size;
+        my $allocpct = $avgpct;
+
+        if ($numempty && ($numempty < $extent_size))
+        {
+            $allocpct = 
+                $totpct/($extent_size-$numempty);
+            $allocpct = 90 
+                if ($allocpct > 90);
+        }
+
+        $extent_stats{allocpct} = $allocpct;
+        $extent_stats{avgpct}   = $avgpct;
+        # track the number of empty blocks in an extent
+        $extent_stats{numempty} = $numempty;
+        unshift @pct, \%extent_stats;
+    }
+
+    return @pct;
+} # end  _xhdr_bv_to_pct
 
 
 sub _find_extent_hdr
@@ -517,7 +796,151 @@ sub _find_extent_hdr
 sub nextfreeblock
 {
     # STUB: this routine for finding free blocks in allocated extents
+
+    # First, check curr_extent -- if have space there use it.
+    # If current extent is full, pop back to segment header.
+    # Check for free extents in segment header.  If have one, set it
+    # as current and use it.
+    # If no space available in the segment header, call SMFile and ask
+    # for more space.
+
     my $self = shift;
+
+    my $seghdr = $self->{first_seghdr};
+    unless (defined($seghdr))
+    {
+        goto  L_nospacefound;
+    }
+
+    my $rowd = $self->_get_rowd($seghdr);
+    unless (defined($rowd))
+    {
+        goto  L_nospacefound;
+#        return (undef);
+    }
+    my $row = $rowd->_get_meta_row("X1A");
+
+    unless (defined($row) && (scalar(@{$row}) > 1))
+    {
+        goto  L_nospacefound;
+#        print "bad X1A row for $blockno \n";
+#        return (undef);
+    }
+
+    my (@checklist, %revised);
+    for my $xdesc (@{$row})
+    {
+        my @ggg = $self->_split_extent_descriptor($xdesc);
+        next
+            unless (scalar(@ggg) > 4);
+        my ($blockno, $extent_size, $total_pctused,
+            $alloc_pctused, $free_len) = @ggg;
+
+        next
+            unless ($free_len > 0);
+
+        my $checkitem = [$blockno, $extent_size, $total_pctused,
+                         $alloc_pctused, $free_len];
+
+        push @checklist, $checkitem;
+    } # end for all xdesc in X1A row
+
+    for my $item (@checklist)
+    {
+        my ($blockno, $extent_size, $total_pctused,
+            $alloc_pctused, $free_len) = @{$item};
+
+        $rowd = $self->_get_rowd($blockno);
+        unless (defined($rowd))
+        {
+            print "bad rowd for $blockno!!\n";
+            return (undef);
+        }
+        $row = $rowd->_get_meta_row("XHA");
+        unless (defined($row) && (scalar(@{$row}) > 1))
+        {
+            print "bad XHA row for $blockno \n";
+            return (undef);
+        }
+        my $seghdr = $row->[0];
+        my $extsiz = $row->[1];
+        my $bvec   = $row->[2];
+        my @pct = $self->_xhdr_bv_to_pct($bvec, $row->[1]);
+
+        my $extent_stats = shift @pct;
+        my $avgpct   = $extent_stats->{avgpct};
+        my $numempty = $extent_stats->{numempty};
+        my $allocpct = $extent_stats->{allocpct};
+
+# XXX XXX XXX XXX        
+#        print "block $blockno: ",  join(" ",
+#                                        ( $total_pctused,
+#                                         $alloc_pctused, $free_len)), "\n";
+
+        # get magnitude of number of empty blocks (0-9, where 0 is 0
+        # free, and 9 is 10^9)
+        my $new_free_len = $numempty ? length($numempty) : 0;
+        $new_free_len = 9 
+            if ($new_free_len > 9 );
+
+        $avgpct   =  _trunc_or_pad($avgpct, 2);
+        $allocpct =  _trunc_or_pad($allocpct, 2);
+
+# XXX XXX XXX XXX
+#        print "now: ", join(" ", ($avgpct, $allocpct, $new_free_len)),"\n";
+
+        if (($total_pctused != $avgpct) ||
+            ($alloc_pctused != $allocpct) ||
+            ($free_len != $new_free_len))
+        {
+            # use numempty, not free_len, because make_extent_desc
+            # will do calculation
+            my $revitem = [$blockno, $extent_size, $avgpct,
+                           $allocpct, $numempty];
+
+            $revised{$blockno} =  $revitem;
+        }
+
+    } # end for checklist
+
+    if (scalar(keys(%revised)))
+    {
+        $rowd = $self->_get_rowd($seghdr);
+        unless (defined($rowd))
+        {
+            return (undef);
+        }
+        $row = $rowd->_get_meta_row("X1A");
+        
+        unless (defined($row) && (scalar(@{$row}) > 1))
+        {
+            goto  L_nospacefound;
+#        print "bad X1A row for $blockno \n";
+#        return (undef);
+        }
+
+        for my $ii (0..(scalar(@{$row})-1))
+        {
+            my $xdesc = $row->[$ii];
+
+            my @ggg = $self->_split_extent_descriptor($xdesc);
+            next
+                unless (scalar(@ggg) > 4);
+            my ($blockno, $extent_size, $total_pctused,
+                $alloc_pctused, $free_len) = @ggg;
+
+            next 
+                unless (exists($revised{$blockno}));
+
+            my $new_xd = $revised{$blockno};
+            $row->[$ii] = $self->_make_extent_descriptor(@{$new_xd});
+
+        } # end for all xdesc in X1A row
+        $rowd->_set_meta_row("X1A", $row);
+    }
+    
+
+  L_nospacefound:
     # if no space available, get space from SMFile
     return $self->_file_nextfreeblock(@_);
 }
@@ -611,31 +1034,8 @@ sub _file_nextfreeblock
 
       L_setposition:
         my $posn = $self->{extent_posn};
-        # set meta data for the extent header
-        $rowd->_set_meta_row("XHP", [$posn]);
-
-        if (0) # XXX XXX: move this to a callback
-        {
-            # update the extent header
-            $rowd = $self->_get_rowd($blockno - $posn);
-            unless (defined($rowd))
-            {
-                return (undef);
-            }
-            my $old_posn = $self->{extent_posn} - 1;
-            # update previous position as 100% used...
-            unless ($self->_update_extent_hdr($rowd, $old_posn, 100))
-            {
-                my $msg = "could not update extent header\n";
-                my %earg = (self => $self, msg => $msg,
-                            severity => 'warn');
-        
-                &$GZERR(%earg)
-                    if (defined($GZERR));
-
-                return undef;
-            }
-        }
+        # set meta data for the extent header (position, initial %used is zero)
+        $rowd->_set_meta_row("XHP", [$posn, 0]);
 
     }
     else # got new extent
@@ -674,7 +1074,8 @@ sub _file_nextfreeblock
             push @new_extent_info, $blockno, $extent_size;
         }
         # set meta data for the extent header
-        unless ($self->_create_extent_hdr($rowd, $extent_size))
+        unless ($self->_create_extent_hdr($rowd, $extent_size,
+                                          $self->{current_seghdr}))
         {
             my $msg = "could not create extent header\n";
             my %earg = (self => $self, msg => $msg,
@@ -688,9 +1089,11 @@ sub _file_nextfreeblock
 
     }
 
+    my $curr_seghdr = $self->{current_seghdr};
+
     if (scalar(@new_extent_info))
     {
-        $self->_update_segment_hdr(@new_extent_info);
+        $self->_add_extent_to_segment_hdr(@new_extent_info);
     }
         
     $rowd = $self->_get_rowd(0);
@@ -840,7 +1243,14 @@ actually, could top out extent size at 1M, use 256 4K blocks per extent
 
 xhd needs to track seghd/subhead info
 
+xhp tracks extent position [0 to N-1] and
+%used in extent header (ie 0 is 0%, 3 is 30%, 6 is 60%, and 9 is 90+%).
 
+Note that block zero is a very similar to a segment header, though it
+tracks the lists of extents associated with each object, and it
+doesn't track percent usage.  However, if we have the case of a file
+which is solely for one object, we could merge a good portion of block
+zero and the segment header into a combined set of data structures.
 
 
 =head1 FUNCTIONS
@@ -849,7 +1259,19 @@ xhd needs to track seghd/subhead info
 
 =item currblock
 
-return the current active block (insert high water mark) for an object
+return the current active block (insert high water mark) for an object.
+
+Advanced: allow multiple active blocks for concurrent usage.
+
+=item nextfreeblock
+
+return the next unused block for an object, which would be one beyond
+the current block in the current extent if possible, or else it
+allocates a new extent.
+
+Advanced: allow multiple "next blocks" for concurrent users.  Maintain
+multiple freelists.  Use this call as an opportunity to probe extent
+headers to update the segment header.
 
 =item firstblock, nextblock
 
@@ -884,6 +1306,7 @@ extent lists spread over multiple blocks.
 
 =over 4
 
+=item  remove the seghdr/segnxt debugging tags
 
 =item  need to coalesce adjacent free extents
 

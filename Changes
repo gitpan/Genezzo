@@ -1,5 +1,10 @@
 Revision history for Perl extension Genezzo
 
+0.61 Fri Jul  7 00:26:15 2006
+        - RDBlock hooks
+        - RSTab update improvements
+        - preliminary SMExtent/SMHook packaging
+
 0.60 Fri May 12 22:53:12 2006
         - genexp enhancements
         - quurl/unquurl: new sql functions for URL-style quoting

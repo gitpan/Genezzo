@@ -1,0 +1,26 @@
+# havok version=7.12
+ABSTRACT:     
+AUTHOR:    Jeffrey I Cohen (jcohen@cpan.org)
+DML:    
+  -    
+    check:    
+      -    select * from sys_hook where xname='Genezzo::SpaceMan::SMHook'
+
+    install:    
+      -    i sys_hook 10 Genezzo::Block::RDBlock push_post_hook Push_Hook require Genezzo::SpaceMan::SMHook block_push_hook SYSTEM 2006-07-06T07:35:35 1.23
+      -    i sys_hook 11 Genezzo::Block::RDBlock delete_post_hook Delete_Hook require Genezzo::SpaceMan::SMHook block_delete_hook SYSTEM 2006-07-06T07:35:35 1.23
+      -    i sys_hook 12 Genezzo::Block::RDBlock realstore_post_hook Store_Hook require Genezzo::SpaceMan::SMHook block_store_hook SYSTEM 2006-07-06T07:35:35 1.23
+      -    i sys_hook 13 Genezzo::Row::RSFile untie_block_pre_hook PreUntie_Hook require Genezzo::SpaceMan::SMHook block_pre_untie_hook SYSTEM 2006-07-06T07:35:35 1.23
+      -    i sys_hook 14 Genezzo::Row::RSFile untie_block_post_hook PostUntie_Hook require Genezzo::SpaceMan::SMHook block_post_untie_hook SYSTEM 2006-07-06T07:35:35 1.23
+      -    i sys_hook 15 Genezzo::Row::RSFile tie_block_post_hook PostTie_Hook require Genezzo::SpaceMan::SMHook block_post_tie_hook SYSTEM 2006-07-06T07:35:35 1.23
+
+
+
+LICENSE:    gpl
+NAME:    Genezzo::SpaceMan::SMHook
+PREREQ_HAVOK:    
+  Genezzo::Havok:    0.0
+  Genezzo::Havok::SysHook:    0.0
+
+UPDATED:    2006-07-07T00:27:47
+VERSION:    1.23

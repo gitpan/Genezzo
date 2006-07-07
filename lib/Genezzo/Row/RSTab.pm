@@ -961,10 +961,15 @@ sub _localStore
     }
     my $maxsize = 2 * $self->{small_row}; 
 
+#    greet "max: $maxsize, old: $oldsize";
+
     $maxsize = $oldsize
         if ($oldsize > $maxsize);
 
     my $packstr = PackRowCheck($value, $maxsize);
+
+#    greet "packstr: ", length($packstr) if (defined($packstr));
+
     unless ($oldsize)
     {
         # keep maxsize a bit small unless space is already allocated
@@ -1003,7 +1008,8 @@ sub _localStore
            (   (scalar(@estat) > 2) 
             && Genezzo::Block::RDBlock::_isheadrow($estat[0])
             && Genezzo::Block::RDBlock::_istailrow($estat[0])
-            && $estat[2] >= $maxsize # see if still fits   
+            && !($toobig)
+            && $estat[2] >= length($packstr) # see if still fits   
            )
         )
     {

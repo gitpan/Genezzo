@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Block/RCS/RDBlock.pm,v 7.3 2005/09/07 08:33:20 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Block/RCS/RDBlock.pm,v 7.7 2006/05/29 18:36:27 claude Exp claude $
 #
-# copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 use strict;
@@ -150,6 +150,12 @@ sub _init
        return 0;
     }
     $self->{can_insert} = ($freespace > $self->{absfree});
+
+    # Contrib is the counterpart to the CPAN Genezzo::Contrib
+    # namespace.  Add hash keys according to your package name, e.g.
+    #   $self->{Contrib}->{Clustered} = 'foo' 
+    $self->{Contrib} = {}; 
+
 #    return $self->_mkrowdir( $numelts, $freespace);
     return _mkrowdir($self, $numelts, $freespace);
 }
@@ -208,17 +214,27 @@ sub TIEHASH
         {
             for my $msg (@{$msglist}) # check all msgs
             {
-                # RSVP to sender
-
                 if (exists($msg->{Msg})
                     && exists($msg->{From})
                     && $msg->{Msg} eq 'RSVP')
                 {
+                    # RSVP to sender
+
                     my $sender = $msg->{From};
                     $sender->RSVP(name  => __PACKAGE__,
                                   value => $new_self);
                 }
-            } # end fo
+                if (exists($msg->{Msg})
+                    && exists($msg->{From})
+                    && $msg->{Msg} eq 'RegisterSender')
+                {
+                    # list the sender in the Contrib hash
+                    my $r1 = ref($msg->{From});
+                    
+                    $self->{Contrib}->{mailbox}->{$r1}->{self} = $msg->{From};
+
+                }
+            } # end for
         }
     } # end if mailbag
 
@@ -660,9 +676,10 @@ sub _push_one
     return (undef)
         if ($nextpos <= _calctotalheader($numelts));
 
-    # decrement the freespace
-    $self->{freespace} -= 
+    my $sizediff = 
         ($packlen + $Genezzo::Block::RowDir::LenRowDirTemplate);
+    # decrement the freespace
+    $self->{freespace} -= $sizediff;
 
     $self->{can_insert} = ($self->{freespace} > $self->{absfree});    
 
@@ -688,6 +705,15 @@ sub _push_one
     
     # add new row count to main header
     SetStdHdr($self, $self->{blocktype}, $self->{numelts}, $self->{freespace});
+
+    # push_post_hook
+    if (defined(&push_post_hook))  
+    {
+#        return 0
+#            unless 
+            (push_post_hook(self => $self, sizediff => $sizediff));
+    }
+
 
     return ($self->{numelts} - 1);
 
@@ -1046,6 +1072,16 @@ sub _realstore # return undef if out of space
     SetStdHdr($self, $self->{blocktype}, $self->{numelts}, $self->{freespace})
         unless (0 == $sizediff);
 
+    # realstore_post_hook
+    # check sizediff
+    if (defined(&realstore_post_hook))  
+    {
+#        return 0
+#            unless 
+            (realstore_post_hook(self => $self, sizediff => $sizediff));
+    }
+
+
     return ($value);
 
 }
@@ -1238,6 +1274,8 @@ sub DELETE
 
     my ($rowstat, $rowposn, $rowlen) = @{ $refrowdir->[$place] };
 
+    my $sizediff = 0;
+
     # normal case if not at end
     unless (($place + 1) == $numelts)
     {
@@ -1257,7 +1295,8 @@ sub DELETE
         # and free space unchanged until we can really free up this
         # row or shuffle the space...
 
-        return ($self->_realfetch ($rowposn, $rowlen ));
+#        return ($self->_realfetch ($rowposn, $rowlen ));
+        goto L_fin_delete;
     }
 
     # NOTE: trivial truncation if at end of row directory
@@ -1272,7 +1311,12 @@ sub DELETE
     while (1)
     {
         $self->{numelts}   -= 1;
-        $self->{freespace} += ($iln + $Genezzo::Block::RowDir::LenRowDirTemplate);
+        
+        my $deltadiff = ($iln + $Genezzo::Block::RowDir::LenRowDirTemplate);
+
+        $self->{freespace} += $deltadiff;
+        $sizediff += $deltadiff;
+
         # clear the block if rownum = 0
         $clrblock = ($self->{numelts} == 0);
             
@@ -1312,6 +1356,17 @@ sub DELETE
             if ($self->{can_insert});
     }
  
+
+L_fin_delete:
+
+    # delete_post_hook
+    if (defined(&delete_post_hook))  
+    {
+#        return 0
+#            unless 
+            (delete_post_hook(self => $self, sizediff => $sizediff));
+    }
+
     # don't need to update rowdir elements in header -- numelts
     # specifies the length of the rowdir, and the trailing elemnts
     # will just get overwritten if new rows are added
@@ -1373,6 +1428,11 @@ sub FIRSTKEY {
     return $_[0]->NEXTKEY(-1);
 }
 
+sub GetContrib
+{
+    my $self = shift;
+    return $self->{Contrib};
+}
 
 END {
 
@@ -1608,7 +1668,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 
 L<perl(1)>.
 
-Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2003, 2004, 2005, 2006 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
