@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/SQLScalar.pm,v 1.7 2006/05/21 06:12:07 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/SQLScalar.pm,v 1.8 2006/08/05 22:49:45 claude Exp claude $
 #
 # copyright (c) 2005, 2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -75,7 +75,7 @@ our $VERSION;
 our $MAKEDEPS;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 1.7 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.8 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     my $pak1  = __PACKAGE__;
     $MAKEDEPS = {
@@ -93,7 +93,7 @@ BEGIN {
     # DML is an array, not a hash
 
     my $now = 
-    do { my @r = (q$Date: 2006/05/21 06:12:07 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
+    do { my @r = (q$Date: 2006/08/05 22:49:45 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
 
 
     my %tabdefs = ();
@@ -574,9 +574,129 @@ Genezzo::Havok::SQLScalar - scalar SQL functions
 
 =head1 FUNCTIONS
 
+=head2 perl functions
+
 =over 4
 
-=item  abs 
+=item  chomp 
+
+=item  chop
+
+=item  chr
+
+=item  crypt
+
+=item  index
+
+=item  lc
+
+=item  lcfirst
+
+=item  length
+
+=item  ord
+
+=item  pack
+
+=item  reverse
+
+=item  rindex
+
+=item  sprintf
+
+=item  substr
+
+=item  uc
+
+=item  ucfirst
+
+=item  abs
+
+=item  atan2
+
+=item  cos
+
+=item  exp
+
+=item  hex
+
+=item  int
+
+=item  log10
+
+=item  oct
+
+=item  rand
+
+=item  sin
+
+=item  sqrt
+
+=item  srand
+
+=item  perl_join
+
+=back
+
+=head2 SQL string functions
+
+=over 4
+
+=item  concat
+
+=item  greatest
+
+=item  initcap
+
+=item  least
+
+=item  lower
+
+=item  upper
+
+=back
+
+=head2 SQL math functions
+
+=over 4
+
+=item  cosh
+
+=item  ceil
+
+=item  floor
+
+=item  ln
+
+=item  sinh
+
+=item  tan
+
+=item  tanh
+
+=back
+
+=head2 SQL conversion functions
+
+=over 4
+
+=item  ascii
+
+=item  instr        
+
+=item  nvl         
+
+=back
+
+=head2 Genezzo functions
+
+=over 4
+
+=item  quurl
+
+=item  quurl2
+
+=item  unquurl
 
 =back
 

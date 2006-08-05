@@ -1,4 +1,4 @@
-# havok version=7.11
+# havok version=7.12
 ABSTRACT:     
 AUTHOR:    Jeffrey I Cohen (jcohen@cpan.org)
 DML:    
@@ -18,9 +18,9 @@ TABLEDEFS:
   sys_hook:    
     create_table:    xid=n pkg=c hook=c replace=c xtype=c xname=c args=c owner=c creationdate=c version=c
     dml:    
-      -    i havok 3 Genezzo::Havok::SysHook SYSTEM 2006-04-03T07:53:46 0 7.06
+      -    i havok 3 Genezzo::Havok::SysHook SYSTEM 2006-06-04T06:28:21 0 7.07
 
 
 
-UPDATED:    2006-06-03T23:28:40
-VERSION:    7.06
+UPDATED:    2006-08-05T15:55:24
+VERSION:    7.07

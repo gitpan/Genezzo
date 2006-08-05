@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/UserFunctions.pm,v 1.2 2006/05/07 06:43:05 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/UserFunctions.pm,v 1.3 2006/08/05 22:49:39 claude Exp claude $
 #
 # copyright (c) 2004, 2005, 2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -18,7 +18,7 @@ our $VERSION;
 our $MAKEDEPS;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 1.2 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.3 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     my $pak1  = __PACKAGE__;
     $MAKEDEPS = {
@@ -38,7 +38,7 @@ BEGIN {
 
 #    my $now = Genezzo::Dict::time_iso8601()
     my $now = 
-    do { my @r = (q$Date: 2006/05/07 06:43:05 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
+    do { my @r = (q$Date: 2006/08/05 22:49:39 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
 
     my $dml =
         [
@@ -288,7 +288,8 @@ select HavokUse('Genezzo::Havok::UserFunctions') from dual;
 
 NOTE: this module replaces L<Genezzo::Havok::UserExtend>.
 
-Basic Havok module - load the user_functions table
+The module L<Genezzo::XEval::Prepare> constructs a function call
+interface based upon information from the user_functions table:
 
 create table user_functions (
     xid   number,
@@ -376,7 +377,11 @@ Use "import" and "export_to_level".
 
 =item Could just load Acme::Everything and we'd be done...
 
-=item Need function "type" information so can validate argument lists, determine return type of function.  If pass named args, have "TypeCheck" and "Execute" modes for sql_function.  Or have typecheck function pass back name/ref to execute function, since it may change depending on argument types.
+=item Need function "type" information so can validate argument lists,
+determine return type of function.  If pass named args, have
+"TypeCheck" and "Execute" modes for sql_function.  Or have typecheck
+function pass back name/ref to execute function, since it may change
+depending on argument types.
 
 =back
 

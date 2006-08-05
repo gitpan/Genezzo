@@ -1,5 +1,9 @@
 Revision history for Perl extension Genezzo
 
+0.62 Sat Aug  5 15:59:52 2006
+        - fix dbi_example.pl (thanks, Andrew)
+        - debug utility functions
+
 0.61 Fri Jul  7 00:26:15 2006
         - RDBlock hooks
         - RSTab update improvements

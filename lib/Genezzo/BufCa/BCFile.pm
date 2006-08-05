@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BCFile.pm,v 7.9 2006/05/21 06:41:33 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BCFile.pm,v 7.10 2006/08/02 05:40:10 claude Exp claude $
 #
 # copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -16,6 +16,7 @@ use Genezzo::BufCa::BufCa;
 use Genezzo::Block::Util;
 use Genezzo::Util;
 use Carp;
+use File::Spec;
 use warnings::register;
 
 our @ISA = qw(Genezzo::BufCa::BufCa) ;
@@ -83,9 +84,29 @@ sub new
     return undef
         unless (_init($self,%args));
 
+    if (exists($args{tsname}))
+    {
+        $self->{tsname} = $args{tsname};
+    }
+
     return bless $self, $class;
 
 } # end new
+
+sub _get_fn_array
+{
+    my $self = shift;
+    my $fn_arr = $self->{ __PACKAGE__ . ":FN_ARRAY" };
+    my $fn_hsh = $self->{ __PACKAGE__ . ":FN_HASH" };
+    return $fn_arr;
+}
+sub _get_fn_hash
+{
+    my $self = shift;
+    my $fn_arr = $self->{ __PACKAGE__ . ":FN_ARRAY" };
+    my $fn_hsh = $self->{ __PACKAGE__ . ":FN_HASH" };
+    return $fn_hsh;
+}
 
 sub Dump
 {
@@ -103,6 +124,11 @@ sub Dump
 #                 fileinfo     => $fn_arr
                  open_list    => $self->{open_list}
                  );
+
+    if (exists($self->{tsname}))
+    {
+        $hashi{tsname} = $self->{tsname} 
+    }
 
     return \%hashi;
 }
@@ -141,13 +167,15 @@ sub FileReg
     my $fn_arr = $self->{ __PACKAGE__ . ":FN_ARRAY" };
     my $fn_hsh = $self->{ __PACKAGE__ . ":FN_HASH" };
 
+    my $filename = File::Spec->rel2abs($args{FileName});
+
     # XXX: need a lock here for multithread
-    unless (exists($fn_hsh->{$args{FileName}}))
+    unless (exists($fn_hsh->{$filename}))
     {
         # array of hashes of file info
         my %th;
         my @headerinfo;
-        $th{name} = $args{FileName};
+        $th{name} = $filename;
 
         # XXX: open all handles for now
         $th{fh} = new IO::File "+<$th{name}"
@@ -180,12 +208,12 @@ sub FileReg
         # XXX: NOTE: treat filename array as 1 based, vs 0 based 
         # -- use fn_arr[n-1]->name to get filename.
         
-        $fn_hsh->{$args{FileName}} = $fileno;            
+        $fn_hsh->{$filename} = $fileno;            
         $fileno--;
         $fn_arr->[$fileno] = \%th;
     }   
 
-    return ($fn_hsh->{$args{FileName}})
+    return ($fn_hsh->{$filename})
 }
 
 sub _getOpenFileHandle
@@ -291,10 +319,12 @@ sub BCFileInfoByName
 
     my $fn_hsh = $self->{ __PACKAGE__ . ":FN_HASH" };
 
-    return undef
-        unless (exists($fn_hsh->{$args{FileName}}));
+    my $filename = File::Spec->rel2abs($args{FileName});
 
-    my $fileno = $fn_hsh->{$args{FileName}};
+    return undef
+        unless (exists($fn_hsh->{$filename}));
+
+    my $fileno = $fn_hsh->{$filename};
 
     return ($self->_getOpenFileHandle(filenum => $fileno, getscalar => 1));
 }

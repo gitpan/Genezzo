@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/XEval/RCS/Prepare.pm,v 7.6 2006/05/07 06:50:42 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/XEval/RCS/Prepare.pm,v 7.7 2006/08/05 22:46:33 claude Exp claude $
 #
 # copyright (c) 2005, 2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -17,7 +17,7 @@ use Carp;
 our $VERSION;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 7.6 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.7 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -583,6 +583,27 @@ sub _sql_where
                     $fn_name = 'Genezzo::GenDBI::sql_func_'
                         . lc($genTree->{function_name});
                 }
+
+                my $dbh = $dict->{dbh};
+                my $sth;
+                my $ffname = lc($genTree->{function_name});
+                $sth = $dbh->prepare("select argstyle, args, typecheck from user_functions where sqlname = \'$ffname\'");
+
+                if ($sth) 
+                {
+                    $sth->execute();
+
+                    my @lastfetch = $sth->fetchrow_array();
+
+                    if (scalar(@lastfetch))
+                    {
+                        if ($lastfetch[0] =~ m/HASH/)
+                        {
+                            $hash_args = 1;
+                        }
+                    }
+                }
+
             }
 
             if (($genTree->{function_name} =~ m/^sql_func_HavokUse$/)

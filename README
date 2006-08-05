@@ -634,7 +634,7 @@ NEW FEATURES - improved genexp.pl
 
 INCOMPATIBLE CHANGES
 
-  Version 0.61 dictionary and block format is incompatible with
+  Version 0.62 dictionary and block format is incompatible with
   previous releases.  No upgrade path is supported.
   Version 0.48 thru 0.50 are compatible.
 

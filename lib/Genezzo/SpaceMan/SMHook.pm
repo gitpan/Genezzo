@@ -845,7 +845,7 @@ sub _track_usage
         }
         else
         {
-            if ($pctused != 0)
+            if ($pctused != 0) ### ?
             {
                 $new_pctused = 0;
             }

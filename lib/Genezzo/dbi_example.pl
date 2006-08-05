@@ -1,4 +1,4 @@
-# Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
+# Copyright (c) 2003-2006 Jeffrey I Cohen.  All rights reserved.
 #
 #!/usr/bin/perl
 use strict;
@@ -58,7 +58,7 @@ if (1)
     $dbh->do("create table test2 (col1 char,col2 char,col3 char,col4 char)");
 
     my $sth = 
-        $dbh->prepare("insert into test2 values (alpha, bravo, charlie, delta, echo, foxtrot, golf, hotel)");
+        $dbh->prepare("insert into test2 values (\'alpha\', \'bravo\', \'charlie\', \'delta\', \'echo\', \'foxtrot\', \'golf\', \'hotel\')");
 
     for my $ii (1..10)
     {
@@ -106,7 +106,7 @@ if (1)
     print $sth->{NUM_OF_FIELDS}, " columns in select list\n";
     print Dumper($sth->{NAME});
 
-    print Dumper ($dbh->selectall_arrayref("select rid, rownum, col1 from test2 where col1 < \"bravo\""));
+    print Dumper ($dbh->selectall_arrayref("select rid, rownum, col1 from test2 where col1 < \'bravo\'"));
 
     $dbh->do("shutdown"); # shutdown the database
 

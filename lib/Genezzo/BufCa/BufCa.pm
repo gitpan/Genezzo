@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BufCa.pm,v 7.2 2005/08/27 06:37:29 claude Exp $
+# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BufCa.pm,v 7.3 2006/08/02 06:01:21 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -24,7 +24,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 7.2 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.3 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
 #    @EXPORT      = qw(&func1 &func2 &func4 &func5);
@@ -93,6 +93,7 @@ sub _init
                        name => "blocksize",
                        val => $args{blocksize},
                        MIN => 1));
+
     return 0 
         unless (NumVal(
                        verbose => warnings::enabled(),

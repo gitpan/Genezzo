@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 7.24 2006/07/07 07:30:13 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 7.25 2006/08/05 22:49:57 claude Exp claude $
 #
 # copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -51,11 +51,11 @@ BEGIN {
 }
 
 ##our $VERSION   = $Genezzo::VERSION;
-our $VERSION   = '0.61';
+our $VERSION   = '0.62';
 our $RELSTATUS = 'Alpha'; # release status
 # grab the code check-in date and convert to YYYYMMDD
 our $RELDATE   = 
-    do { my @r = (q$Date: 2006/07/07 07:30:13 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
+    do { my @r = (q$Date: 2006/08/05 22:49:57 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
 
 our $errstr; # DBI errstr
 
