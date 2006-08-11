@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/XEval/RCS/Prepare.pm,v 7.7 2006/08/05 22:46:33 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/XEval/RCS/Prepare.pm,v 7.8 2006/08/11 07:49:23 claude Exp claude $
 #
 # copyright (c) 2005, 2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -17,7 +17,7 @@ use Carp;
 our $VERSION;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 7.7 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.8 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -215,9 +215,9 @@ sub _sql_where
 #                    ']';
                 # for joins, switch to get_alias_col hash
                 $genTree->{vx} = 
-                    '$get_alias_col->{' 
+                    '$get_alias_col->{"' 
                     . $genTree->{tc_col_tablename} . 
-                    '}->[' . ($genTree->{tc_column_num} - 1) .
+                    '"}->[' . ($genTree->{tc_column_num} - 1) .
                     ']';
                 # XXX XXX: handle joins...
                 $genTree->{vx_etc} = 

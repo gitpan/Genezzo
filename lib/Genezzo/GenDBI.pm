@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 7.25 2006/08/05 22:49:57 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 7.27 2006/08/11 07:50:07 claude Exp claude $
 #
 # copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -51,11 +51,11 @@ BEGIN {
 }
 
 ##our $VERSION   = $Genezzo::VERSION;
-our $VERSION   = '0.62';
+our $VERSION   = '0.63';
 our $RELSTATUS = 'Alpha'; # release status
 # grab the code check-in date and convert to YYYYMMDD
 our $RELDATE   = 
-    do { my @r = (q$Date: 2006/08/05 22:49:57 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
+    do { my @r = (q$Date: 2006/08/11 07:50:07 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
 
 our $errstr; # DBI errstr
 
@@ -159,6 +159,8 @@ $Genezzo::Util::USECARP       = 0;
 #$Genezzo::Util::WHISPERPREFIX = "baz: ";
 #$Genezzo::Util::WHISPERPREFIX = undef;
 #$Genezzo::Util::WHISPER_PRINT = sub { print "baz2: ", @_ ; };
+
+our $FEEBLE_DOWNCASE = 1;
 
 # Preloaded methods go here.
 
@@ -812,6 +814,71 @@ sub Kgnz_Describe
 
 } # end describe
 
+sub Feeble_CIdx
+{
+    my $self = shift @_;
+
+    my @outi;
+
+    if (scalar(@_) > 2)
+    {
+	my $indexname = shift @_ ;
+        $indexname = lc($indexname) if ($FEEBLE_DOWNCASE);
+
+        if ($FEEBLE_DOWNCASE)
+        {
+            unless (Feeble_tablename_check($indexname))
+            {
+                my $msg = "invalid indentifier $indexname\n";
+                my %earg = (self => $self, msg => $msg,
+                            severity => 'warn');
+            
+                &$GZERR(%earg)
+                    if (defined($GZERR));
+                return 0;
+            }
+        }
+
+        push @outi, $indexname;
+
+	my @params = @_ ;
+
+        if (ref($params[0]) eq 'HASH')
+        {
+            my $p1 = shift @params;
+
+            push @outi, $p1;
+        }
+
+        my $tablename = shift @params;
+
+        $tablename = lc($tablename) if ($FEEBLE_DOWNCASE);
+
+        if ($FEEBLE_DOWNCASE)
+        {
+            unless (Feeble_tablename_check($tablename))
+            {
+                my $msg = "invalid indentifier $tablename\n";
+                my %earg = (self => $self, msg => $msg,
+                            severity => 'warn');
+            
+                &$GZERR(%earg)
+                    if (defined($GZERR));
+                return 0;
+            }
+        }
+        push @outi, $tablename;
+
+        my @pr2 = ($FEEBLE_DOWNCASE) ? map(lc, @params) : @params;
+
+        push @outi, @pr2;
+
+    }
+
+    return $self->Kgnz_CIdx(@outi);
+}
+
+
 sub Kgnz_CIdx
 {
     my $self = shift;
@@ -912,6 +979,38 @@ sub Kgnz_CreateTS
 
     }
     return 0;
+}
+
+sub Feeble_tablename_check
+{
+    my $tablename = shift;
+
+    return ($tablename =~ m/^([a-zA-Z0-9]|_)*$/);
+}
+
+sub Feeble_CT
+{
+    my $self = shift;
+
+    my @outi = ($FEEBLE_DOWNCASE) ? map(lc, @_) : @_;
+
+    if ($FEEBLE_DOWNCASE && scalar(@outi))
+    {
+        my $tablename = $outi[0];
+
+        unless (Feeble_tablename_check($tablename))
+        {
+            my $msg = "invalid indentifier $tablename\n";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+            return 0;
+        }
+    }    
+
+    return $self->Kgnz_CT(@outi);
 }
 
 sub Kgnz_CT
@@ -1182,6 +1281,16 @@ sub Kgnz_Create
     }
     return 0;
         
+}
+
+sub Feeble_Drop
+{
+    my $self = shift;
+
+    my @outi = ($FEEBLE_DOWNCASE) ? map(lc, @_) : @_;
+
+    return $self->Kgnz_Drop(@outi);
+
 }
 
 sub Kgnz_Drop
@@ -1465,6 +1574,32 @@ sub Kgnz_Password
     return 1;
 }
 
+sub Feeble_Delete
+{
+    my $self = shift;
+
+    my @outi = ($FEEBLE_DOWNCASE) ? map(lc, @_) : @_;
+
+    if ($FEEBLE_DOWNCASE && scalar(@outi))
+    {
+        my $tablename = $outi[0];
+
+        unless (Feeble_tablename_check($tablename))
+        {
+            my $msg = "invalid indentifier $tablename\n";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+            return 0;
+        }
+    }
+
+    return $self->Kgnz_Delete(@outi);
+
+}
+
 sub Kgnz_Delete
 {
 #    greet @_ ; 
@@ -1517,6 +1652,35 @@ sub Kgnz_Delete
     return undef;
 	
 } # end kgnz_delete
+
+sub Feeble_Insert
+{
+    my $self = shift @_;
+
+    my $tablename = shift @_;
+
+    $tablename = lc($tablename) if ($FEEBLE_DOWNCASE);
+
+    if ($FEEBLE_DOWNCASE)
+    {
+        unless (Feeble_tablename_check($tablename))
+        {
+            my $msg = "invalid indentifier $tablename\n";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+            return 0;
+        }
+    }
+
+    my @outi;
+
+    push @outi, $tablename, @_;
+
+    return $self->Kgnz_Insert(@outi);
+}
 
 sub Kgnz_Insert
 {
@@ -1700,6 +1864,36 @@ sub Kgnz_Insert2
     return undef;
 	
 } # end parseinsert
+
+sub Feeble_Update
+{
+    my $self = shift @_;
+
+    my $tablename = shift @_;
+
+    $tablename = lc($tablename) if ($FEEBLE_DOWNCASE);
+
+    if ($FEEBLE_DOWNCASE)
+    {
+        unless (Feeble_tablename_check($tablename))
+        {
+            my $msg = "invalid indentifier $tablename\n";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+            return 0;
+        }
+    }
+
+    my @outi;
+
+    push @outi, $tablename, @_;
+
+    return $self->Kgnz_Update(@outi);
+
+}
 
 sub Kgnz_Update
 {
@@ -2276,7 +2470,7 @@ sub SQLUpdate
     # NOTE: would be nice to avoid parsing a SELECT statement after we
     # parsed the UPDATE.  Should optimize this code.
 
-    my $sel_query = "select " . join(', ', @colvec) . " from $tablename ";
+    my $sel_query = "select " . join(', ', @colvec) . " from \"$tablename\" ";
 
     if (defined($where) && scalar(@{$where}))
     {
@@ -2622,7 +2816,7 @@ sub SQLDelete
         }
     }
 
-    my $sel = "select rid from $tablename ";
+    my $sel = "select rid from \"$tablename\" ";
     $sel .= "where " . $where_clause
         if (defined($where_clause));
 
@@ -2658,6 +2852,77 @@ sub SQLDelete
     return $self->Kgnz_Delete($tablename, @ridlist);
 }
 
+
+sub SQLDrop
+{
+    my $self = shift;    
+
+    my $sqltxt = $self->{current_line};
+
+    my $plan_status = $self->{plan}->Plan(statement => $sqltxt);
+
+    if (exists($plan_status->{parse_tree}))
+    {
+        greet $plan_status->{parse_tree};
+    }
+    else
+    {
+        my $msg  = "Input: " . $sqltxt;
+        my %earg = (self => $self, msg => $msg, severity => 'warn');
+
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
+        return undef;
+    }
+
+    return undef
+        unless (exists($plan_status->{algebra}));
+
+    my ($tc, $err_status);
+    $tc = $plan_status->{algebra};
+    $err_status = $plan_status->{error_status};
+
+    greet $tc, $err_status;
+
+    return undef
+        if ($err_status);
+
+    ($tc, $err_status)  = $self->{xeval}->Prepare(plan => $tc);
+
+    return undef
+        if ($err_status);
+
+    if (exists($tc->{sql_drop}))
+    {
+        if (exists($tc->{sql_drop}->{tc_table_fullname}))
+        {
+
+            my ($tablename, $stat);
+
+            $tablename = $tc->{sql_drop}->{tc_table_fullname};
+
+            my $dictobj = $self->{dictobj};
+
+            $stat = $dictobj->DictTableDrop (tname   => $tablename,
+                                             dbh_ctx => $self->{dbh_ctx}
+                                             );
+
+            return $stat;
+        }
+
+
+    }
+    my $msg  = "Input: " . $sqltxt;
+    my %earg = (self => $self, msg => $msg, severity => 'warn');
+
+    &$GZERR(%earg)
+        if (defined($GZERR));
+
+    return undef;
+
+
+}
 
 sub HCountPrepare
 {
@@ -2929,6 +3194,32 @@ sub ECountPrint
 
     return $stat;
 } # ecountprint
+
+sub Feeble_Select
+{
+    my $self = shift;
+
+    my @outi = ($FEEBLE_DOWNCASE) ? map(lc, @_) : @_;
+
+    if ($FEEBLE_DOWNCASE && scalar(@outi))
+    {
+        my $tablename = $outi[0];
+
+        unless (Feeble_tablename_check($tablename))
+        {
+            my $msg = "invalid indentifier $tablename\n";
+            my %earg = (self => $self, msg => $msg,
+                        severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+            return 0;
+        }
+    }
+
+    return $self->Kgnz_Select(@outi);
+
+}
 
 sub Kgnz_Select
 {
@@ -3591,24 +3882,24 @@ qw(
    desc     Kgnz_Describe
    describe Kgnz_Describe
 
-   ci     Kgnz_CIdx
+   ci     Feeble_CIdx
 
-   ct     Kgnz_CT
+   ct     Feeble_CT
    dt     Kgnz_Drop
-   drop   Kgnz_Drop
+   drop   SQLDrop
 
    alter  SQLAlter
    create SQLCreate
 
-   i      Kgnz_Insert
+   i      Feeble_Insert
    insert SQLInsert
 
    update SQLUpdate
    delete SQLDelete
-   u      Kgnz_Update
-   d      Kgnz_Delete
+   u      Feeble_Update
+   d      Feeble_Delete
 
-   s      Kgnz_Select
+   s      Feeble_Select
    select SQLSelect
 
    addfile  Kgnz_AddFile
@@ -4642,7 +4933,7 @@ sub _init
     {
 #        greet $args{statement};
         $self->{param} = $args{statement};
-        my $match1 = '(^Kgnz_Select$)';
+        my $match1 = '(^Feeble_Select$)';
         my $match2 = '(^SQLSelect$)';
         my $match3 = '(^SQLSelectPrepare2$)';
 
@@ -4729,7 +5020,7 @@ sub execute
 
         # get the number of rows affected by insert/update/delete
         if ($self->{param}->[0] =~ 
-            m/(?i)^(Kgnz_Insert2|SQLInsert|SQLUpdate|Kgnz_Update|Kgnz_Delete|SQLDelete)$/)
+            m/(?i)^(Kgnz_Insert2|SQLInsert|SQLUpdate|Feeble_Update|Feeble_Delete|SQLDelete)$/)
         {
 #            greet $self->{param}->[0];
             $self->{rownum} = $stat;
@@ -4956,6 +5247,8 @@ Genezzo::GenDBI.pm - an extensible database with SQL and DBI
 =head1 TODO
 
 =over 4
+
+=item Feeble/SQL: fix DESCribe to handle quoted identifiers.
 
 =item TABLESPACE: alter, drop, online, offline, more testing...
 

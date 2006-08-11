@@ -245,7 +245,7 @@ EXAMPLES
   Feeble "u" and "d" commands only work via rowid.  For example:
 
     gendba 10> s EMP rid rownum *
-    rid     rownum  ENAME   ID
+    rid     rownum  ename   id
     ___     ______  _____   __
 
     1/33/1  1       bob     1
@@ -257,14 +257,14 @@ EXAMPLES
     5 rows selected.
 
     gendba 11> d EMP 1/33/1
-    deleted 1 rows from table EMP.
+    deleted 1 rows from table emp.
 
     gendba 12> u EMP 1/33/5 margo 66
-    updated 1 rows in table EMP.
+    updated 1 rows in table emp.
 
     gendba 13> !10
     s EMP rid rownum *
-    rid     rownum  ENAME   ID
+    rid     rownum  ename   id
     ___     ______  _____   __
 
     1/33/2  1       orville 2
@@ -297,15 +297,15 @@ NEW FEATURES - Indexed Tables
   index object to a particular column or group of columns.
 
     gendba 9> ct EMP index id=n name=c
-    Create Table : EMP 
+    Create Table : emp 
     with unique index option
-    tablename : EMP
+    tablename : emp
     column id : n (primary key)
     column name : c
-    table EMP created 
+    table emp created 
 
     gendba 10> i EMP 1 bob 2 orville 3 wilbur 4 harry 5 luke
-    inserted 5 rows into table EMP.
+    inserted 5 rows into table emp.
 
     gendba 11> s EMP rid *
     rid     id      name
@@ -321,14 +321,14 @@ NEW FEATURES - Indexed Tables
 
     gendba 12> i EMP 1 bob 2 orville 3 wilbur 4 harry 5 luke
     whisper: duplicate key 1
-    Failed to insert row 1 in table EMP at lib/Genezzo/gendba.pl line 230
-    inserted 0 rows into table EMP.
+    Failed to insert row 1 in table emp at lib/Genezzo/gendba.pl line 230
+    inserted 0 rows into table emp.
 
-    gendba 13> select tid, tname, otype from _tab1 where tname = 'EMP'
+    gendba 13> select tid, tname, otype from _tab1 where tname = 'emp'
     tid     tname   otype
     ___     _____   _____
 
-    14      EMP     IDXTAB
+    14      emp     IDXTAB
 
     1 row selected.
 
@@ -631,10 +631,27 @@ NEW FEATURES - improved genexp.pl
   The version 0.60 database export (genexp.pl) now correctly handles table
   constraints and indexes.
 
+NEW FEATURES - Feeble/SQL compatible case-sensitivity
+
+  Previously, Feeble commands (ct, d, u, s) did not match the SQL
+  behavior for case-insensitive identifiers.  For example, the Feeble
+  command:
+    "ct EMP COL1=c" 
+  would create a table called EMP (uppercase) with a column COL1, while
+  the SQL command:
+    "create table EMP (COL1 char(10))"
+  would create a table called emp (lowercase) with a column col1.
+  This discrepancy would require the use of quoted identifiers in SQL
+  in order to reference uppercase or mixed case table or column names.
+  To facilitate interoperablity between Feeble and SQL, Feeble now
+  matches the SQL usage and legal naming restrictions for unquoted,
+  case-insensitive names, and uppercase or mixed case names are only
+  available using SQL quoted identifiers.  Feeble does not support
+  quoted names.
 
 INCOMPATIBLE CHANGES
 
-  Version 0.62 dictionary and block format is incompatible with
+  Version 0.63 dictionary and block format is incompatible with
   previous releases.  No upgrade path is supported.
   Version 0.48 thru 0.50 are compatible.
 
