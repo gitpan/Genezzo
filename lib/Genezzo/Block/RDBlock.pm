@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Block/RCS/RDBlock.pm,v 7.7 2006/05/29 18:36:27 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Block/RCS/RDBlock.pm,v 7.8 2006/08/21 20:56:21 claude Exp claude $
 #
 # copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -1120,6 +1120,19 @@ sub _packdeleted
     }
 
     $self->{compacted} = 1; # cleaned up as much as possible
+
+
+    # NOTE: don't need a packdel_post_hook because this function calls
+    # _realstore...
+
+    # packdel_post_hook
+#    if (defined(&packdel_post_hook))  
+#    {
+#        return 0
+#            unless 
+#            (packdel_post_hook(self => $self, sizediff => $sizediff,
+#                               numrows => $numrows));
+#    }
 
     if ($numrows)
     {

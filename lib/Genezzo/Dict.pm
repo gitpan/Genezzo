@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 7.22 2006/06/18 08:40:53 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 7.23 2006/08/21 21:06:45 claude Exp claude $
 #
 # copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -19,7 +19,7 @@ use Genezzo::Havok;
 
 BEGIN {
     our $VERSION;
-    $VERSION = do { my @r = (q$Revision: 7.22 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.23 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -2201,6 +2201,34 @@ sub DictTableExists
     return &$tabexists(dhash => $self, @_);
 }
 
+# wrapper function for sequence numbers
+sub DictGetNextVal
+{
+    my $self = shift;
+
+    my %required = (
+                    tname => "no tablename !",
+                    tieval => "no tie val!"
+                    );
+    my %args = (
+		@_
+                );
+
+    return (-1)
+        unless (Validate(\%args, \%required));
+
+    my $tablename = $args{tname} ;
+    my $tv = $args{tieval} ;
+#    my $currval = $args{currval};
+
+    # XXX XXX: need max fileidx functions!
+    # XXX XXX: need real sequence numbers
+    my $currval = $tv->HCount();
+
+    return ($currval + 1);
+
+}
+
 # perform operations against alltab and allcol
 sub DictTableAllTab
 {
@@ -2262,9 +2290,23 @@ sub DictTableAllTab
         
         my $numcols = scalar(keys(%{$args{tabdef}}));
 
-        my $nexttid =  $realtie->HCount(); # XXX XXX: need maxtid function!!
+        my $nexttid = $self->DictGetNextVal(tname => "_tab1", 
+                                            tieval => $realtie);
 
-        $nexttid++;
+        unless ($nexttid > -1)
+        {
+            my $msg = "invalid table id";
+            my %earg = (self => $self, msg => $msg, 
+                        severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
+            $self->DictTableAllTab(operation => "delete", 
+                                   tname => $tablename);
+
+            return 0 ;
+        }
 
         $self->{dict_tables}->{$tablename}->{object_id} = $nexttid;
 
@@ -2590,9 +2632,19 @@ sub DictAddFile
 
     my $realtie = tied(%{$alltsfiles});
 
-    # XXX XXX: need max fileidx functions!
-    my $fileidx = $realtie->HCount(); # file index is current count + 1
-    $fileidx++;
+    my $fileidx =  $self->DictGetNextVal(tname => "_tsfiles",
+                                         tieval => $realtie);
+
+    unless ($fileidx > -1)
+    {
+        my %earg = (self => $self, msg => "invalid file index\n",
+                    severity => 'warn');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
+        return 0;
+    }
 
     my $filesize = $args{filesize};
     if (defined($filesize))
@@ -2770,9 +2822,19 @@ sub _DictTSAddFile
 
     my $realtie = tied(%{$alltsfiles});
 
-    # XXX XXX: need max fileidx functions!
-    my $fileidx = $realtie->HCount(); # file index is current count + 1
-    $fileidx++;
+    my $fileidx =  $self->DictGetNextVal(tname => "_tsfiles",
+                                         tieval => $realtie);
+
+    unless ($fileidx > -1)
+    {
+        my %earg = (self => $self, msg => "invalid file index\n",
+                    severity => 'warn');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
+        return 0;
+    }
 
     my $tsname = $args{tsname};
     my $tablespace_id = $self->_get_tsid_by_name($tsname);
@@ -3638,8 +3700,19 @@ sub DictTableAddConstraint
         my $hashi  = $self->DictTableGetTable (tname => "cons1") ;
         my $tv = tied(%{$hashi});
 
-        my $consid = $tv->HCount(); # XXX XXX: need max consid function!
-        $consid++;
+        my $consid =   $self->DictGetNextVal(tname => "cons1",
+                                             tieval => $tv);
+
+        unless ($consid > -1)
+        {
+            my %earg = (self => $self, msg => "invalid constraint index\n",
+                        severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
+            return 0;
+        }
 
         unless (exists($args{cons_name}))
         {
@@ -4209,9 +4282,19 @@ sub DictIndexCreate
     my $hashi  = $self->DictTableGetTable (tname => "cons1") ;
     my $tv = tied(%{$hashi});
 
-    # XXX XXX: need max consid functions!
-    my $consid = $tv->HCount(); # XXX XXX: won't work if delete constraints
-    $consid++;
+    my $consid =   $self->DictGetNextVal(tname => "cons1",
+                                         tieval => $tv);
+
+    unless ($consid > -1)
+    {
+        my %earg = (self => $self, msg => "invalid constraint index\n",
+                    severity => 'warn');
+            
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
+        return 0;
+    }
 
     my $cons_name;
     if (exists($args{cons_name}))

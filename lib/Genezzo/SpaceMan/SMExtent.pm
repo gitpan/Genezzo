@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/SpaceMan/RCS/SMExtent.pm,v 1.32 2006/07/06 07:37:59 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/SpaceMan/RCS/SMExtent.pm,v 1.35 2006/08/21 20:58:02 claude Exp claude $
 #
 # copyright (c) 2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -22,7 +22,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 1.32 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.35 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
     @EXPORT      = ( ); # qw(&NumVal);
@@ -131,8 +131,8 @@ sub _init
 
 # XXX XXX: remove seghdr 
         # if the current hdr is full...
-        while (defined($row) && (scalar(@{$row}) > 1)
-               && ($row->[1] =~ m/F/))
+        while (defined($row) && (scalar(@{$row}) > 0)
+               && ($row->[0] =~ m/F/))
         {
             # overflow header is listed in x1b
             my $row2 = $rowd->_get_meta_row("X1B");
@@ -337,6 +337,125 @@ sub _split_extent_descriptor
     return split(':', $extent_desc_str);
 }
 
+sub _dump_extent_descriptor
+{
+    my $xdsc = shift @_;
+    my $outi;
+
+    my @ggg = _split_extent_descriptor("fakeself", $xdsc);
+
+    unless (scalar(@ggg) > 4)
+    {
+        $outi = 'invalid descriptor: $xdsc\n';
+        return $outi;
+    }
+
+    my ($ext_hdr_block, $extent_size, $total_pctused,
+        $alloc_pctused, $free_len) = @ggg;
+
+    $outi .= "starts: block number $ext_hdr_block, length: $extent_size\n";
+    $outi .= "$total_pctused % of total used, $alloc_pctused % of allocated blocks used\n";
+    if (0 == $free_len)
+    {
+        $outi .= "0 free blocks \n";
+    }
+    else 
+    {
+        my $freeb = "0" x $free_len;
+
+        $outi .= "less than 1" . $freeb . " free blocks\n";
+    }
+    return $outi;
+}
+sub _meta_row_dump_X1A
+{
+    my ($self, $v1) =  @_;
+
+    my @val = @{$v1};
+# XXX XXX: remove seghdr
+#    my $seghdr = shift @val;
+    my $vfflag = shift @val;
+
+    my $outi = "Extent Header: ";
+    $outi .= (($vfflag =~ m/v/i) ? '[V]acant ' : '[F]ull ');
+
+    $outi .= "\n";
+ 
+    for my $xd (@val)
+    {
+        $outi .= _dump_extent_descriptor($xd);
+    }
+
+    $outi .= "\n";
+
+    return $outi;
+
+}
+sub _meta_row_dump_X1B
+{
+    my ($self, $v1) =  @_;
+
+    my @val = @{$v1};
+
+# XXX XXX: remove segnxt
+#    my $segnxt = shift @val;
+    my $prev   = shift @val;
+
+    my $outi;
+    $outi .= "Previous header at block $prev\n";
+
+    if (scalar(@val))
+    {
+        $outi .= "Next at:\n";
+    }
+
+
+    for my $xd (@val)
+    {
+        $outi .= _dump_extent_descriptor($xd);
+    }
+
+    return $outi;
+}
+sub _meta_row_dump_XHA
+{
+    my ($self, $v1) =  @_;
+
+    my @val = @{$v1};
+
+    my $seghdr = shift @val;
+    my $extsiz = shift @val;
+    my $bvec   = shift @val;
+
+    my $outi = "Segment header at block $seghdr,\n current extent size $extsiz blocks\n";
+    my $bvstr = unpack("b*",$bvec);
+    $outi .= "bitvec: $bvstr\n";
+
+    my @pct = $self->_xhdr_bv_to_pct($bvec, $extsiz);
+    my $extent_stats  = shift @pct;
+
+    $outi .= "block usage:\n";
+    $outi .= join('% ', @pct) . "% \n";
+    return $outi;
+
+}
+sub _meta_row_dump_XHP
+{
+    my ($self, $v1) =  @_;
+
+    my @val = @{$v1};
+
+    my $offset = shift @val;
+    my $pctused = shift @val;
+
+    $pctused = $pctused * 10;
+
+    my $outi = "basic block info - offset: $offset, $pctused" . "% used\n";
+
+    return $outi;
+}
+
+
 sub _create_segment_hdr
 {
     my ($self, $rowd, $blockno, $extent_size, $parent) = @_;
@@ -357,7 +476,7 @@ sub _create_segment_hdr
     $rowd->_set_meta_row("X1A", 
                          [
 # XXX XXX: remove seghdr
-                          "seghdr", 
+#                          "seghdr", 
                           "V", # [V]acant, vs [F]ull
                           $self->_make_extent_descriptor(
                                                          $blockno, 
@@ -392,7 +511,7 @@ sub _create_segment_hdr
     # no "next" segment header, just list parent piece of seg hdr
     $rowd->_set_meta_row("X1B", [
 # XXX XXX: remove segnxt
-                                 "segnxt", 
+#                                 "segnxt", 
                                  $parent]);
 
     return $rowd;
@@ -419,7 +538,7 @@ sub _add_extent_to_segment_hdr
 
         # if current segment header does not have a child for overflow,
         # then the new extent is allocated for that purpose
-        if (defined($row2) && (scalar(@{$row2}) < 3)) # XXX XXX: remove segnxt
+        if (defined($row2) && (scalar(@{$row2}) < 2)) # XXX XXX: remove segnxt
         {
             # X1B (eXtent FIRST _B_):
             #
@@ -490,7 +609,7 @@ sub _add_extent_to_segment_hdr
         # else we set the current header as full, and use the next
         pop @{$row};
 # XXX XXX: remove seghdr 
-        $row->[1] = 'F' ; # row is full
+        $row->[0] = 'F' ; # row is full
         $val = $rowd->_set_meta_row("X1A", $row);
         unless (defined($val))
         {

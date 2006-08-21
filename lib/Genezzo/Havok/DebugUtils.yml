@@ -9,6 +9,7 @@ DML:
     install:    
       -    i user_functions 49 require Genezzo::Havok::DebugUtils sql_func_bcfiledump SYSTEM 2006-08-02T05:46:23 0 HASH bcfiledump
       -    i user_functions 50 require Genezzo::Havok::DebugUtils sql_func_metadump SYSTEM 2006-08-02T05:46:23 0 HASH metadump
+      -    i user_functions 51 require Genezzo::Havok::DebugUtils sql_func_makebigdb SYSTEM 2006-08-02T05:46:23 0 HASH makebigdb
 
 
 
@@ -19,5 +20,5 @@ PREREQ_HAVOK:
 
 TABLEDEFS:    
 
-UPDATED:    2006-08-01T22:56:16
+UPDATED:    2006-08-21T14:01:29
 VERSION:    1.01

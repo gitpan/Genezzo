@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Plan/RCS/TypeCheck.pm,v 7.15 2006/05/07 06:48:58 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Plan/RCS/TypeCheck.pm,v 7.16 2006/08/21 21:04:28 claude Exp claude $
 #
 # copyright (c) 2005,2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -17,7 +17,7 @@ use Carp;
 our $VERSION;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 7.15 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.16 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -276,8 +276,9 @@ sub _process_name_pieces
         else
         {
             # XXX XXX: may need to uc or lc here...
-            for my $p1 (values(%{$name_piece}))
+            while ( my ($kk,$p1) = (each(%{$name_piece})))
             {
+                next if ($kk =~ m/^(p1|p2)$/);
                 push @full_name, lc($p1);
             }
         }

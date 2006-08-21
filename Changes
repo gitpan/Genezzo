@@ -1,5 +1,8 @@
 Revision history for Perl extension Genezzo
 
+0.64 Mon Aug 21 14:10:54 2006
+        - enhancements to debug utility functions
+
 0.63 Fri Aug 11 00:56:28 2006
         - fix Feeble case-sensitivity (Andrew, thanks again)
         - several fixes for quoted identifiers with embedded spaces

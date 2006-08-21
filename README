@@ -633,9 +633,9 @@ NEW FEATURES - improved genexp.pl
 
 NEW FEATURES - Feeble/SQL compatible case-sensitivity
 
-  Previously, Feeble commands (ct, d, u, s) did not match the SQL
-  behavior for case-insensitive identifiers.  For example, the Feeble
-  command:
+  Prior to version 0.63, Feeble commands (ct, d, u, s) did not match
+  the SQL behavior for case-insensitive identifiers.  For example, the
+  Feeble command:
     "ct EMP COL1=c" 
   would create a table called EMP (uppercase) with a column COL1, while
   the SQL command:
@@ -651,7 +651,7 @@ NEW FEATURES - Feeble/SQL compatible case-sensitivity
 
 INCOMPATIBLE CHANGES
 
-  Version 0.63 dictionary and block format is incompatible with
+  Version 0.64 dictionary and block format is incompatible with
   previous releases.  No upgrade path is supported.
   Version 0.48 thru 0.50 are compatible.
 

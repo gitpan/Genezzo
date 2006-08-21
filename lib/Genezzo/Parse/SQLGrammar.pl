@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Parse/RCS/SQLGrammar.pl,v 7.8 2006/05/13 06:04:27 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Parse/RCS/SQLGrammar.pl,v 7.10 2006/08/21 21:04:00 claude Exp claude $
 #
 # copyright (c) 2005, 2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -1502,9 +1502,19 @@ num_perlish_substitution : num_primary perlish_substitution(?)
 { my @foo = @{$item[1]}; $return = \@foo; }
 
 	identifier  : quoted_string
-{ $return = {quoted_string => $item{quoted_string}}}
+{ 
+    my $p1 = $itempos[1]{offset}{from};
+    my $p2 = $itempos[1]{offset}{to};
+    $return = {quoted_string => $item{quoted_string},
+               p1 => $p1,
+               p2 => $p2 }}
                     | bareword 
-{ $return = {bareword => $item{bareword}}}
+{  
+    my $p1 = $itempos[1]{offset}{from};
+    my $p2 = $itempos[1]{offset}{to};
+    $return = {bareword => $item{bareword},
+               p1 => $p1,
+               p2 => $p2 }}
                     | <error: invalid identifier >
 	
 	quoted_string:
