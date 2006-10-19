@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Util.pm,v 7.17 2006/08/21 07:38:36 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Util.pm,v 7.18 2006/10/19 08:35:09 claude Exp claude $
 #
 # copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -22,7 +22,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 7.17 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.18 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
     @EXPORT      = qw(&whisper &whoami &greet 
@@ -925,14 +925,13 @@ row pieces, and the row pieces are chained (via the next pointers),
 which lets us reconstruct a complete row.  Individual columns that are
 split are said to be fragmented.
 
+=back
+
 =head2 future work
 
 The packer could be extended to support more complex structures than
 arrays of scalars.  In lieu of this ability, these structures can be
 flattened using Data::Dumper or YAML to large strings.
-
-=back
-
 
 =cut
 

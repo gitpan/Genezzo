@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/SpaceMan/RCS/SMFile.pm,v 7.9 2006/03/10 08:24:46 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/SpaceMan/RCS/SMFile.pm,v 7.11 2006/10/19 09:13:07 claude Exp claude $
 #
 # copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -13,6 +13,7 @@ use warnings;
 use Carp;
 use Genezzo::Util;
 use Genezzo::Row::RSBlock;
+use Genezzo::SpaceMan::SMFreeBlock;
 
 BEGIN {
     use Exporter   ();
@@ -21,7 +22,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 7.9 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.11 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
     @EXPORT      = ( ); # qw(&NumVal);
@@ -788,16 +789,69 @@ sub nextfreeblock
     {
         # NOTE: for RSFile
         # return as hash vs simple array
-        my $h1 = {};
-        $h1->{basic_array} = \@outi;
-        $h1->{currblocknum} = $currBlocknum;
-        $h1->{currextent} = \@currExtent
+
+        my %nargs = (basic_array => \@outi,
+                     currblocknum => $currBlocknum,
+                     firstextent  => $firstextent);
+        $nargs{currextent} = \@currExtent
             if ($gotnewextent);
-        $h1->{firstextent} = $firstextent;
-        return $h1;
+        # XXX XXX: replace with SMFreeBlock
+        my $foo = _make_all_info_for_free_block(%nargs);
+
+        %nargs = (
+                  blocknum        => $currBlocknum,
+                  firstextent     => $firstextent,
+                  current_extent  => $currExtent[0],
+                  extent_size     => $currExtent[1],
+                  extent_position => ($currBlocknum - $currExtent[0])
+                  );
+
+        my $baz = 
+            Genezzo::SpaceMan::SMFreeBlock->new(%nargs);
+
+        return $foo;
     }
 
     return @outi;
+}
+
+# XXX XXX: replace with SMFreeBlock
+# XXX: note - not a class or instance method
+sub _make_all_info_for_free_block
+{
+    my %required = (
+                    currblocknum => "no block number!"
+                    );
+
+    my %optional = (
+#                    basic_array => [],
+#                    currextent  => [],
+                    firstextent => 0
+                    );
+
+    my %args = (%optional,
+                @_);
+
+    return undef
+        unless (Validate(\%args, \%required));
+
+    my $h1 = {};
+    $h1->{currblocknum} = $args{currblocknum};
+    if (defined($args{basic_array}))
+    {
+        $h1->{basic_array} = $args{basic_array};
+    }
+    else
+    {
+        # basic array of only the blocknum in simplest case...
+        $h1->{basic_array} = [$args{currblocknum}];
+    }
+
+    $h1->{currextent} = ($args{currextent})
+        if (defined($args{currextent}));
+
+    $h1->{firstextent} = $args{firstextent};
+    return $h1;
 }
 
 sub get_current_block

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSFile.pm,v 7.18 2006/07/04 07:36:18 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSFile.pm,v 7.19 2006/10/19 08:53:30 claude Exp claude $
 #
 # copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -77,7 +77,8 @@ sub _init
                     numbytes   => "no bytes !",
                     numblocks  => "no blocks !",
                     bufcache   => "no bufcache !",
-                    tso        => "no tso !"
+                    tso        => "no tso !",
+                    object_type => "no object type"
                     );
     my %optional = (
                     RDBlock_Class  => "Genezzo::Block::RDBlock",
@@ -101,6 +102,7 @@ sub _init
     $self->{realbc}    = $args{bufcache};
     $self->{object_id} = $args{object_id};
     $self->{tso}       = $args{tso};
+    $self->{object_type} = $args{object_type};
 
 #    $self->{initial_extent} = $args{initial_extent};
 #    $self->{next_extent}    = $args{next_extent};
@@ -111,7 +113,8 @@ sub _init
                  bufcache   => $args{bufcache},
                  filenumber => $args{filenumber},
                  tablename  => $args{tablename},
-                 object_id  => $args{object_id}
+                 object_id  => $args{object_id},
+                 object_type  => $args{object_type}
                  );
 
     if ((exists($args{GZERR}))

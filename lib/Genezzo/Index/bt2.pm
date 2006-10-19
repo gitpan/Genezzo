@@ -229,6 +229,7 @@ construct comparison/equality callbacks
     };
 
 =cut
+
 # XXX: note - not a class or instance method
 sub _build_cmp_and_eq
 {

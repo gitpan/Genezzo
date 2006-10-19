@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 7.23 2006/08/21 21:06:45 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 7.24 2006/10/19 08:59:39 claude Exp claude $
 #
 # copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -19,7 +19,7 @@ use Genezzo::Havok;
 
 BEGIN {
     our $VERSION;
-    $VERSION = do { my @r = (q$Revision: 7.23 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.24 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -959,12 +959,16 @@ sub DictDump
                 $fhts = File::Spec->catdir($self->{gnz_home}, "ts");
 	    }
 
+            my $fnam1   = $vv->[$getcol->{filename}];
+
             my $fname   = 
+                File::Spec->file_name_is_absolute($fnam1) ?
+                $fnam1 : 
                 File::Spec->rel2abs(
-                         File::Spec->catfile(
-                                             $fhts,
-                                             $vv->[$getcol->{filename}]
-                                             ));
+                                    File::Spec->catfile(
+                                                        $fhts,
+                                                        $fnam1
+                                                        ));
 
             print "\n$fname\n";
 
@@ -5857,10 +5861,12 @@ tables.
 
 =head2 Dictionary concepts
 
+=over 4
 =item Tablespace -- a physical space to store the contents of tables.
 A tablespace is a collection of files.  The default install of Genezzo
 creates a single SYSTEM tablespace in a single file.  
 
+=back
 
 =head2 Core Tables 
 
@@ -5869,6 +5875,7 @@ tablespace.  Genezzo only uses six core tables to describe its basic
 dictionary.  NOTE: Modifying any dictionary tables will framboozle
 your nimwits.  You have been warned.
 
+=over 4
 =item _pref1 -- a set of key/value pairs that describe the database
 configuration
 
@@ -5882,6 +5889,7 @@ configuration
 
 =item allfileused -- the list of files actually used by each table
 
+=back
 
 =head1 FUNCTIONS
 

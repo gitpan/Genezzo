@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/PushHash/RCS/hph.pm,v 7.1 2005/07/19 07:49:03 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/PushHash/RCS/hph.pm,v 7.2 2006/10/19 08:51:27 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -573,6 +573,7 @@ You may construct hierarchical pushhashes of arbitrary depth.
 
 =head2 EXPORT
 
+=over 4
 =item RIDSEP -- (Row) Identifier Separator character - "/" by default.
 
 =item RIDSEPRX -- Regular Expression for RIDSEP - used to handle case
@@ -582,6 +583,7 @@ and split operations.
 =item MAXCOUNT -- no max if -1, else maximum number of elements for
 this hash
 
+=back
 
 =head1 CONCEPTS and INTERNALS - useful for implementors
 

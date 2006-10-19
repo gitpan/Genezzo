@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Plan/RCS/TypeCheck.pm,v 7.16 2006/08/21 21:04:28 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Plan/RCS/TypeCheck.pm,v 7.17 2006/08/26 06:58:03 claude Exp claude $
 #
 # copyright (c) 2005,2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -17,7 +17,7 @@ use Carp;
 our $VERSION;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 7.16 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.17 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -132,6 +132,7 @@ sub TypeCheck
 
     # build a special "statement handle" to hold error and context info
     my $tc_sth = {};
+    $tc_sth->{statement} = $args{statement};
 
     $algebra = $self->TableCheck(algebra => $algebra,
                                  dict    => $args{dict},
@@ -276,11 +277,16 @@ sub _process_name_pieces
         else
         {
             # XXX XXX: may need to uc or lc here...
-            while ( my ($kk,$p1) = (each(%{$name_piece})))
+            if (exists($name_piece->{bareword}))
             {
-                next if ($kk =~ m/^(p1|p2)$/);
+                my $p1 = $name_piece->{bareword};
                 push @full_name, lc($p1);
             }
+#            while ( my ($kk,$p1) = (each(%{$name_piece})))
+#            {
+#                next if ($kk =~ m/^(p1|p2)$/);
+#                push @full_name, lc($p1);
+#            }
         }
     }
 
@@ -288,6 +294,30 @@ sub _process_name_pieces
     # embedded "." (dot) if wish to construct full_name_str 
     # as join('.', @full_name) -- need to avoid ambiguity
     return @full_name;
+
+}
+
+sub _process_name_position
+{
+    my @pieces = @_;
+
+    my @full_pos;
+
+    for my $name_piece (@pieces)
+    {
+        my ($p1, $p2);
+
+        $p1 = undef;
+        $p2 = undef;
+
+        $p1 = ($name_piece->{p1})
+            if (exists($name_piece->{p1}));
+        $p2 = ($name_piece->{p2})
+            if (exists($name_piece->{p2}));
+        # build array of positions of each piece of name...
+        push @full_pos, [$p1, $p2];
+    }
+    return @full_pos;
 
 }
 
@@ -651,6 +681,7 @@ sub _check_table_info # private
                     my $msg = "Found duplicate table name: " .
                         "\'$tab_alias\'\n";
                     my %earg = (self => $self, msg => $msg,
+                                statement => $tc_sth->{statement},
                                 severity => 'warn');
                     
                     &$GZERR(%earg)
@@ -1152,6 +1183,14 @@ sub _get_col_alias # private
                 my $isColumnName = ($kk =~ m/column_name$/);
 
                 my @full_name = _process_name_pieces(@{$vv});
+                my @full_pos  = _process_name_position(@{$vv});
+
+                my $stat_pos = [];
+                if (scalar(@full_pos))
+                {
+                    $stat_pos->[0] = $full_pos[0]->[0];
+                    $stat_pos->[1] = $full_pos[-1]->[1];
+                }
 
                 # last portion should be column name (if not an alias)
                 my $column_name;
@@ -1173,7 +1212,8 @@ sub _get_col_alias # private
                     }
                     else
                     {
-                        $genTree->{tc_column_name}    = $column_name;
+                        $genTree->{tc_column_name}          = $column_name;
+                        $genTree->{tc_column_name_stat_pos} = $stat_pos;
                     }
 
                 }
@@ -1223,6 +1263,7 @@ sub _get_col_alias # private
                                 "\'$full_name_str\'";
 
                             my %earg = (self => $self, msg => $msg,
+                                        statement => $tc_sth->{statement},
                                         severity => 'warn');
                             
                             &$GZERR(%earg)
@@ -1350,6 +1391,9 @@ sub _get_col_info # private
                     $full_name_str = $genTree->{tc_col_tablename};
                 }
                 my $column_name = $genTree->{tc_column_name};
+                my $stat_pos    = [];
+                $stat_pos = ($genTree->{tc_column_name_stat_pos})
+                    if (exists($genTree->{tc_column_name_stat_pos}));
 
                 # XXX XXX XXX: need to deal with table.rid...
                 if ($column_name =~ m/^(rid|rownum)$/i)
@@ -1428,6 +1472,8 @@ sub _get_col_info # private
                                     "\', \'" . $hkk . "\'";
 
                                 my %earg = (self => $self, msg => $msg,
+                                            statement => $tc_sth->{statement},
+                                            stat_pos  => $stat_pos,
                                             severity => 'warn');
                                 
                                 &$GZERR(%earg)
@@ -1461,6 +1507,8 @@ sub _get_col_info # private
                     my $msg = "column \'$column_name\' not found\n";
 
                     my %earg = (self => $self, msg => $msg,
+                                statement => $tc_sth->{statement},
+                                stat_pos  => $stat_pos,
                                 severity => 'warn');
                     
                     &$GZERR(%earg)
@@ -1815,6 +1863,7 @@ sub _find_aggregate_functions
                                 "\'$adq\' for non-aggregate function \'$fname\'";
 
                             my %earg = (self => $self, msg => $msg,
+                                        statement => $tc_sth->{statement},
                                         severity => 'warn');
 
                             push @{$treeCtx->{tc_err}->{invalid_args}},  $msg;
@@ -1902,6 +1951,7 @@ sub _check_aggregate_functions
                         " aggregate function \'$fname\' in WHERE clause";
 
                     my %earg = (self => $self, msg => $msg,
+                                statement => $tc_sth->{statement},
                                 severity => 'warn');
 
                     push @{$treeCtx->{tc_err}->{invalid_args}},  $msg;

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/gendba.pl,v 7.7 2006/04/24 06:23:06 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/gendba.pl,v 7.8 2006/10/19 08:35:09 claude Exp claude $
 #
 # copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -204,6 +204,7 @@ All tables are currently created in the system tablespace by default.
 
 There are a couple of other useful commands:
 
+=over 4
 =item HELP -- give useless help
 
 =item DUMP -- dump out internal data structures
@@ -219,6 +220,8 @@ transactional -- you have to commit to update the persistent dictionary.
 Forgetting to commit can cause weird behaviors, since the buffer cache may
 flush data out to the dbf file.  Then you can have the condition where the
 tablespace reuses these "empty" blocks and they already have data in them.
+
+=back
 
 =head2 Environment
 

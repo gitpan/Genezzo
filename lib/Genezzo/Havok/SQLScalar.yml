@@ -7,54 +7,54 @@ DML:
       -    select * from user_functions where xname = 'Genezzo::Havok::SQLScalar'
 
     install:    
-      -    i user_functions 1 require Genezzo::Havok::SQLScalar sql_func_chomp SYSTEM 2006-08-05T22:49:45 0 
-      -    i user_functions 2 require Genezzo::Havok::SQLScalar sql_func_chop SYSTEM 2006-08-05T22:49:45 0 
-      -    i user_functions 3 require Genezzo::Havok::SQLScalar sql_func_chr SYSTEM 2006-08-05T22:49:45 0 
-      -    i user_functions 4 require Genezzo::Havok::SQLScalar sql_func_crypt SYSTEM 2006-08-05T22:49:45 0 
-      -    i user_functions 5 require Genezzo::Havok::SQLScalar sql_func_index SYSTEM 2006-08-05T22:49:45 0 
-      -    i user_functions 6 require Genezzo::Havok::SQLScalar sql_func_lc SYSTEM 2006-08-05T22:49:45 0 
-      -    i user_functions 7 require Genezzo::Havok::SQLScalar sql_func_lcfirst SYSTEM 2006-08-05T22:49:45 0 
-      -    i user_functions 8 require Genezzo::Havok::SQLScalar sql_func_length SYSTEM 2006-08-05T22:49:45 0 
-      -    i user_functions 9 require Genezzo::Havok::SQLScalar sql_func_ord SYSTEM 2006-08-05T22:49:45 0 
-      -    i user_functions 10 require Genezzo::Havok::SQLScalar sql_func_pack SYSTEM 2006-08-05T22:49:45 0 
-      -    i user_functions 11 require Genezzo::Havok::SQLScalar sql_func_reverse SYSTEM 2006-08-05T22:49:45 0 
-      -    i user_functions 12 require Genezzo::Havok::SQLScalar sql_func_rindex SYSTEM 2006-08-05T22:49:45 0 
-      -    i user_functions 13 require Genezzo::Havok::SQLScalar sql_func_sprintf SYSTEM 2006-08-05T22:49:45 0 
-      -    i user_functions 14 require Genezzo::Havok::SQLScalar sql_func_substr SYSTEM 2006-08-05T22:49:45 0 
-      -    i user_functions 15 require Genezzo::Havok::SQLScalar sql_func_uc SYSTEM 2006-08-05T22:49:45 0 
-      -    i user_functions 16 require Genezzo::Havok::SQLScalar sql_func_ucfirst SYSTEM 2006-08-05T22:49:45 0 
-      -    i user_functions 17 require Genezzo::Havok::SQLScalar sql_func_abs SYSTEM 2006-08-05T22:49:45 0 
-      -    i user_functions 18 require Genezzo::Havok::SQLScalar sql_func_atan2 SYSTEM 2006-08-05T22:49:45 0 
-      -    i user_functions 19 require Genezzo::Havok::SQLScalar sql_func_cos SYSTEM 2006-08-05T22:49:45 0 
-      -    i user_functions 20 require Genezzo::Havok::SQLScalar sql_func_exp SYSTEM 2006-08-05T22:49:45 0 
-      -    i user_functions 21 require Genezzo::Havok::SQLScalar sql_func_hex SYSTEM 2006-08-05T22:49:45 0 
-      -    i user_functions 22 require Genezzo::Havok::SQLScalar sql_func_int SYSTEM 2006-08-05T22:49:45 0 
-      -    i user_functions 23 require Genezzo::Havok::SQLScalar sql_func_log10 SYSTEM 2006-08-05T22:49:45 0 
-      -    i user_functions 24 require Genezzo::Havok::SQLScalar sql_func_oct SYSTEM 2006-08-05T22:49:45 0 
-      -    i user_functions 25 require Genezzo::Havok::SQLScalar sql_func_rand SYSTEM 2006-08-05T22:49:45 0 
-      -    i user_functions 26 require Genezzo::Havok::SQLScalar sql_func_sin SYSTEM 2006-08-05T22:49:45 0 
-      -    i user_functions 27 require Genezzo::Havok::SQLScalar sql_func_sqrt SYSTEM 2006-08-05T22:49:45 0 
-      -    i user_functions 28 require Genezzo::Havok::SQLScalar sql_func_srand SYSTEM 2006-08-05T22:49:45 0 
-      -    i user_functions 29 require Genezzo::Havok::SQLScalar sql_func_perl_join SYSTEM 2006-08-05T22:49:45 0 
-      -    i user_functions 30 require Genezzo::Havok::SQLScalar sql_func_concat SYSTEM 2006-08-05T22:49:45 0
-      -    i user_functions 31 require Genezzo::Havok::SQLScalar sql_func_greatest SYSTEM 2006-08-05T22:49:45 0 HASH
-      -    i user_functions 32 require Genezzo::Havok::SQLScalar sql_func_initcap SYSTEM 2006-08-05T22:49:45 0
-      -    i user_functions 33 require Genezzo::Havok::SQLScalar sql_func_least SYSTEM 2006-08-05T22:49:45 0 HASH
-      -    i user_functions 34 require Genezzo::Havok::SQLScalar sql_func_lower SYSTEM 2006-08-05T22:49:45 0
-      -    i user_functions 35 require Genezzo::Havok::SQLScalar sql_func_upper SYSTEM 2006-08-05T22:49:45 0
-      -    i user_functions 36 require Genezzo::Havok::SQLScalar sql_func_cosh SYSTEM 2006-08-05T22:49:45 0
-      -    i user_functions 37 require Genezzo::Havok::SQLScalar sql_func_ceil SYSTEM 2006-08-05T22:49:45 0
-      -    i user_functions 38 require Genezzo::Havok::SQLScalar sql_func_floor SYSTEM 2006-08-05T22:49:45 0
-      -    i user_functions 39 require Genezzo::Havok::SQLScalar sql_func_ln SYSTEM 2006-08-05T22:49:45 0
-      -    i user_functions 40 require Genezzo::Havok::SQLScalar sql_func_sinh SYSTEM 2006-08-05T22:49:45 0
-      -    i user_functions 41 require Genezzo::Havok::SQLScalar sql_func_tan SYSTEM 2006-08-05T22:49:45 0
-      -    i user_functions 42 require Genezzo::Havok::SQLScalar sql_func_tanh SYSTEM 2006-08-05T22:49:45 0
-      -    i user_functions 43 require Genezzo::Havok::SQLScalar sql_func_ascii SYSTEM 2006-08-05T22:49:45 0
-      -    i user_functions 44 require Genezzo::Havok::SQLScalar sql_func_instr SYSTEM 2006-08-05T22:49:45 0
-      -    i user_functions 45 require Genezzo::Havok::SQLScalar sql_func_nvl SYSTEM 2006-08-05T22:49:45 0
-      -    i user_functions 46 require Genezzo::Havok::SQLScalar sql_func_quurl SYSTEM 2006-08-05T22:49:45 0
-      -    i user_functions 47 require Genezzo::Havok::SQLScalar sql_func_quurl2 SYSTEM 2006-08-05T22:49:45 0
-      -    i user_functions 48 require Genezzo::Havok::SQLScalar sql_func_unquurl SYSTEM 2006-08-05T22:49:45 0
+      -    i user_functions 1 require Genezzo::Havok::SQLScalar sql_func_chomp SYSTEM 2006-10-19T08:41:34 0 
+      -    i user_functions 2 require Genezzo::Havok::SQLScalar sql_func_chop SYSTEM 2006-10-19T08:41:34 0 
+      -    i user_functions 3 require Genezzo::Havok::SQLScalar sql_func_chr SYSTEM 2006-10-19T08:41:34 0 
+      -    i user_functions 4 require Genezzo::Havok::SQLScalar sql_func_crypt SYSTEM 2006-10-19T08:41:34 0 
+      -    i user_functions 5 require Genezzo::Havok::SQLScalar sql_func_index SYSTEM 2006-10-19T08:41:34 0 
+      -    i user_functions 6 require Genezzo::Havok::SQLScalar sql_func_lc SYSTEM 2006-10-19T08:41:34 0 
+      -    i user_functions 7 require Genezzo::Havok::SQLScalar sql_func_lcfirst SYSTEM 2006-10-19T08:41:34 0 
+      -    i user_functions 8 require Genezzo::Havok::SQLScalar sql_func_length SYSTEM 2006-10-19T08:41:34 0 
+      -    i user_functions 9 require Genezzo::Havok::SQLScalar sql_func_ord SYSTEM 2006-10-19T08:41:34 0 
+      -    i user_functions 10 require Genezzo::Havok::SQLScalar sql_func_pack SYSTEM 2006-10-19T08:41:34 0 
+      -    i user_functions 11 require Genezzo::Havok::SQLScalar sql_func_reverse SYSTEM 2006-10-19T08:41:34 0 
+      -    i user_functions 12 require Genezzo::Havok::SQLScalar sql_func_rindex SYSTEM 2006-10-19T08:41:34 0 
+      -    i user_functions 13 require Genezzo::Havok::SQLScalar sql_func_sprintf SYSTEM 2006-10-19T08:41:34 0 
+      -    i user_functions 14 require Genezzo::Havok::SQLScalar sql_func_substr SYSTEM 2006-10-19T08:41:34 0 
+      -    i user_functions 15 require Genezzo::Havok::SQLScalar sql_func_uc SYSTEM 2006-10-19T08:41:34 0 
+      -    i user_functions 16 require Genezzo::Havok::SQLScalar sql_func_ucfirst SYSTEM 2006-10-19T08:41:34 0 
+      -    i user_functions 17 require Genezzo::Havok::SQLScalar sql_func_abs SYSTEM 2006-10-19T08:41:34 0 
+      -    i user_functions 18 require Genezzo::Havok::SQLScalar sql_func_atan2 SYSTEM 2006-10-19T08:41:34 0 
+      -    i user_functions 19 require Genezzo::Havok::SQLScalar sql_func_cos SYSTEM 2006-10-19T08:41:34 0 
+      -    i user_functions 20 require Genezzo::Havok::SQLScalar sql_func_exp SYSTEM 2006-10-19T08:41:34 0 
+      -    i user_functions 21 require Genezzo::Havok::SQLScalar sql_func_hex SYSTEM 2006-10-19T08:41:34 0 
+      -    i user_functions 22 require Genezzo::Havok::SQLScalar sql_func_int SYSTEM 2006-10-19T08:41:34 0 
+      -    i user_functions 23 require Genezzo::Havok::SQLScalar sql_func_log10 SYSTEM 2006-10-19T08:41:34 0 
+      -    i user_functions 24 require Genezzo::Havok::SQLScalar sql_func_oct SYSTEM 2006-10-19T08:41:34 0 
+      -    i user_functions 25 require Genezzo::Havok::SQLScalar sql_func_rand SYSTEM 2006-10-19T08:41:34 0 
+      -    i user_functions 26 require Genezzo::Havok::SQLScalar sql_func_sin SYSTEM 2006-10-19T08:41:34 0 
+      -    i user_functions 27 require Genezzo::Havok::SQLScalar sql_func_sqrt SYSTEM 2006-10-19T08:41:34 0 
+      -    i user_functions 28 require Genezzo::Havok::SQLScalar sql_func_srand SYSTEM 2006-10-19T08:41:34 0 
+      -    i user_functions 29 require Genezzo::Havok::SQLScalar sql_func_perl_join SYSTEM 2006-10-19T08:41:34 0 
+      -    i user_functions 30 require Genezzo::Havok::SQLScalar sql_func_concat SYSTEM 2006-10-19T08:41:34 0
+      -    i user_functions 31 require Genezzo::Havok::SQLScalar sql_func_greatest SYSTEM 2006-10-19T08:41:34 0 HASH
+      -    i user_functions 32 require Genezzo::Havok::SQLScalar sql_func_initcap SYSTEM 2006-10-19T08:41:34 0
+      -    i user_functions 33 require Genezzo::Havok::SQLScalar sql_func_least SYSTEM 2006-10-19T08:41:34 0 HASH
+      -    i user_functions 34 require Genezzo::Havok::SQLScalar sql_func_lower SYSTEM 2006-10-19T08:41:34 0
+      -    i user_functions 35 require Genezzo::Havok::SQLScalar sql_func_upper SYSTEM 2006-10-19T08:41:34 0
+      -    i user_functions 36 require Genezzo::Havok::SQLScalar sql_func_cosh SYSTEM 2006-10-19T08:41:34 0
+      -    i user_functions 37 require Genezzo::Havok::SQLScalar sql_func_ceil SYSTEM 2006-10-19T08:41:34 0
+      -    i user_functions 38 require Genezzo::Havok::SQLScalar sql_func_floor SYSTEM 2006-10-19T08:41:34 0
+      -    i user_functions 39 require Genezzo::Havok::SQLScalar sql_func_ln SYSTEM 2006-10-19T08:41:34 0
+      -    i user_functions 40 require Genezzo::Havok::SQLScalar sql_func_sinh SYSTEM 2006-10-19T08:41:34 0
+      -    i user_functions 41 require Genezzo::Havok::SQLScalar sql_func_tan SYSTEM 2006-10-19T08:41:34 0
+      -    i user_functions 42 require Genezzo::Havok::SQLScalar sql_func_tanh SYSTEM 2006-10-19T08:41:34 0
+      -    i user_functions 43 require Genezzo::Havok::SQLScalar sql_func_ascii SYSTEM 2006-10-19T08:41:34 0
+      -    i user_functions 44 require Genezzo::Havok::SQLScalar sql_func_instr SYSTEM 2006-10-19T08:41:34 0
+      -    i user_functions 45 require Genezzo::Havok::SQLScalar sql_func_nvl SYSTEM 2006-10-19T08:41:34 0
+      -    i user_functions 46 require Genezzo::Havok::SQLScalar sql_func_quurl SYSTEM 2006-10-19T08:41:34 0
+      -    i user_functions 47 require Genezzo::Havok::SQLScalar sql_func_quurl2 SYSTEM 2006-10-19T08:41:34 0
+      -    i user_functions 48 require Genezzo::Havok::SQLScalar sql_func_unquurl SYSTEM 2006-10-19T08:41:34 0
 
 
 
@@ -65,5 +65,5 @@ PREREQ_HAVOK:
 
 TABLEDEFS:    
 
-UPDATED:    2006-08-05T15:55:22
-VERSION:    1.08
+UPDATED:    2006-10-19T01:55:44
+VERSION:    1.09

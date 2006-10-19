@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSJoinA.pm,v 1.6 2006/03/30 07:20:30 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSJoinA.pm,v 1.7 2006/10/19 08:54:29 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -574,7 +574,8 @@ sub SQLFetch
             my $val;
 
             # be very paranoid - filter might be invalid perl
-            eval {$val = &$filter($self, $currkey, $outarr, $get_alias_col) };
+            eval {$val = &$filter($self, $currkey, $outarr, 
+                                  $get_alias_col, $tc_rownum) };
             if ($@)
             {
                 whisper "filter blew up: $@";

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BufCaElt.pm,v 7.5 2005/09/15 08:55:14 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BufCaElt.pm,v 7.6 2006/10/19 08:37:02 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -23,7 +23,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 7.5 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.6 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
 #    @EXPORT      = qw(&func1 &func2 &func4 &func5);
@@ -257,6 +257,7 @@ each block.
 
 =head1 FUNCTIONS
 
+=over 4
 =item  GetInfo - return a reference to the info hash.  BCFile uses
        this hash to store the filenum/blocknum info associated with
        the current BufCaElt.
@@ -278,6 +279,8 @@ each block.
        buffer cache, but unreferenced blocks can be freed.  If they are
        "dirty", the modified buffer must be written to disk, else the
        BufCaElt can simply be re-used.
+
+=back
 
 =head2 EXPORT
 

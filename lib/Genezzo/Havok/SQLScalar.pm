@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/SQLScalar.pm,v 1.8 2006/08/05 22:49:45 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/SQLScalar.pm,v 1.9 2006/10/19 08:41:34 claude Exp claude $
 #
 # copyright (c) 2005, 2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -75,7 +75,7 @@ our $VERSION;
 our $MAKEDEPS;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 1.8 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.9 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     my $pak1  = __PACKAGE__;
     $MAKEDEPS = {
@@ -93,7 +93,7 @@ BEGIN {
     # DML is an array, not a hash
 
     my $now = 
-    do { my @r = (q$Date: 2006/08/05 22:49:45 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
+    do { my @r = (q$Date: 2006/10/19 08:41:34 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
 
 
     my %tabdefs = ();
@@ -710,45 +710,43 @@ Genezzo::Havok::SQLScalar - scalar SQL functions
 
 =head1 LIMITATIONS
 
-#abs
- ceil
-#cos
- cosh
-#exp
- floor
- ln
-#log - log 10
-mod
-power
-round
-sign
-#sin
- sinh
-#sqrt
- tan
- tanh
-trunc
 
-#chr
-#concat
- initcap
- lower
-lpad
-ltrim
-replace
-rpad
-rtrim
-soundex
-#substr
-translate
- upper
+In Perl, "log" is a natural log, but the standard SQL log
+function is log base 10.  To prevent confusion in usage, Genezzo
+supplies a natural log function "ln" and a base 10 function "log10".
 
- ascii
- instr
-#length
- nvl
+instr needs to handle "occurrence".
+
+The following standard functions are not implemented:
+
+=over 4
+
+=item mod
+
+=item power
+
+=item round
+
+=item sign
+
+=item trunc
+
+=item lpad
+
+=item ltrim
 
 
+=item replace
+
+=item rpad
+
+=item rtrim
+
+=item soundex
+
+=item translate
+
+=back
 
 =head1 AUTHOR
 

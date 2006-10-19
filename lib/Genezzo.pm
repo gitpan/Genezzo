@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/RCS/Genezzo.pm,v 1.5 2006/08/21 21:23:57 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/RCS/Genezzo.pm,v 1.6 2006/10/19 09:22:20 claude Exp claude $
 #
 # copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -38,7 +38,7 @@ BEGIN {
 	
 }
 
-our $VERSION   = '0.64';
+our $VERSION   = '0.65';
 
 1;
 __END__

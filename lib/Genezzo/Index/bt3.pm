@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Index/RCS/bt3.pm,v 7.1 2005/07/19 07:49:03 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Index/RCS/bt3.pm,v 7.2 2006/10/19 08:43:18 claude Exp claude $
 #
 # copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -127,6 +127,7 @@ sub _more_init
                  bufcache  => $self->{bc},
 
                  tso  => $self->{tso},
+                 object_type => 'INDEX'
                  );
 
     my $tiehash = tie %realhash, 'Genezzo::Row::RSTab', %hargs;

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/SpaceMan/RCS/SMExtent.pm,v 1.35 2006/08/21 20:58:02 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/SpaceMan/RCS/SMExtent.pm,v 1.36 2006/10/19 09:20:13 claude Exp claude $
 #
 # copyright (c) 2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -22,7 +22,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 1.35 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.36 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
     @EXPORT      = ( ); # qw(&NumVal);
@@ -87,7 +87,8 @@ sub _init
                       bufcache   => "no bufcache !",
                       filenumber => "no filenumber !",
                       tablename  => "no tablename !",
-                      object_id  => "no object id !"
+                      object_id  => "no object id !",
+                      object_type => "no object type"
                       );
     
     my %args = (@_);
@@ -96,6 +97,8 @@ sub _init
         unless (Validate(\%args, \%required));
 
     $self->{filename} = $args{filename}; # save for error reporting
+    $self->{object_type} = $args{object_type}; # use type to determine
+                                               # storage allocation
 
     my $smf = Genezzo::SpaceMan::SMFile->new($args{filename},
                                              $args{numbytes},
@@ -399,10 +402,11 @@ sub _meta_row_dump_X1B
 
 # XXX XXX: remove segnxt
 #    my $segnxt = shift @val;
-    my $prev   = shift @val;
+    my $first_seghdr = shift @val;
+    my $prev         = shift @val;
 
     my $outi;
-    $outi .= "Previous header at block $prev\n";
+    $outi .= "First seghdr at $first_seghdr, previous header at block $prev\n";
 
     if (scalar(@val))
     {
@@ -458,7 +462,7 @@ sub _meta_row_dump_XHP
 
 sub _create_segment_hdr
 {
-    my ($self, $rowd, $blockno, $extent_size, $parent) = @_;
+    my ($self, $rowd, $blockno, $extent_size, $parent, $first_seghdr) = @_;
 
     return undef
         unless (defined($rowd));
@@ -490,19 +494,21 @@ sub _create_segment_hdr
         # should only be for very first allocated extent
         $self->{first_seghdr}   = $blockno;
         $self->{current_seghdr} = $blockno;
-        $parent = $blockno;
+        $parent                 = $blockno;
+        $first_seghdr           = $blockno;
     }
 
     # X1B (eXtent FIRST _B_):
     #   1 at start of segment (segment header/first extent), and 1 for
     #   each overflow block of the segment header.
     #
-    #   Initially, just has the block number for the previous segment
-    #   header (which is just the current blockno if this block is the
-    #   very first).  However, once the first extent is allocated for
-    #   this piece of the segment header, then this extent is
-    #   designated as the segment header overflow block, and the
-    #   extent descriptor is appended to the X1B row.
+    #   Initially, just has the block number for the first segment
+    #   header and the previous segment header (which is just the
+    #   current blockno if this block is the very first).  However,
+    #   once the first extent is allocated for this piece of the
+    #   segment header, then this extent is designated as the segment
+    #   header overflow block, and the extent descriptor is appended
+    #   to the X1B row.
     #
     #   Note that the extent descriptor should describe the overall
     #   status of all the extents managed beneath the overflow block,
@@ -512,6 +518,7 @@ sub _create_segment_hdr
     $rowd->_set_meta_row("X1B", [
 # XXX XXX: remove segnxt
 #                                 "segnxt", 
+                                 $first_seghdr,
                                  $parent]);
 
     return $rowd;
@@ -538,7 +545,7 @@ sub _add_extent_to_segment_hdr
 
         # if current segment header does not have a child for overflow,
         # then the new extent is allocated for that purpose
-        if (defined($row2) && (scalar(@{$row2}) < 2)) # XXX XXX: remove segnxt
+        if (defined($row2) && (scalar(@{$row2}) < 3)) # XXX XXX: remove segnxt
         {
             # X1B (eXtent FIRST _B_):
             #
@@ -561,12 +568,14 @@ sub _add_extent_to_segment_hdr
                 return (undef);
             }
             
-            my $parent = $self->{current_seghdr};
+            my $parent       = $self->{current_seghdr};
+            my $first_seghdr = $self->{first_seghdr};
 
             # create the new segment subheader in the new extent
             $self->_create_segment_hdr($rowd, 
                                        $blockno, $extent_size, 
-                                       $parent);
+                                       $parent,
+                                       $first_seghdr);
 
             $rowd = $self->_get_rowd($self->{current_seghdr});
             unless (defined($rowd))
@@ -589,6 +598,8 @@ sub _add_extent_to_segment_hdr
 
         push @{$row}, $new_ext;
 
+
+# XXX XXX XXX: overflow test? but how to check?
         if (0 && scalar(@{$row}) > 4)
         {
 #            print "overflow to next header\n";
@@ -914,7 +925,7 @@ sub _find_extent_hdr
 
 sub nextfreeblock
 {
-    # STUB: this routine for finding free blocks in allocated extents
+    # this routine for finding free blocks in allocated extents
 
     # First, check curr_extent -- if have space there use it.
     # If current extent is full, pop back to segment header.
@@ -925,6 +936,19 @@ sub nextfreeblock
 
     my $self = shift;
 
+    # XXX XXX: should main space information for all objects, but only
+    # re-use space for standard tables.
+   if (!exists($self->{object_type})
+       || ($self->{object_type} ne 'TABLE'))
+    {
+        goto  L_nospacefound;
+    }
+
+
+    # if no space in current extent, then perform housekeeping on the
+    # segment subheader, and check it for free space.
+
+    # XXX XXX: check current extent first, then current seghdr...
     my $seghdr = $self->{first_seghdr};
     unless (defined($seghdr))
     {
@@ -964,6 +988,7 @@ sub nextfreeblock
         push @checklist, $checkitem;
     } # end for all xdesc in X1A row
 
+    # update the extents in the checklist if necessary
     for my $item (@checklist)
     {
         my ($blockno, $extent_size, $total_pctused,
@@ -1022,21 +1047,22 @@ sub nextfreeblock
 
     } # end for checklist
 
-    if (scalar(keys(%revised)))
+    $rowd = $self->_get_rowd($seghdr);
+    unless (defined($rowd))
     {
-        $rowd = $self->_get_rowd($seghdr);
-        unless (defined($rowd))
-        {
-            return (undef);
-        }
-        $row = $rowd->_get_meta_row("X1A");
+        return (undef);
+    }
+    $row = $rowd->_get_meta_row("X1A");
         
-        unless (defined($row) && (scalar(@{$row}) > 1))
-        {
-            goto  L_nospacefound;
+    unless (defined($row) && (scalar(@{$row}) > 1))
+    {
+        goto  L_nospacefound;
 #        print "bad X1A row for $blockno \n";
 #        return (undef);
-        }
+    }
+
+    if (scalar(keys(%revised)))
+    {
 
         for my $ii (0..(scalar(@{$row})-1))
         {
@@ -1056,6 +1082,55 @@ sub nextfreeblock
 
         } # end for all xdesc in X1A row
         $rowd->_set_meta_row("X1A", $row);
+    }
+
+    for my $ii (0..(scalar(@{$row})-1))
+    {
+        my $xdesc = $row->[$ii];
+
+        my @ggg = $self->_split_extent_descriptor($xdesc);
+        next
+            unless (scalar(@ggg) > 4);
+        my ($blockno, $extent_size, $total_pctused,
+            $alloc_pctused, $free_len) = @ggg;
+
+        next 
+            unless (exists($revised{$blockno}));
+
+        my $new_xd = $revised{$blockno};
+        $row->[$ii] = $self->_make_extent_descriptor(@{$new_xd});
+
+    } # end for all xdesc in X1A row
+
+    if (0)
+    {
+        # XXX XXX: fixup SMFile and SMExtent
+
+        my $currBlocknum;
+
+        my %nargs = (
+                     currblocknum => $currBlocknum
+                     );
+#        $nargs{currextent}  = $blockno;
+#        $nargs{extent_size} = $extent_size;
+#        $nargs{extent_posn} = 0;
+
+        my $h1 = 
+            Genezzo::SpaceMan::SMFile::_make_all_info_for_free_block(
+                                                                     %nargs
+                                                                     );
+
+        %nargs = (
+                  blocknum        => $currBlocknum,
+#                  firstextent     => $firstextent,
+                  current_extent  => $self->{curr_extent},
+                  extent_size     => $self->{extent_size},
+                  extent_position => $self->{extent_posn}
+                  );
+
+        my $h2 = 
+            Genezzo::SpaceMan::SMFreeBlock->new(%nargs);
+
     }
     
 

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSTab.pm,v 7.4 2006/03/14 08:21:14 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSTab.pm,v 7.5 2006/10/19 09:04:13 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -96,7 +96,8 @@ sub _init
                       tablename => "no tablename !",
                       object_id => "no object id !",
                       tso       => "no tso",
-                      bufcache  => "no buffer cache"
+                      bufcache  => "no buffer cache",
+                      object_type => "no object type"
                       );
     my %optional  =  (
                       dbh_ctx  => {} # XXX XXX XXX: is this used?
@@ -111,6 +112,7 @@ sub _init
     $self->{tso}       = $args{tso};
     $self->{bc}        = $args{bufcache};
     $self->{object_id} = $args{object_id};
+    $self->{object_type} = $args{object_type};
 
     $self->{fac1} = make_fac1('Genezzo::PushHash::PushHash');
 
@@ -230,6 +232,7 @@ sub _make_new_chunk # override the hph method
                 factory   => $self->{fac1}, 
                 tablename => $self->{tablename},
                 object_id => $self->{object_id},
+                object_type => $self->{object_type},
                 filename  => $filename,
                 numbytes  => $filesize,
                 numblocks => $fileblks,
@@ -1008,7 +1011,7 @@ sub _localStore
            (   (scalar(@estat) > 2) 
             && Genezzo::Block::RDBlock::_isheadrow($estat[0])
             && Genezzo::Block::RDBlock::_istailrow($estat[0])
-            && !($toobig)
+            && !($toobig)                    # toobig check
             && $estat[2] >= length($packstr) # see if still fits   
            )
         )
@@ -1391,6 +1394,7 @@ sub _init
             }
         }
     }
+    $self->{rownum} = 0;
 
     return 1;
 }
@@ -1500,8 +1504,10 @@ sub SQLFetch
         # filter is defined
         my $val;
 
+        my $rownum = $self->{rownum} + 1;
         # be very paranoid - filter might be invalid perl
-        eval {$val = &$filter($self, $currkey, $outarr, $get_col_alias) };
+        eval {$val = &$filter($self, $currkey, $outarr, 
+                              $get_col_alias, $rownum) };
         if ($@)
         {
             whisper "filter blew up: $@";
@@ -1518,8 +1524,12 @@ sub SQLFetch
 
             return undef;
         }
-        return ($currkey, $outarr)
-            unless (!$val);
+        unless (!$val)
+        {
+            $self->{rownum} += 1;
+            return ($currkey, $outarr);
+        }
+
     }
 
     return undef;
@@ -1679,6 +1689,8 @@ various
 =head1 TODO
 
 =over 4
+
+=item rownum filter support to move to separate package
 
 =item $href: remove - need a dict function to return allfileused via tso
 

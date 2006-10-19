@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/DirtyScalar.pm,v 7.2 2005/09/07 08:50:59 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/DirtyScalar.pm,v 7.3 2006/10/19 08:37:02 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -92,6 +92,7 @@ BufCaElt uses DirtyScalar to detect when a data block is modified.
 
 =head1 FUNCTIONS
 
+=over 4
 =item  _StoreCB - a callback function that is activated on every STORE, 
        i.e., whenever the scalar is updated.  BufCaElt uses this function
        to set a "dirty" bit for the buffer.
@@ -99,6 +100,8 @@ BufCaElt uses DirtyScalar to detect when a data block is modified.
 =item  SetBCE - set a reference back to the BufCaElt that owns this tie.
        Some DirtyScalar hook routines need to query the BufCaElt info hash
        via BufCaElt::GetInfo.
+
+=back
 
 =head2 EXPORT
 

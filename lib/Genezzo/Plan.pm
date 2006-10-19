@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Plan.pm,v 7.4 2006/01/02 10:32:29 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Plan.pm,v 7.6 2006/10/19 08:49:03 claude Exp claude $
 #
 # copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -23,7 +23,7 @@ use Carp;
 our $VERSION;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 7.4 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.6 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -49,6 +49,68 @@ our $GZERR = sub {
 };
 
 our $GZERR_MAGIC; # refer back to gzerr in a magic way...
+
+sub _build_gzerr_wrapper 
+{
+    my $gzerr_cb = shift;
+
+    # build a closure to control printing of statement position information
+    my $gzerr_closure = sub {
+
+        my %nargs = @_;
+
+        my $statement = undef;
+
+        if (0
+            && exists($nargs{statement})
+            && exists($nargs{stat_pos}))
+        {
+            my $stat = $nargs{statement};
+            my $pos  = $nargs{stat_pos};
+
+            if (scalar(@{$pos}) && length($stat))
+            {
+                #position vector points to start and finish of token
+                my $p1 = $pos->[0];
+                my $caret = (" " x ($p1+1) ) . "^";
+
+                # remove newlines, tabs
+                $stat =~ s/\n/ /g;
+                $stat =~ s/\t/ /g;
+                # high-end chars
+                $stat =~ s/([\200-\377])/ /g; 
+                # low-end chars (including newline (^J = octal 12))
+                $stat =~ s/([\0-\37\177])/ /g;
+
+                if (length($caret) > 40)
+                {
+                    my $off2 = 40;
+                    $off2 *= -1;
+                    $caret = substr($caret, $off2);
+                    $stat  = substr($stat,  $off2);
+                }
+
+                print $stat, "\n", $caret, "\n";
+            }
+
+        }
+
+#        if (exists($nargs{self}))
+#        {
+#            my $self = $nargs{self};
+#            $statement = $self->GetStatement()
+#                if ($self->can("GetStatement"));
+#            $nargs{statement} = $statement
+#                if (defined($statement));
+#        }
+
+        return &$gzerr_cb(%nargs);
+
+    };
+
+    return $gzerr_closure;
+}
+
 
 sub _init
 {
@@ -132,8 +194,12 @@ sub new
     {
         # NOTE: don't supply our GZERR here - will get
         # recursive failure...
-        $self->{GZERR} = $args{GZERR};
+        $self->{GZERR} = _build_gzerr_wrapper($args{GZERR});
+#        $self->{GZERR} = $args{GZERR};
         my $err_cb     = $self->{GZERR};
+        # pass the wrapped GZERR down to the other Plan subclasses...
+        $args{GZERR}   = $self->{GZERR};
+
         # capture all standard error messages
         $Genezzo::Util::UTIL_EPRINT = 
             sub {
@@ -377,7 +443,7 @@ sub SQLWhere2
 
         no warnings qw(uninitialized); # shut off null string warnings
 
-        my ($tabdef, $rid, $outarr, $get_alias_col) = @_;
+        my ($tabdef, $rid, $outarr, $get_alias_col, $tc_rownum) = @_;
         return 1
             if (defined($outarr) &&
                 ( ';
@@ -510,6 +576,9 @@ relational algebra.
 =head1 TODO
 
 =over 4
+
+=item SQLWhere2: need to allow rownum in where clause, which means we
+need a rownum rowsource [select * from dual where rownum < 10; ]
 
 =item update pod
 
