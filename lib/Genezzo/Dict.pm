@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 7.24 2006/10/19 08:59:39 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 7.25 2006/10/20 18:51:56 claude Exp claude $
 #
 # copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -19,7 +19,7 @@ use Genezzo::Havok;
 
 BEGIN {
     our $VERSION;
-    $VERSION = do { my @r = (q$Revision: 7.24 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.25 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -5862,6 +5862,7 @@ tables.
 =head2 Dictionary concepts
 
 =over 4
+
 =item Tablespace -- a physical space to store the contents of tables.
 A tablespace is a collection of files.  The default install of Genezzo
 creates a single SYSTEM tablespace in a single file.  
@@ -5876,6 +5877,7 @@ dictionary.  NOTE: Modifying any dictionary tables will framboozle
 your nimwits.  You have been warned.
 
 =over 4
+
 =item _pref1 -- a set of key/value pairs that describe the database
 configuration
 

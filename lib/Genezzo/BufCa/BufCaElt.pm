@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BufCaElt.pm,v 7.6 2006/10/19 08:37:02 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/BufCa/RCS/BufCaElt.pm,v 7.7 2006/10/20 18:52:16 claude Exp claude $
 #
-# copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2003,2004,2005,2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 use strict;
@@ -23,7 +23,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 7.6 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.7 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
 #    @EXPORT      = qw(&func1 &func2 &func4 &func5);
@@ -258,6 +258,7 @@ each block.
 =head1 FUNCTIONS
 
 =over 4
+
 =item  GetInfo - return a reference to the info hash.  BCFile uses
        this hash to store the filenum/blocknum info associated with
        the current BufCaElt.
@@ -313,7 +314,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 
 L<perl(1)>.
 
-Copyright (c) 2003, 2004, 2005 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2003, 2004, 2005, 2006 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

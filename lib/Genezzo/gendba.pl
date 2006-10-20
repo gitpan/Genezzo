@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/gendba.pl,v 7.8 2006/10/19 08:35:09 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/gendba.pl,v 7.9 2006/10/20 18:51:20 claude Exp claude $
 #
 # copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -205,6 +205,7 @@ All tables are currently created in the system tablespace by default.
 There are a couple of other useful commands:
 
 =over 4
+
 =item HELP -- give useless help
 
 =item DUMP -- dump out internal data structures

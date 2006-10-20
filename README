@@ -57,7 +57,7 @@ USAGE
 
   Try:
 
-    perl -Iblib/lib lib/Genezzo/dbi_example.pl # runs an example
+    perl -Iblib/lib demo/dbi_example.pl # runs an example
     perldoc Genezzo::GenDBI
 
   for more information.
@@ -651,7 +651,7 @@ NEW FEATURES - Feeble/SQL compatible case-sensitivity
 
 INCOMPATIBLE CHANGES
 
-  Version 0.64 dictionary and block format is incompatible with
+  Version 0.66 dictionary and block format is incompatible with
   previous releases.  No upgrade path is supported.
   Version 0.48 thru 0.50 are compatible.
 

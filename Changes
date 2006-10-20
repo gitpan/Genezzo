@@ -1,5 +1,10 @@
 Revision history for Perl extension Genezzo
 
+0.66 Fri Oct 20 11:49:27 2006
+        - fix sprintf SQL function
+        - move dbi_example to demo directory
+        - more pod fixes to improve kwalitee
+
 0.65 Thu Oct 19 02:26:57 2006
         - Parse/Plan: position information for identifiers
         - better support for rownum filters

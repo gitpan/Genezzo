@@ -282,7 +282,12 @@ sub sql_func_rindex
 }
 sub sql_func_sprintf
 {
-return sprintf(@_);
+    # Note: sprintf prototype expects a scalar for first arg, so
+    # supplying an array causes it to get evaluated in the scalar
+    # context, which is wrong.  Shift off the format first.
+    my $fformat = shift @_;
+    my $foo = sprintf($fformat, @_);
+    return $foo;
 }
 sub sql_func_substr
 {

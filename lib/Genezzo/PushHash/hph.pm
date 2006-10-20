@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/PushHash/RCS/hph.pm,v 7.2 2006/10/19 08:51:27 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/PushHash/RCS/hph.pm,v 7.3 2006/10/20 18:53:09 claude Exp claude $
 #
-# copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2003,2004,2005,2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 use strict;
@@ -574,6 +574,7 @@ You may construct hierarchical pushhashes of arbitrary depth.
 =head2 EXPORT
 
 =over 4
+
 =item RIDSEP -- (Row) Identifier Separator character - "/" by default.
 
 =item RIDSEPRX -- Regular Expression for RIDSEP - used to handle case
@@ -649,7 +650,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 L<Genezzo::PushHash::PushHash>,
 L<perl(1)>. 
 
-Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2003, 2004, 2005, 2006 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
