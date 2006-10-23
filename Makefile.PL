@@ -9,7 +9,10 @@ WriteMakefile(
     'VERSION_FROM'	=> 'lib/Genezzo.pm', # finds $VERSION
     'PREREQ_PM'		=> {
         'Text::ParseWords' => '0.0',
+        'Text::Soundex'    => '0.0',
         'Term::ReadLine'   => '0.0',
+        'File::Copy'       => '0.0',
+        'File::Compare'    => '0.0',
         'File::Path'       => '0.0',
         'File::Spec'       => '0.0',
 #        'IO::File'         => '0.0',

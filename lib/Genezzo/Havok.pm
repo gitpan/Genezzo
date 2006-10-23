@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Havok.pm,v 7.12 2006/06/04 06:28:02 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Havok.pm,v 7.13 2006/10/23 06:10:00 claude Exp claude $
 #
 # copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -19,7 +19,7 @@ our $VERSION;
 our $MAKEDEPS;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 7.12 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.13 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     my $pak1  = __PACKAGE__;
     $MAKEDEPS = {
@@ -41,7 +41,7 @@ BEGIN {
 
 #    my $now = Genezzo::Dict::time_iso8601()
     my $now = 
-    do { my @r = (q$Date: 2006/06/04 06:28:02 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
+    do { my @r = (q$Date: 2006/10/23 06:10:00 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
 
     my $dml =
         [
@@ -596,9 +596,11 @@ sub MakeSQL
 #
 #REM HAVOK_EXAMPLE
 #REM select * from tab1 where Genezzo::Havok::Examples::isRedGreen(col1)
+#REM note that UserExtend usage is deprecated, please use UserFunctions
 #select HavokUse('Genezzo::Havok::UserExtend') from dual
 #i user_extend 1 require Genezzo::Havok::Examples isRedGreen SYSTEM TODAY 0
-#i user_extend 2 require Text::Soundex soundex SYSTEM TODAY 0
+#REM moved soundex to Genezzo::Havok::SQLScalar
+#REM i user_extend 2 require Text::Soundex soundex SYSTEM TODAY 0
 #
 #
 #

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Parse/RCS/SQLGrammar.pl,v 7.10 2006/08/21 21:04:00 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Parse/RCS/SQLGrammar.pl,v 7.11 2006/10/23 06:05:36 claude Exp claude $
 #
 # copyright (c) 2005, 2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -121,12 +121,14 @@ my @standard_funcs = qw(
                         MEAN
                         STDDEV
                         IN
+                        INT
                         EXISTS
                         ANY
                         SOME
                         ALL
                         UNIQUE
                         LIKE
+                        TRANSLATE
                         TRIM
                         UPPER
                         LOWER

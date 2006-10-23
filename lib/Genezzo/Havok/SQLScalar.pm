@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/SQLScalar.pm,v 1.9 2006/10/19 08:41:34 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/SQLScalar.pm,v 1.13 2006/10/23 06:07:49 claude Exp claude $
 #
 # copyright (c) 2005, 2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -44,15 +44,28 @@ require Exporter;
              &sql_func_initcap
              &sql_func_least
              &sql_func_lower
+             &sql_func_lpad
+             &sql_func_ltrim
+             &sql_func_replace
+             &sql_func_rpad
+             &sql_func_rtrim
+             &sql_func_soundex
+             &sql_func_translate
              &sql_func_upper
 
              &sql_func_cosh
              &sql_func_ceil
              &sql_func_floor
              &sql_func_ln
+             &sql_func_logn
+             &sql_func_mod
+             &sql_func_power
+             &sql_func_round
+             &sql_func_sign
              &sql_func_sinh
              &sql_func_tan
              &sql_func_tanh
+             &sql_func_trunc
 
              &sql_func_ascii
              &sql_func_instr        
@@ -75,7 +88,7 @@ our $VERSION;
 our $MAKEDEPS;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 1.9 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.13 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     my $pak1  = __PACKAGE__;
     $MAKEDEPS = {
@@ -93,7 +106,7 @@ BEGIN {
     # DML is an array, not a hash
 
     my $now = 
-    do { my @r = (q$Date: 2006/10/19 08:41:34 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
+    do { my @r = (q$Date: 2006/10/23 06:07:49 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
 
 
     my %tabdefs = ();
@@ -138,15 +151,28 @@ BEGIN {
                        initcap
                        least
                        lower
+                       lpad
+                       ltrim
+                       replace
+                       rpad
+                       rtrim
+                       soundex
+                       translate
                        upper
 
                        cosh
                        ceil
                        floor
                        ln
+                       logn
+                       mod
+                       power
+                       round
+                       sign
                        sinh
                        tan
                        tanh
+                       trunc
                        
                        ascii
                        instr
@@ -234,7 +260,13 @@ sub sql_func_chr
 }
 sub sql_func_crypt
 {
-    return crypt $_[0], $_[1];
+    my ($plain, $salt) = @_;
+
+    # XXX XXX
+    return undef
+        unless (defined($salt));
+
+    return crypt $plain, $salt;
 }
 sub sql_func_index
 {
@@ -266,8 +298,14 @@ sub sql_func_ord
 }
 sub sql_func_pack
 {
-return pack(@_);
+    # Note: pack  prototype expects a scalar for first arg, so
+    # supplying an array causes it to get evaluated in the scalar
+    # context, which is wrong.  Shift off the format first.
+    my $fformat = shift @_;
+    my $foo = pack($fformat, @_);
+    return $foo;
 }
+
 sub sql_func_reverse
 {
 return reverse(@_);
@@ -277,7 +315,7 @@ sub sql_func_rindex
     my $str = shift;
     my $substr = shift;
     my $pos = shift;
-    $pos = 0 unless (defined($pos));
+    $pos = length($str) unless (defined($pos));
     return rindex $str, $substr, $pos;
 }
 sub sql_func_sprintf
@@ -289,6 +327,7 @@ sub sql_func_sprintf
     my $foo = sprintf($fformat, @_);
     return $foo;
 }
+
 sub sql_func_substr
 {
     my $exp1 = shift;
@@ -324,6 +363,8 @@ sub sql_func_cos
     my $num = shift;
     return cos($num);
 }
+
+# natural log base e
 sub sql_func_exp
 {
     my $num = shift;
@@ -347,6 +388,15 @@ sub sql_func_log10
 {
     my $n = shift;
     return log($n)/log(10);
+}
+sub sql_func_logn
+{
+    my ($base, $num) = @_;
+    
+    return undef
+        unless (defined($base) && defined($num));
+
+    return log($num)/log($base);
 }
 sub sql_func_oct
 {
@@ -428,6 +478,185 @@ sub sql_func_lower
     return lc($str);
 }
 
+sub sql_func_lpad
+{
+    my ($str, $len, $pattern) = @_;
+
+    # error
+    return undef
+        unless (defined($str) && defined($len));
+
+    my $outi = $str;
+
+    if (defined($pattern) && length($pattern))
+    {
+        my $repeat = 0;
+
+        my $orig_len = length($str);
+
+        if ($orig_len < $len)
+        {
+            $repeat = 1 + ($len - $orig_len)/ length($pattern);
+        }
+
+        $outi = reverse($str);
+
+        my $revpat = reverse($pattern);
+        $outi .= ($revpat x $repeat) ;
+
+        $outi = reverse(substr($outi, 0, $len));
+
+    }
+    else
+    {
+        # blank pad
+        my $tmplate = "A$len";
+        my $revstr = reverse($str);
+        $outi = reverse(pack($tmplate, $revstr));
+    }
+    return $outi;
+
+}
+
+sub sql_func_ltrim
+{
+    my ($str, $pattern) = @_;
+
+    # error
+    return undef
+        unless (defined($str));
+
+    my $outi = $str;
+
+    if (defined($pattern))
+    {
+        my $qmp = quotemeta($pattern);
+        my $tmplate = '^(' . $qmp. ')*';
+        $outi =~ s/$tmplate// ;
+
+    }
+    else
+    {
+        my $tmplate = '^\s*';
+        $outi =~ s/$tmplate// ;
+    }
+    return $outi;
+}
+
+sub sql_func_replace
+{
+    my ($str, $search_str, $replace_str) = @_;
+
+    # error
+    return undef
+        unless (defined($str) && defined($search_str));
+
+    my $outi = $str;
+
+    if (defined($replace_str))
+    {
+        my $qmp1 = quotemeta($search_str);
+        my $qmp2 = quotemeta($replace_str);
+        $outi =~ s/$qmp1/$qmp2/gm ;
+    }
+    else
+    {
+        my $qmp1 = quotemeta($search_str);
+
+        $outi =~ s/$qmp1//gm ;
+    }
+    return $outi;
+}
+
+sub sql_func_rpad
+{
+    my ($str, $len, $pattern) = @_;
+
+    # error
+    return undef
+        unless (defined($str) && defined($len));
+
+    my $outi = $str;
+
+    if (defined($pattern) && length($pattern))
+    {
+        my $repeat = 0;
+
+        my $orig_len = length($str);
+
+        if ($orig_len < $len)
+        {
+            $repeat = 1 + ($len - $orig_len)/ length($pattern);
+        }
+        $outi .= ($pattern x $repeat);
+        $outi = substr($outi, 0, $len);
+
+    }
+    else
+    {
+        # blank pad
+        my $tmplate = "A$len";
+        $outi = pack($tmplate, $str);
+    }
+    return $outi;
+
+}
+
+sub sql_func_rtrim
+{
+    my ($str, $pattern) = @_;
+
+    # error
+    return undef
+        unless (defined($str));
+
+    my $outi = $str;
+
+    if (defined($pattern))
+    {
+        my $qmp = quotemeta($pattern);
+        my $tmplate = '(' . $qmp. ')*$';
+        $outi =~ s/$tmplate// ;
+
+    }
+    else
+    {
+        my $tmplate = '\s*$';
+        $outi =~ s/$tmplate// ;
+    }
+    return $outi;
+}
+
+sub sql_func_soundex
+{
+    my $str = shift;
+
+    use Text::Soundex;
+
+    return soundex($str);
+}
+
+sub sql_func_translate
+{
+    my ($str, $search_str, $replace_str) = @_;
+
+    # error
+    return undef
+        unless (defined($str) && 
+                defined($search_str) && defined($replace_str));
+
+    my $outi = $str;
+
+#    my $qmp1 = quotemeta($search_str);
+#    my $qmp2 = quotemeta($replace_str);
+
+    # translate is built at compile time, not subject to 
+    # double quote interpolation, so must use eval
+    eval "\$outi =~ tr/$search_str/$replace_str/" ;
+
+    return $outi;
+}
+
 sub sql_func_upper
 {
     my $str = shift;
@@ -461,6 +690,76 @@ sub sql_func_ln
     return log($n);
 }
 
+sub sql_func_mod
+{
+    my ($mm, $nn) = @_;
+
+    return undef
+        unless (defined($mm) && defined($nn));
+
+    return $mm if ($nn == 0);
+
+    return $mm % $nn;
+    
+    # XXX XXX: what about negative mod?
+}
+
+sub sql_func_power
+{
+    my ($mm, $nn) = @_;
+
+    return undef
+        unless (defined($mm) && defined($nn));
+
+    return $mm ** $nn;
+}
+
+# XXX XXX
+sub sql_func_round
+{
+    my ($num, $decplace) = @_;
+
+    return undef
+        unless (defined($num));
+
+    # XXX XXX: just call trunc($num+0.5, $decplace) ??
+
+    $decplace = 0 unless (defined($decplace));
+
+    if (0 == $decplace)
+    {
+        # add 1/2 then take the "floor" to get round up/round down behavior
+        return POSIX::floor($num + 0.5);
+    }
+    if ($decplace > 0)
+    {
+        return ((sql_func_round($num * (10**$decplace)))
+                /
+                (10**$decplace)
+                );
+    }
+    # negative decimal places round the left side of the decimal point
+    $decplace *= -1;
+    return ((sql_func_round($num / (10**$decplace)))
+            *
+            (10**$decplace)
+            );
+
+}
+
+# XXX XXX
+sub sql_func_sign
+{
+    my $num = shift;
+
+    return undef unless (defined($num));
+
+    # 0 if num == 0, 1 if num > 0, -1 if num < 0
+
+    return ($num <=> 0);
+}
+
+
 sub sql_func_sinh
 {
     # from Math::Complex - hyperbolic sine sinh(z) = (exp(z) - exp(-z))/2.
@@ -481,6 +780,34 @@ sub sql_func_tanh
     return (sql_func_sinh($num) / sql_func_cosh($num));
 }
 
+# XXX XXX
+sub sql_func_trunc
+{
+    my ($num, $decplace) = @_;
+
+    return undef
+        unless (defined($num));
+
+    $decplace = 0 unless (defined($decplace));
+
+    if (0 == $decplace)
+    {
+        return POSIX::floor($num);
+    }
+    if ($decplace > 0)
+    {
+        return (
+                (POSIX::floor(($num) * (10**$decplace))) /
+                (10**$decplace));
+    }
+    # negative decimal places round the left side of the decimal point
+    $decplace *= -1;
+    return (
+            (POSIX::floor(($num) / (10**$decplace))) *
+            (10**$decplace));
+
+}
+
 
 
 # SQL scalar functions
@@ -490,16 +817,32 @@ sub sql_func_ascii
     my $str = shift;
     return ord($str);
 }
+
 sub sql_func_instr
 {
     # XXX XXX: need to handle occurrence!!
     my ($str, $substr, $pos, $occurrence) = @_;
     $pos = 0 unless (defined($pos));
+    $occurrence = 1 unless (defined($occurrence));
+
+    # XXX XXX
+    return undef unless ($occurrence > 0);
+
     if ($pos >= 0)
     {
         # instr starts at 1, and index starts at zero
         $pos-- if ($pos);
-        return (index $str, $substr, $pos) + 1;
+
+        my $foundit = (index $str, $substr, $pos);
+
+        while (($occurrence > 1) && ($foundit > -1))
+        {
+            $pos = $foundit + 1;
+            $foundit = (index $str, $substr, $pos);
+            $occurrence--;
+        }
+
+        return ($foundit + 1);
     }
     else
     {
@@ -509,7 +852,24 @@ sub sql_func_instr
         # instr starts at 1, and index starts at zero
         $pos++;
         $pos *= -1;
-        return (index $str, $substr, $pos) + 1;
+
+        my $foundit = (index $str, $substr, $pos);
+
+        while (($occurrence > 1) && ($foundit > -1))
+        {
+            $pos = $foundit + 1;
+            $foundit = (index $str, $substr, $pos);
+            $occurrence--;
+        }
+
+        # going backwards, so we are positioned at end of substr, not
+        # the beginning.  Need to subtract the length
+        
+        return 0
+            if ($foundit < 0);
+
+#        return (($foundit - length($substr)) + 1);
+        return (((length($str) - $foundit) - length($substr)) + 1);
     }
 
 }
@@ -657,6 +1017,20 @@ Genezzo::Havok::SQLScalar - scalar SQL functions
 
 =item  lower
 
+=item  lpad
+
+=item  ltrim
+
+=item  soundex
+
+=item  replace
+
+=item  rpad
+
+=item  rtrim
+
+=item  translate
+
 =item  upper
 
 =back
@@ -673,11 +1047,23 @@ Genezzo::Havok::SQLScalar - scalar SQL functions
 
 =item  ln
 
+=item  logN
+
+=item  mod
+
+=item  power
+
+=item  round
+
+=item  sign
+
 =item  sinh
 
 =item  tan
 
 =item  tanh
+
+=item  trunc
 
 =back
 
@@ -716,40 +1102,17 @@ Genezzo::Havok::SQLScalar - scalar SQL functions
 =head1 LIMITATIONS
 
 
-In Perl, "log" is a natural log, but the standard SQL log
-function is log base 10.  To prevent confusion in usage, Genezzo
-supplies a natural log function "ln" and a base 10 function "log10".
-
-instr needs to handle "occurrence".
+In Perl, "log" is a natural log, but the standard SQL log function is
+log base N.  To prevent confusion in usage, Genezzo supplies a natural
+log function "ln", a base 10 function "log10", and a log of variable
+base called "logN".
 
 The following standard functions are not implemented:
 
 =over 4
 
-=item mod
-
-=item power
-
-=item round
-
-=item sign
-
-=item trunc
-
-=item lpad
-
-=item ltrim
-
-
-=item replace
-
-=item rpad
-
-=item rtrim
-
 =item soundex
 
-=item translate
 
 =back
 

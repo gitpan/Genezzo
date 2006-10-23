@@ -27,6 +27,9 @@ t/Prefs1.t
 t/PTPrep1.t
 t/PushHash1.t
 t/Row1.t
+t/SQLTest1.t
+t/SQL/SQLScalar1.log
+t/SQL/SQLScalar1.sql
 t/Util1.t
 lib/Genezzo.pm
 lib/Genezzo/bigdb.sql
@@ -96,6 +99,7 @@ lib/Genezzo/Index/bt2.pm
 lib/Genezzo/Index/bt3.pm
 lib/Genezzo/Index/btHash.pm
 lib/Genezzo/TestSetup.pm
+lib/Genezzo/TestSQL.pm
 lib/Genezzo/XEval.pm
 lib/Genezzo/XEval/Prepare.pm
 lib/Genezzo/XEval/SQLAlter.pm

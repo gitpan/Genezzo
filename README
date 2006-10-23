@@ -626,6 +626,11 @@ NEW FEATURES - Havok::UserFunctions, standard SQL scalar functions
   perl counterparts, which are listed above).  The SQL conversion
   functions are ascii, instr, and nvl.
 
+  Version 0.67 has many fixes plus added support for the string
+  functions lpad, ltrim, rpad, rtrim, translate, replace, and soundex
+  and the math functions mod, power, round, sign, trunc, logN.  Please
+  see Genezzo::Havok::SQLScalar for more information.
+
 NEW FEATURES - improved genexp.pl
  
   The version 0.60 database export (genexp.pl) now correctly handles table
@@ -651,7 +656,7 @@ NEW FEATURES - Feeble/SQL compatible case-sensitivity
 
 INCOMPATIBLE CHANGES
 
-  Version 0.66 dictionary and block format is incompatible with
+  Version 0.67 dictionary and block format is incompatible with
   previous releases.  No upgrade path is supported.
   Version 0.48 thru 0.50 are compatible.
 

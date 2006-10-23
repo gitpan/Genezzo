@@ -1,4 +1,4 @@
-# Copyright (c) 2003, 2004, 2005 Jeffrey I Cohen.  All rights reserved.
+# Copyright (c) 2003, 2004, 2005, 2006 Jeffrey I Cohen.  All rights reserved.
 #
 # Before `make install' is performed this script should be runnable with
 # `make test'. After `make install' it should work as `perl test.pl'
@@ -8,7 +8,7 @@
 # Change 1..1 below to 1..last_test_to_print .
 # (It may become useful if the test is moved to ./t subdirectory.)
 
-BEGIN { $| = 1; print "1..27\n"; }
+BEGIN { $| = 1; print "1..26\n"; }
 END {print "not ok 1\n" unless $loaded;}
 use Genezzo::GenDBI;
 $loaded = 1;
@@ -94,30 +94,37 @@ my $gnz_restore = File::Spec->catdir("t", "restore");
         not_ok ("could not startup");
     }
 
-    my $bigSQL = Genezzo::Havok::MakeSQL(); # get the string
+    # DEPRECATED: new havok tests should use yml documents and
+    # HavokUse function.  soundex function is now part of SQLScalar
+    # package.
 
-    my @bigarr = split(/\n/, $bigSQL);
-#    greet @bigarr;
-
-    for my $lin (@bigarr)
+    if (0)
     {
-#        print $lin, "\n";
-
-        if ($lin =~ m/commit/) 
+        my $bigSQL = Genezzo::Havok::MakeSQL(); # get the string
+        
+        my @bigarr = split(/\n/, $bigSQL);
+#    greet @bigarr;
+        
+        for my $lin (@bigarr)
         {
-            ok(); # stop at commit
-            last;
+#        print $lin, "\n";
+            
+            if ($lin =~ m/commit/) 
+            {
+                ok(); # stop at commit
+                last;
+            }
+            
+            next # ignore comments (REMarks)
+                if ($lin =~ m/REM/);
+            
+            next
+                unless (length($lin));
+            
+            not_ok ("could not create table havok")
+                unless ($dbh->do($lin));
         }
-
-        next # ignore comments (REMarks)
-            if ($lin =~ m/REM/);
-        
-        next
-            unless (length($lin));
-        
-        not_ok ("could not create table havok")
-            unless ($dbh->do($lin));
-    }
+    } # end if 0
 
     if ($dbh->do("commit"))
     {       
