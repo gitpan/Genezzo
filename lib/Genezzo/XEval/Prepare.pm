@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/XEval/RCS/Prepare.pm,v 7.8 2006/08/11 07:49:23 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/XEval/RCS/Prepare.pm,v 7.10 2006/10/26 07:33:18 claude Exp claude $
 #
 # copyright (c) 2005, 2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -17,7 +17,7 @@ use Carp;
 our $VERSION;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 7.8 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.10 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -258,13 +258,22 @@ sub _sql_where
         if (exists($genTree->{comp_op}))
         {
             my $bigstr = '( ';
+
             for my $op1 (@{$genTree->{operands}})
             {
                 if (ref($op1) eq 'HASH')
                 {
                     if (exists($op1->{vx}))
                     {
-                        $bigstr .= $op1->{vx} . ' ';
+                        if (defined($op1->{vx}))
+                        {
+                            $bigstr .= $op1->{vx} . ' ' ;
+                        }
+                        else
+                        {
+                            # handle NULL/UNDEF
+                            $bigstr .= ' undef ';
+                        }
                     }
                     if (exists($op1->{tc_comp_op}))
                     {
@@ -334,6 +343,7 @@ sub _sql_where
             # XXX XXX XXX: not an array!
             my $op1 = $genTree->{operands};
             {
+                # XXX XXX: undef issue?
                 if (exists($op1->{vx}))
                 {
                     $bigstr .= $op1->{vx} . ' ';
@@ -432,6 +442,7 @@ sub _sql_where
             {
                 if (ref($op1))
                 {
+                    # XXX XXX: undef issue?
                     if (exists($op1->{vx}))
                     {
                         $bigstr .= $op1->{vx} . ' ';

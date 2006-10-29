@@ -1,6 +1,6 @@
-REM  $Header: /Users/claude/fuzz/lib/Genezzo/RCS/dict.sql,v 1.9 2006/05/07 06:47:09 claude Exp claude $
+REM  $Header: /Users/claude/fuzz/lib/Genezzo/RCS/dict.sql,v 1.10 2006/10/29 06:36:54 claude Exp claude $
 REM
-REM $Revision: 1.9 $
+REM $Revision: 1.10 $
 REM
 REM copyright (c) 2005, 2006 Jeffrey I Cohen, all rights reserved, worldwide
 REM
@@ -24,7 +24,7 @@ insert into dual values ('X');
 
 select HavokUse('Genezzo::Havok') from dual;
 select HavokUse('Genezzo::Havok::SQLScalar') from dual;
-
+select HavokUse('Genezzo::Havok::SQLCompare') from dual;
 
 
 REM always commit changes!!

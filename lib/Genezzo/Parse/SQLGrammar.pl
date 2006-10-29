@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Parse/RCS/SQLGrammar.pl,v 7.11 2006/10/23 06:05:36 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Parse/RCS/SQLGrammar.pl,v 7.13 2006/10/26 07:27:13 claude Exp claude $
 #
 # copyright (c) 2005, 2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -1322,7 +1322,7 @@ num_perlish_substitution : num_primary perlish_substitution(?)
 # return an array of operands (even though there is only one)
 # to match AND, OR
         $return = {bool_op   => 'NOT',
-                   NOT       => $item{'NOT(?)'},
+
                    operands  => [$item{bool_test}]
                 };
     }
@@ -1452,20 +1452,25 @@ num_perlish_substitution : num_primary perlish_substitution(?)
 # XXX XXX: isn't this rule really in bool test, since it must support 
 # a leading NOT ??? XXX XXX
 #  (need to support In and Like )
-                    | value_expression function_name ...'(' 
+                    | value_expression NOT(?) function_name ...'(' 
                       '(' <commit> 
                          function_guts(?) ')'
-{$return = { 
-    comp_op  => 'function',
-    operator => $item{function_name},
-    operands => [
-                 $item{value_expression},
-                 { 
-                     function_name => $item{function_name},
-                     operands      => $item{'function_guts(?)'}
-                 }
-                 ]
-                 }
+{
+    my $not = scalar(@{$item{'NOT(?)'}});
+    my $fn_name = $item{function_name};
+    my @opands;
+    push @opands, {numeric_literal => $not,     tc_expr_type => 'n'};
+    push @opands, {string_literal  => '\'' . $fn_name .'\'', 
+                   tc_expr_type => 'c'};
+    push @opands, $item{value_expression};
+    if (scalar(@{$item{'function_guts(?)'}})
+        && exists($item{'function_guts(?)'}->[0]->{operands}))
+    {
+        push @opands, @{$item{'function_guts(?)'}->[0]->{operands}};
+    }
+$return = { function_name => 'compare_function',
+            operands => [{operands      => \@opands}]
+            }
 }
                     | value_expression 
 {$return = $item[1]}

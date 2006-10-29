@@ -427,15 +427,45 @@ cc
 
 t/SQL/SQLScalar1.sql> 
 
-t/SQL/SQLScalar1.sql> select  initcap(col1) from test1;
-initcap(col1)	
+t/SQL/SQLScalar1.sql> select  initcap(col3) from test1;
+initcap(col3)	
 _____________	
 
-Aa	
-Bb	
-Cc	
+I Have Trailing Spaces       	
+     And Many Leading Spaces Too 	
+   And Special Chars Like %^&*()  	
 
 3 rows selected.
+
+t/SQL/SQLScalar1.sql> 
+
+t/SQL/SQLScalar1.sql> select initcap('aaaa bbbb aaa bbb aa bb a b') from dual;
+initcap('aaaa bbbb aaa bbb aa bb a b')	
+______________________________________	
+
+Aaaa Bbbb Aaa Bbb Aa Bb A B	
+
+1 row selected.
+
+t/SQL/SQLScalar1.sql> 
+
+t/SQL/SQLScalar1.sql> select initcap('hi man how are you,dude,kk*ll123gg&ff') from dual;
+initcap('hi man how are you,dude,kk*ll123gg&ff')	
+________________________________________________	
+
+Hi Man How Are You,Dude,Kk*Ll123gg&Ff	
+
+1 row selected.
+
+t/SQL/SQLScalar1.sql> 
+
+t/SQL/SQLScalar1.sql> select initcap('hi man how are you,dude,kk.*()()ll123gg&ff') from dual;
+initcap('hi man how are you,dude,kk.*()()ll123gg&ff')	
+_____________________________________________________	
+
+Hi Man How Are You,Dude,Kk.*()()Ll123gg&Ff	
+
+1 row selected.
 
 t/SQL/SQLScalar1.sql> 
 
@@ -483,6 +513,14 @@ XXand special chars like %^&*()  XX
 
 3 rows selected.
 
+t/SQL/SQLScalar1.sql> select  ltrim('abababcdcddceeeeabababcdcddc', 'abcd') from dual;
+ltrim('abababcdcddceeeeabababcdcddc', 'abcd')	
+_____________________________________________	
+
+eeeeabababcdcddc	
+
+1 row selected.
+
 t/SQL/SQLScalar1.sql> select  replace(col3, 'a', 'REPLACE') from test1;
 replace(col3, 'a', 'REPLACE')	
 _____________________________	
@@ -512,6 +550,14 @@ XX     and many leading spaces tooXX
 XX   and special chars like %^&*()XX	
 
 3 rows selected.
+
+t/SQL/SQLScalar1.sql> select  rtrim('abababcdcddceeeeabababcdcddc', 'abcd') from dual;
+rtrim('abababcdcddceeeeabababcdcddc', 'abcd')	
+_____________________________________________	
+
+abababcdcddceeee	
+
+1 row selected.
 
 t/SQL/SQLScalar1.sql> select  soundex(col3) from test1;
 soundex(col3)	

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSExpr.pm,v 7.3 2006/03/30 07:20:30 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSExpr.pm,v 7.4 2006/10/26 07:24:28 claude Exp claude $
 #
 # copyright (c) 2005, 2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -320,7 +320,7 @@ sub new
 
 } # end new
 
-# XXX XXX: where is SQLExecute?
+# XXX XXX: where is SQLExecute? part of the autoload...
 
 sub SQLFetch
 {
@@ -481,11 +481,38 @@ Genezzo::Row::RSExpr - Row Source Expression Evaluation
 
 =head1 SYNOPSIS
 
+use Genezzo::Row::RSExpr;
+
+# see Genezzo::GenDBI usage
+
 =head1 DESCRIPTION
+
+RSExpr is a hierarchical pushhash (see L<Genezzo::PushHash::hph>) class
+which evaluates and B<projects> a set of expressions for each input row.
+The input rows are produced by RSTab (see L<Genezzo::Row::RSTab>).
 
 =head1 ARGUMENTS
 
+=over 4
+
+=item row source 
+(Required) - an input row source 
+
+=item dict
+(Required) - dictionary object from B<Genezzo::Dict>
+
+=item dbh
+(Required) - database handle object from B<Genezzo::GenDBI>
+
+=item select list
+(Optional) - a list of output expressions that is applied as a
+transform on the input row
+
+=back
+
 =head1 FUNCTIONS
+
+RSExpr support all standard hph hierarchical pushhash operations.
 
 =head2 EXPORT
 

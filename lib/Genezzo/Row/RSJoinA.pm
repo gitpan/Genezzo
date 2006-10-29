@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSJoinA.pm,v 1.7 2006/10/19 08:54:29 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSJoinA.pm,v 1.8 2006/10/26 07:24:28 claude Exp claude $
 #
-# copyright (c) 2005 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2005,2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 use strict;
@@ -182,6 +182,7 @@ sub FETCH
     my ($self, $place) = @_;
     return $self->_localFetch($place, "STANDARD");
 }
+
 sub _localFetch
 {
     my ($self, $place, $mode) = @_;
@@ -283,6 +284,7 @@ sub FIRSTKEY
     return $firstkey[0];
 
 }
+
 sub NEXTKEY  
 {
     my ($self, $prevkey) = @_;
@@ -357,6 +359,7 @@ sub NEXTKEY
     return $prevkeylist[0];
 
 }
+
 sub EXISTS   
 {
     my $self = shift;
@@ -366,6 +369,7 @@ sub EXISTS
 
     return ($rs->EXISTS(@_));
 }
+
 sub DELETE   
 {
     my $self = shift;
@@ -375,6 +379,7 @@ sub DELETE
 
     return ($rs->DELETE(@_));
 }
+
 sub CLEAR    
 {
     my $self = shift;
@@ -736,25 +741,50 @@ __END__
 
 =head1 NAME
 
-Genezzo::Row::RSJoinA - Row Source Expression Evaluation
+Genezzo::Row::RSJoinA - Row Source Join [A]
 
 =head1 SYNOPSIS
 
+use Genezzo::Row::RSJoinA;
+
+# see Genezzo::GenDBI usage
+
 =head1 DESCRIPTION
+
+RSJoinA is a hierarchical pushhash (see L<Genezzo::PushHash::hph>) class
+which performs a cartesian product of multiple rowsources.
 
 =head1 ARGUMENTS
 
+=over 4
+
+=item row source list
+(Required) - list of row sources to join
+
+=item dict
+(Required) - dictionary object from B<Genezzo::Dict>
+
+=item dbh
+(Required) - database handle object from B<Genezzo::GenDBI>
+
+=back
+
 =head1 FUNCTIONS
+
+RSJoinA supports all standard READ-ONLY hph hierarchical pushhash
+operations, like FETCH, FIRSTKEY, NEXTKEY, HCOUNT
 
 =head2 EXPORT
 
 =head1 LIMITATIONS
 
-various
+HPUSH, STORE, EXISTS, DELETE, CLEAR are probably broken...
 
-=head1 #TODO
+=head1 TODO
 
 =over 4
+
+=item build nested-loop, sort-merge, hash join
 
 =back
 
@@ -766,7 +796,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 
 L<perl(1)>.
 
-Copyright (c) 2005 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2005, 2006 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

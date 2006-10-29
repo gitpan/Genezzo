@@ -654,9 +654,31 @@ NEW FEATURES - Feeble/SQL compatible case-sensitivity
   available using SQL quoted identifiers.  Feeble does not support
   quoted names.
 
+NEW FEATURES - additional comparison functions IN, LIKE
+
+  In version 0.68, basic support for IN and LIKE comparison is
+  supported.  IN only supports expression lists, not subqueries, e.g:
+
+  Select * from tab1 where col1 IN ('a', 'b', 'c');
+  Select * from tab2 where col2 NOT IN (22,33,44);
+
+  The LIKE operator supported as a function (versus a separate clause),
+  e.g:
+
+  Select * from tab1 where col3 LIKE ('foo%');
+  Select * from tab1 where col3 NOT LIKE ('#_foo_', '#');
+
+  The first argument to LIKE is a pattern which can take two special
+  matching characters -- a percent ('%') which is a wildcard (any number
+  of characters, including zero), and an underscore ('_') which matches
+  a single character.  The optional second argument is an ESCAPE
+  character.  If the '%' or '_' is prefixed with the ESCAPE character it
+  is treated as a literal.  Note that LIKE comparisons are
+  case-sensitive.
+
 INCOMPATIBLE CHANGES
 
-  Version 0.67 dictionary and block format is incompatible with
+  Version 0.68 dictionary and block format is incompatible with
   previous releases.  No upgrade path is supported.
   Version 0.48 thru 0.50 are compatible.
 

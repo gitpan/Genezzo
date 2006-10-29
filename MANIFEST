@@ -60,6 +60,8 @@ lib/Genezzo/Havok.pm
 lib/Genezzo/Havok.yml
 lib/Genezzo/Havok/DebugUtils.pm
 lib/Genezzo/Havok/DebugUtils.yml
+lib/Genezzo/Havok/SQLCompare.pm
+lib/Genezzo/Havok/SQLCompare.yml
 lib/Genezzo/Havok/SQLScalar.pm
 lib/Genezzo/Havok/SQLScalar.yml
 lib/Genezzo/Havok/SysHook.pm

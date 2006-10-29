@@ -85,7 +85,13 @@ select  concat(col1, col2, col3) from test1;
 
 select  greatest(col1, col3) from test1;
 
-select  initcap(col1) from test1;
+select  initcap(col3) from test1;
+
+select initcap('aaaa bbbb aaa bbb aa bb a b') from dual;
+
+select initcap('hi man how are you,dude,kk*ll123gg&ff') from dual;
+
+select initcap('hi man how are you,dude,kk.*()()ll123gg&ff') from dual;
 
 select  least(col1, col3) from test1;
 
@@ -93,9 +99,11 @@ select  lower(col3) from test1;
 
 select  'XX'||lpad(col1, 11, 'zz')||'XX' from test1;
 select  'XX'||ltrim(col3)||'XX' from test1;
+select  ltrim('abababcdcddceeeeabababcdcddc', 'abcd') from dual;
 select  replace(col3, 'a', 'REPLACE') from test1;
 select  'XX'||rpad(col1, 11, 'zz')||'XX' from test1;
 select  'XX'||rtrim(col3)||'XX' from test1;
+select  rtrim('abababcdcddceeeeabababcdcddc', 'abcd') from dual;
 select  soundex(col3) from test1;
 select  translate(col3, 'abcdefghijklmnopqrstuvwxyz', 
                         '~!@#$%^&*()--+=[]{};:<>012') 

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/SQLScalar.pm,v 1.13 2006/10/23 06:07:49 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/SQLScalar.pm,v 1.14 2006/10/26 07:26:24 claude Exp claude $
 #
 # copyright (c) 2005, 2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -88,7 +88,7 @@ our $VERSION;
 our $MAKEDEPS;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 1.13 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.14 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     my $pak1  = __PACKAGE__;
     $MAKEDEPS = {
@@ -106,7 +106,7 @@ BEGIN {
     # DML is an array, not a hash
 
     my $now = 
-    do { my @r = (q$Date: 2006/10/23 06:07:49 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
+    do { my @r = (q$Date: 2006/10/26 07:26:24 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
 
 
     my %tabdefs = ();
@@ -455,7 +455,25 @@ sub sql_func_greatest
 sub sql_func_initcap
 {
     my $str = shift;
-    return ucfirst($str);
+
+    # find all the words in the string, and capitalize the first
+    # letter of each one (add underscore to non-word chars)
+    my @foo = split(/\W|_/, $str);
+
+    for my $val (@foo)
+    {
+        next unless (defined($val));
+
+        # shouldn't need to use quotemeta because split should extra
+        # only valid words -- no metachars
+        my $ucfval = ucfirst($val);
+
+        # replace each word (bounded by end of line, underscore, or
+        # some non-word char) with its titlecase equivalent
+        $str =~ s/(^|\W|_)($val)(\W|_|$)/$1$ucfval$3/gm;
+    }
+
+    return ($str);
 }
 
 sub sql_func_least
@@ -530,7 +548,9 @@ sub sql_func_ltrim
 
     if (defined($pattern))
     {
-        my $qmp = quotemeta($pattern);
+        # pattern is a set of individual matching characters
+        my @foo = split(/ */, $pattern);
+        my $qmp = join('|', map(quotemeta, @foo));
         my $tmplate = '^(' . $qmp. ')*';
         $outi =~ s/$tmplate// ;
 
@@ -614,7 +634,10 @@ sub sql_func_rtrim
 
     if (defined($pattern))
     {
-        my $qmp = quotemeta($pattern);
+        # pattern is a set of individual matching characters
+        my @foo = split(/ */, $pattern);
+        my $qmp = join('|', map(quotemeta, @foo));
+
         my $tmplate = '(' . $qmp. ')*$';
         $outi =~ s/$tmplate// ;
 
@@ -933,6 +956,8 @@ Genezzo::Havok::SQLScalar - scalar SQL functions
 
 =head1 SYNOPSIS
 
+HavokUse("Genezzo::Havok::SQLScalar")
+
 =head1 DESCRIPTION
 
 =head1 ARGUMENTS
@@ -940,6 +965,8 @@ Genezzo::Havok::SQLScalar - scalar SQL functions
 =head1 FUNCTIONS
 
 =head2 perl functions
+
+See L<perlfunc(1)> for descriptions.
 
 =over 4
 
@@ -987,8 +1014,6 @@ Genezzo::Havok::SQLScalar - scalar SQL functions
 
 =item  int
 
-=item  log10
-
 =item  oct
 
 =item  rand
@@ -1001,37 +1026,79 @@ Genezzo::Havok::SQLScalar - scalar SQL functions
 
 =item  perl_join
 
+The perl string join, renamed to avoid conflict with the SQL relational join
+
 =back
 
 =head2 SQL string functions
 
 =over 4
 
-=item  concat
+=item  concat(char1, char2)
 
-=item  greatest
+Concatenate strings
 
-=item  initcap
+=item  greatest(item1, item2...)
 
-=item  least
+Find the greatest element in a list
 
-=item  lower
+=item  initcap(char)
 
-=item  lpad
+Return the string with the initial letter of each word capitalized,
+where words are defined as contiguous groups of alphanumeric chars
+separated by non-word chars.
 
-=item  ltrim
+=item  least(item1, item2...)
+
+Find the smallest element in a list
+
+=item  lower(char)
+
+Return the string with all letters lowercase
+
+=item  lpad(char1, n [, char2])
+
+Returns the string char1 padded out on the left to length n with
+copies of char2.  If char2 is not specified blanks are used.  If char1
+is larger than length n it is truncated to fit.
+
+=item  ltrim(char [, set])
+
+Returns the string which is trimmed on the left up to the first
+character which is not in the specified set.  If set is unspecified,
+blanks are trimmed.
 
 =item  soundex
 
-=item  replace
+Knuth's soundex from L<Text::Soundex>.
 
-=item  rpad
+=item  replace(char, search_str [, replace_str])
 
-=item  rtrim
+Returns char with all occurrences of the search_str replaced by
+replace_str.  If the replace_str is unspecified or null, it removes
+all occurrences of the search_str.
 
-=item  translate
+=item  rpad(char1, n [, char2])
 
-=item  upper
+Returns the string char1 padded out on the right to length n with
+copies of char2.  If char2 is not specified blanks are used.  If char1
+is larger than length n it is truncated to fit.
+
+=item  rtrim(char [, set])
+
+Returns the string which is trimmed on the rightt up to the first
+character which is not in the specified set.  If set is unspecified,
+blanks are trimmed.
+
+=item  translate(char, search_str, replace_str)
+
+Similar to perl transliteration tr/ (see L<perlop(1)> ), returns a
+string where all occurrences of a character in the search string are
+replaced with the corresponding character in the replace string.
+
+=item  upper(char)
+
+Returns the string with all characters uppercase.
 
 =back
 
@@ -1039,43 +1106,92 @@ Genezzo::Havok::SQLScalar - scalar SQL functions
 
 =over 4
 
-=item  cosh
+=item  cosh(n)
 
-=item  ceil
+Hyperbolic cosine
+
+=item  ceil(n)
+
+Returns the smallest integer greater than or equal to n
 
 =item  floor
 
+Returns the largest integers less than or equal to n
+
 =item  ln
+ 
+Natural log.
 
-=item  logN
+=item  log10
 
-=item  mod
+Log base 10.
 
-=item  power
+=item  logN(base_N, num)
 
-=item  round
+Returns the Log base base_N on num.
 
-=item  sign
+=item  mod(m,n)
+
+Returns the remainder of m divided by n.
+
+=item  power(m,n)
+
+Returns m**n
+
+=item  round(num [, m])
+
+Return num rounded to m places to the right of the decimal point.  M=0
+if not specified.  If m is negative num is rounded to the left of the
+decimal point.
+
+
+=item  sign(n)
+
+Similar to "spaceship", returns -1 for N < 0, 0 for N==0, and 1 for N > 0.
 
 =item  sinh
 
+Hyperbolic sine.
+
 =item  tan
+
+tangent
 
 =item  tanh
 
-=item  trunc
+Hyperbolic tangent.
+
+=item  trunc(num [, m])
+
+Return num truncated to m places to the right of the decimal point.  M=0
+if not specified.  If m is negative num is truncated to the left of the
+decimal point.
+
 
 =back
 
 =head2 SQL conversion functions
 
+These functions return a value of a different type than their operands.
+
 =over 4
 
-=item  ascii
+=item  ascii(char)
 
-=item  instr        
+Return the ascii value of the first char of the string.
 
-=item  nvl         
+=item  instr(char, substring [, position [, occurrence]])
+
+Returns the index (1 based, not zero based) of the substring in the
+char, starting at position.  If occurrence and position are not
+specified they default to one: instr returns the index of the first
+occurrence of the substring.  If occurrence is specified instr returns
+the index of the Nth occurrence.  If position is negative instr begins
+the search from the tail end of char.
+
+=item  nvl(char1, char2)
+
+Returns char2 if char1 is NULL, else returns char1
 
 =back
 
@@ -1085,9 +1201,18 @@ Genezzo::Havok::SQLScalar - scalar SQL functions
 
 =item  quurl
 
+"Quote URL" - Replace all non-alphanumeric chars in a string with
+'%hex' values, similar to the standard URL-style quoting.
+
 =item  quurl2
 
+"Quote URL" - Replace most non-alphanumeric chars in a string with
+'%hex' values, leaving spaces and most punctuation (with the exception
+of '%') untouched.
+
 =item  unquurl
+
+Convert a "quoted url" string back.
 
 =back
 
@@ -1107,14 +1232,8 @@ log base N.  To prevent confusion in usage, Genezzo supplies a natural
 log function "ln", a base 10 function "log10", and a log of variable
 base called "logN".
 
-The following standard functions are not implemented:
-
-=over 4
-
-=item soundex
-
-
-=back
+The current implementation does not do any compile-time type checking
+of arguments for any functions.
 
 =head1 AUTHOR
 
