@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/UserFunctions.pm,v 1.3 2006/08/05 22:49:39 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/UserFunctions.pm,v 1.5 2006/12/03 09:47:47 claude Exp claude $
 #
 # copyright (c) 2004, 2005, 2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -18,7 +18,7 @@ our $VERSION;
 our $MAKEDEPS;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 1.3 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.5 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     my $pak1  = __PACKAGE__;
     $MAKEDEPS = {
@@ -38,7 +38,7 @@ BEGIN {
 
 #    my $now = Genezzo::Dict::time_iso8601()
     my $now = 
-    do { my @r = (q$Date: 2006/08/05 22:49:39 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
+    do { my @r = (q$Date: 2006/12/03 09:47:47 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
 
     my $dml =
         [
@@ -94,6 +94,145 @@ sub MakeYML
     return Genezzo::Havok::MakeYML($makedp);
 }
 
+sub LoadFunction
+{
+    my %optional;
+
+    my %required = (
+                    xid          => "no xid!",
+                    xtype        => "no xtype!",
+                    xname        => "no xname!",
+                    owner        => "no owner!",
+                    creationdate => "no creationdate!",
+                    args         => "no args!"
+                    );
+
+    my %args = (%optional,
+                @_);
+
+    return 0
+        unless (Validate(\%args, \%required));
+
+    my $xid    = $args{xid};
+    my $xtype  = $args{xtype};
+    my $xname  = $args{xname};
+    my $owner  = $args{owner};
+    my $dat    = $args{creationdate};
+    my $xargs  = $args{args};
+
+    if ($xtype =~ m/^require$/i)
+    {
+        unless (eval "require $xname")
+        {
+            my %earg = (#self => $self,
+                        msg => "no such package - $xname - for table user_functions, row $xid");
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+            
+            return 0;
+        }
+        
+        # check if package has GZERR function, and redefine it to use
+        # our version (since our version might get redefined to point
+        # to parent routine).
+        
+        my $gz_err_var = $xname . "::GZERR";
+        my $use_gzerr;
+        
+        my $s1 = "\$use_gzerr = defined(\$$gz_err_var);";
+        eval "$s1";
+        greet $s1, $use_gzerr;
+        
+        no strict 'refs';
+        no warnings 'redefine';
+        
+        my @inargs;
+        
+        if ($xargs =~ m/\s/)
+        {
+            @inargs = split(/\s/, $xargs);
+        }
+        else
+        {
+            push @inargs, $xargs;
+        }
+        
+        
+        for my $fname (@inargs)
+        {
+            # Note: add functions to "main" namespace...
+            
+            my $mainf = "Genezzo::GenDBI::" . $fname;
+            my $packf =  $xname . "::" . $fname;
+            
+            my $func = "sub " . $mainf ;
+            $func .= "{ " ;
+            
+            if ($use_gzerr)
+            {
+                greet "has gzerr!";
+                $func .= "local \$$gz_err_var = \$Genezzo::Havok::UserFunctions::GZERR; "; 
+                greet $func;
+            }
+            
+            $func .= $packf . '(@_); }';
+            
+#            whisper $func;
+            
+#            eval {$func } ;
+            eval " $func " ;
+            if ($@)
+            {
+                my %earg = (#self => $self,
+                            msg => "$@\nbad function : $func");
+                
+                &$GZERR(%earg)
+                    if (defined($GZERR));
+            }
+            
+        }
+        
+        
+    }
+    elsif ($xtype =~ m/^function$/i)
+    {
+        my $doublecolon = "::";
+        
+        unless ($xname =~ m/$doublecolon/)
+        {
+            # Note: add functions to "main" namespace...
+            
+            $xname = "Genezzo::GenDBI::" . $xname;
+        }
+        
+        my $func = "sub " . $xname . " " . $xargs;
+        
+#            whisper $func;
+        
+#            eval {$func } ;
+        eval " $func " ;
+        if ($@)
+        {
+            my %earg = (#self => $self,
+                        msg => "$@\nbad function : $func");
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+        }
+    }
+    else
+    {
+        my %earg = (#self => $self,
+                    msg => "unknown user extension - $xtype");
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
+    }
+    
+    return 1;
+
+} # end LoadFunction
 
 sub HavokInit
 {
@@ -138,117 +277,14 @@ sub HavokInit
         my $dat    = $vv->[$getcol->{creationdate}];
         my $xargs  = $vv->[$getcol->{args}];
 
-#        greet $vv;
-
-        if ($xtype =~ m/^require$/i)
-        {
-            unless (eval "require $xname")
-            {
-                my %earg = (#self => $self,
-                            msg => "no such package - $xname - for table user_functions, row $xid");
-
-                &$GZERR(%earg)
-                    if (defined($GZERR));
-
-                next;
-            }
-
-            # check if package has GZERR function, and redefine it to use
-            # our version (since our version might get redefined to point
-            # to parent routine).
-
-            my $gz_err_var = $xname . "::GZERR";
-            my $use_gzerr;
-
-            my $s1 = "\$use_gzerr = defined(\$$gz_err_var);";
-            eval "$s1";
-            greet $s1, $use_gzerr;
-
-            no strict 'refs';
-            no warnings 'redefine';
-
-            my @inargs;
-
-            if ($xargs =~ m/\s/)
-            {
-                @inargs = split(/\s/, $xargs);
-            }
-            else
-            {
-                push @inargs, $xargs;
-            }
-
-
-            for my $fname (@inargs)
-            {
-                # Note: add functions to "main" namespace...
-
-                my $mainf = "Genezzo::GenDBI::" . $fname;
-                my $packf =  $xname . "::" . $fname;
-
-                my $func = "sub " . $mainf ;
-                $func .= "{ " ;
-
-                if ($use_gzerr)
-                {
-                    greet "has gzerr!";
-                    $func .= "local \$$gz_err_var = \$Genezzo::Havok::UserFunctions::GZERR; "; 
-                    greet $func;
-                }
-                
-                $func .= $packf . '(@_); }';
-            
-#            whisper $func;
-
-#            eval {$func } ;
-                eval " $func " ;
-                if ($@)
-                {
-                    my %earg = (#self => $self,
-                                msg => "$@\nbad function : $func");
-
-                    &$GZERR(%earg)
-                        if (defined($GZERR));
-                }
-
-            }
-
-            
-        }
-        elsif ($xtype =~ m/^function$/i)
-        {
-            my $doublecolon = "::";
-
-            unless ($xname =~ m/$doublecolon/)
-            {
-                # Note: add functions to "main" namespace...
-
-                $xname = "Genezzo::GenDBI::" . $xname;
-            }
-
-            my $func = "sub " . $xname . " " . $xargs;
-            
-#            whisper $func;
-
-#            eval {$func } ;
-            eval " $func " ;
-            if ($@)
-            {
-                my %earg = (#self => $self,
-                            msg => "$@\nbad function : $func");
-
-                &$GZERR(%earg)
-                    if (defined($GZERR));
-            }
-        }
-        else
-        {
-            my %earg = (#self => $self,
-                        msg => "unknown user extension - $xtype");
-
-            &$GZERR(%earg)
-                if (defined($GZERR));
-        }
+        my $lv = LoadFunction(
+                              xid => $xid,
+                              xtype => $xtype,
+                              xname => $xname,
+                              owner => $owner,
+                              creationdate => $dat,
+                              args => $xargs
+                              );
 
     } # end while
 
@@ -261,7 +297,6 @@ sub HavokCleanup
 #    whoami;
     return HavokInit(@_, phase => "cleanup");
 }
-
 
 END { }       # module clean-up code here (global destructor)
 
@@ -349,7 +384,15 @@ it imports "isRedGreen" into the default Genezzo namespace* (actually,
 it creates a stub function that calls
 Genezzo::Havok::Examples::isRedGreen").
 
+An easier method is to use add_user_function, which is defined in
+L<Genezzo::Havok::Utils>.  The equivalent command to load the
+isRedGreen function is:
 
+  select 
+    add_user_function(
+      'module=Genezzo::Havok::Examples',
+      'function=isRedGreen')
+  from dual;
 
 =head1 ARGUMENTS
 

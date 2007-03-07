@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Havok.pm,v 7.13 2006/10/23 06:10:00 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Havok.pm,v 7.14 2006/11/19 08:57:02 claude Exp $
 #
 # copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -19,7 +19,7 @@ our $VERSION;
 our $MAKEDEPS;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 7.13 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.14 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     my $pak1  = __PACKAGE__;
     $MAKEDEPS = {
@@ -41,7 +41,7 @@ BEGIN {
 
 #    my $now = Genezzo::Dict::time_iso8601()
     my $now = 
-    do { my @r = (q$Date: 2006/10/23 06:10:00 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
+    do { my @r = (q$Date: 2006/11/19 08:57:02 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
 
     my $dml =
         [
@@ -109,6 +109,8 @@ sub HavokUse
 #		
 
 #    whoami (%args);
+
+#    print "havokuse: ", join('*',@_), "\n";
 
     return 0
         unless (Validate(\%args, \%required));
@@ -182,6 +184,8 @@ sub HavokUse
             my $stat = HavokUse(module => $kk,
                                 dict   => $dict,
                                 dbh    => $dbh
+                                # XXX XXX: should we propagate phase?
+
                                 );
             unless (defined($stat))
             {
@@ -305,11 +309,14 @@ sub HavokUse
 
     }
 
+    my $do_reload = 0;
+    $do_reload = 1 if ($args{phase} =~ m/^reload/);
 
-    if ($do_dml)
+  L_do_init:
+    if ($do_dml || $do_reload)
     {
 
-        if ($args{phase} =~ m/^init$/)
+        if ($args{phase} =~ m/^(init|reload)$/)
         {
             return undef
                 unless Genezzo::Havok::HavokInit(dict => $dict, flag => 0);

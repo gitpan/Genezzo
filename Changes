@@ -1,5 +1,10 @@
 Revision history for Perl extension Genezzo
 
+0.69 Sun Dec  3 01:39:32 2006
+        - add_user_function: add support to dynamically load new
+          functions into running database instance (without restart).
+        - alter_ts: function to alter tablespaces
+
 0.68 Sat Oct 28 23:54:03 2006
         - Like, In: new sql comparison functions
         - SQL scalar functions: fixes for initcap, ltrim, rtrim

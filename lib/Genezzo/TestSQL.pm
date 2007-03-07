@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/TestSQL.pm,v 1.1 2006/10/21 00:26:17 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/TestSQL.pm,v 1.2 2006/11/19 08:56:32 claude Exp claude $
 #
 # copyright (c) 2006 Jeffrey I Cohen, all rights reserved, worldwide
 #

@@ -1,4 +1,4 @@
-# havok version=7.13
+# havok version=7.14
 ABSTRACT:     
 AUTHOR:    Jeffrey I Cohen (jcohen@cpan.org)
 LICENSE:    gpl
@@ -9,9 +9,9 @@ TABLEDEFS:
   havok:    
     create_table:    hid=n modname=c owner=c creationdate=c flag=c version=c
     dml:    
-      -    i havok 1 Genezzo::Havok SYSTEM 2006-10-23T06:10:00 0 7.13
+      -    i havok 1 Genezzo::Havok SYSTEM 2006-11-19T08:57:02 0 7.14
 
 
 
-UPDATED:    2006-10-22T23:15:51
-VERSION:    7.13
+UPDATED:    2006-11-19T01:14:04
+VERSION:    7.14

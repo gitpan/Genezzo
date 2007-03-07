@@ -676,9 +676,15 @@ NEW FEATURES - additional comparison functions IN, LIKE
   is treated as a literal.  Note that LIKE comparisons are
   case-sensitive.
 
+NEW FEATURES - additional utility functions add_user_functions, alter_ts
+  
+  In version 0.69 utility functions simplify the tasks of adding new
+  user functions, and altering tablespaces for large databases.
+        
+
 INCOMPATIBLE CHANGES
 
-  Version 0.68 dictionary and block format is incompatible with
+  Version 0.69 dictionary and block format is incompatible with
   previous releases.  No upgrade path is supported.
   Version 0.48 thru 0.50 are compatible.
 

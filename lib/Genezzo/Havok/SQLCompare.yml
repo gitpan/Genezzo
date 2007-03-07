@@ -7,7 +7,7 @@ DML:
       -    select * from user_functions where xname = 'Genezzo::Havok::SQLCompare'
 
     install:    
-      -    i user_functions 1 require Genezzo::Havok::SQLCompare sql_func_compare_function SYSTEM 2006-10-26T21:25:55 0
+      -    select add_user_function('function=sql_func_compare_function', 'creationdate=2006-11-17T07:52:56', 'module=Genezzo::Havok::SQLCompare') from dual
 
 
 
@@ -18,5 +18,5 @@ PREREQ_HAVOK:
 
 TABLEDEFS:    
 
-UPDATED:    2006-10-26T14:27:54
-VERSION:    1.01
+UPDATED:    2006-11-17T00:19:20
+VERSION:    1.02

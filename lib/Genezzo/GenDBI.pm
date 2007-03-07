@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 7.34 2006/10/29 06:54:57 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 7.35 2006/12/03 09:57:07 claude Exp claude $
 #
 # copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -51,11 +51,11 @@ BEGIN {
 }
 
 ##our $VERSION   = $Genezzo::VERSION;
-our $VERSION   = '0.68';
+our $VERSION   = '0.69';
 our $RELSTATUS = 'Alpha'; # release status
 # grab the code check-in date and convert to YYYYMMDD
 our $RELDATE   = 
-    do { my @r = (q$Date: 2006/10/29 06:54:57 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
+    do { my @r = (q$Date: 2006/12/03 09:57:07 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
 
 our $errstr; # DBI errstr
 
@@ -4272,7 +4272,7 @@ sub Kgnz_Prepare
 
                     # NOTE: not all commands are multiline and require
                     # semicolon...
-                    if ($multiline && ($in_line !~ m/;$/))
+                    if ($multiline && ($in_line !~ m/;(\s*)$/))
                     {
                         $prompt = $prompt_2;
                         next L_w1;

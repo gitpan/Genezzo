@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/DebugUtils.pm,v 1.2 2006/08/21 20:59:18 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/DebugUtils.pm,v 1.3 2006/11/17 09:06:53 claude Exp claude $
 #
 # copyright (c) 2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -23,7 +23,7 @@ our $VERSION;
 our $MAKEDEPS;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 1.2 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.3 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     my $pak1  = __PACKAGE__;
     $MAKEDEPS = {
@@ -36,12 +36,13 @@ BEGIN {
 
     $MAKEDEPS->{'PREREQ_HAVOK'} = {
         'Genezzo::Havok::UserFunctions' => '0.0',
+        'Genezzo::Havok::Utils' => '0.0',
     };
 
     # DML is an array, not a hash
 
     my $now = 
-    do { my @r = (q$Date: 2006/08/21 20:59:18 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
+    do { my @r = (q$Date: 2006/11/17 09:06:53 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
 
 
     my %tabdefs = ();
@@ -50,7 +51,6 @@ BEGIN {
     my @perl_funcs = qw(
                         bcfiledump
                         metadump
-                        makebigdb
                         );
 
 
@@ -287,175 +287,6 @@ sub sql_func_metadump
         }
         
     }
-
-    return 1;
-}
-
-sub sql_func_makebigdb
-{
-    my %args= @_;
-
-    my $dict = $args{dict};
-    my $dbh  = $args{dbh};
-    my $fn_args = $args{function_args};
-    
-    print Data::Dumper->Dump($fn_args);
-    
-    my %tspaces;
-    my $increase_by = "50%";
-    my $filesize = "10M";
-    my $bc_size  = 1000;
-    my $show_help = 0;
-
-    if (scalar(@{$fn_args}) < 1)
-    {
-        $tspaces{"SYSTEM"} = 1;
-    }
-    else
-    {
-        for my $arg (@{$fn_args})
-        {
-            if ($arg =~ m/^(help|\?)/)
-            {
-                $show_help = 1;
-            } 
-            elsif ($arg =~ m/^(ts|tsname|tablespace|tspace)/i)
-            {
-                my @ggg = split('=',$arg, 2);
-                if (2 == scalar(@ggg))
-                {
-                    $tspaces{$ggg[1]} = 1;
-                }
-            }
-            elsif ($arg =~ m/^(inc)/i) # increase by
-            {
-                my @ggg = split('=',$arg, 2);
-                if (2 == scalar(@ggg))
-                {
-                    $increase_by = $ggg[1];
-                }
-            }
-            elsif ($arg =~ m/^(bc|buf)/i) # buffer cache size
-            {
-                my @ggg = split('=',$arg, 2);
-                if (2 == scalar(@ggg))
-                {
-                    $bc_size = $ggg[1];
-                }
-            }
-            elsif ($arg =~ m/^(fil)/i) # file size
-            {
-                my @ggg = split('=',$arg, 2);
-                if (2 == scalar(@ggg))
-                {
-                    $filesize = $ggg[1];
-                }
-            }
-            else
-            {
-                my %earg = (#self => $self,
-                            severity => 'warn',
-                            msg => "invalid argument: $arg\n");
-
-                &$GZERR(%earg)
-                    if (defined($GZERR));
-
-                $show_help = 1;
-                last;
-            }
-        } # end for
-
-    }
-
-    if ($show_help)
-    {
-        my $bigstr = 
-            "[tsname=<tablespace name>, [tsname=<tablespace name>] ] , [increase_by=<increase> ] , [filesize=<filesize> ] , [bufcachesize=<bcsize>]";
-
-        return $bigstr;
-    }
-    
-    print join(" ", keys(%tspaces)), "\n";
-    print "inc = ", $increase_by, "\n";
-    print "bc  = ", $bc_size, "\n";
-    print "fil = ", $filesize, "\n";
-
-    my $addfile = "filesize=$filesize increase_by=$increase_by";
-
-    my $sth =
-        $dbh->prepare("select pref_value from _pref1 where pref_key=\'bc_size\'");
-    my $curr_bc_size;
-    
-    return 0
-        unless ($sth);
-
-    $sth->execute();
-
-    while (1) 
-    {
-        my @lastfetch = $sth->fetchrow_array();
-        
-        last
-            unless (scalar(@lastfetch));
-
-        $curr_bc_size = shift @lastfetch;
-    }
-        
-    unless ($curr_bc_size && 
-            ($curr_bc_size == $bc_size))
-    {
-        $sth =
-            $dbh->prepare("update _pref1 set pref_value=$bc_size where pref_key=\'bc_size\'");
-        
-        return 0
-            unless ($sth);
-
-        $sth->execute();
-        
-    }
-
-    for my $tsname (keys(%tspaces))
-    {
-        $sth =
-            $dbh->prepare("select tsid from _tspace  where tsname=\'$tsname\'");
-        
-        next
-            unless ($sth);
-
-        $sth->execute();
-
-        my $tsid = undef;
-
-        while (1) 
-        {
-            my @lastfetch = $sth->fetchrow_array();
-        
-            last
-                unless (scalar(@lastfetch));
-
-            $tsid = shift @lastfetch;
-        }
-        next
-            unless ($tsid);
-        
-        $sth =
-            $dbh->prepare("update _tspace set addfile=\'$addfile\'  where tsid =\'$tsid\'");
-
-        next
-            unless ($sth);
-
-        $sth->execute();
-        
-
-        $sth =
-            $dbh->prepare("update _tsfiles set increase_by=\'$increase_by\'  where tsid =\'$tsid\'");
-        
-        next
-            unless ($sth);
-
-        $sth->execute();
-    } # end for each tsname
-
 
     return 1;
 }

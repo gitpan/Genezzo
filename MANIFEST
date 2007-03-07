@@ -58,6 +58,8 @@ lib/Genezzo/Dict.pm
 lib/Genezzo/dict.sql
 lib/Genezzo/Havok.pm
 lib/Genezzo/Havok.yml
+lib/Genezzo/Havok/Utils.pm
+lib/Genezzo/Havok/Utils.yml
 lib/Genezzo/Havok/DebugUtils.pm
 lib/Genezzo/Havok/DebugUtils.yml
 lib/Genezzo/Havok/SQLCompare.pm

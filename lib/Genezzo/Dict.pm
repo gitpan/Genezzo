@@ -2295,6 +2295,7 @@ sub DictTableAllTab
         my $numcols = scalar(keys(%{$args{tabdef}}));
 
         my $nexttid = $self->DictGetNextVal(tname => "_tab1", 
+                                            col   => "tid",
                                             tieval => $realtie);
 
         unless ($nexttid > -1)
@@ -2637,6 +2638,7 @@ sub DictAddFile
     my $realtie = tied(%{$alltsfiles});
 
     my $fileidx =  $self->DictGetNextVal(tname => "_tsfiles",
+                                         col   => "tsid",
                                          tieval => $realtie);
 
     unless ($fileidx > -1)
@@ -2827,6 +2829,7 @@ sub _DictTSAddFile
     my $realtie = tied(%{$alltsfiles});
 
     my $fileidx =  $self->DictGetNextVal(tname => "_tsfiles",
+                                         col   => "tsid",
                                          tieval => $realtie);
 
     unless ($fileidx > -1)
@@ -3705,6 +3708,7 @@ sub DictTableAddConstraint
         my $tv = tied(%{$hashi});
 
         my $consid =   $self->DictGetNextVal(tname => "cons1",
+                                             col   => "cons_id",
                                              tieval => $tv);
 
         unless ($consid > -1)
@@ -4287,6 +4291,7 @@ sub DictIndexCreate
     my $tv = tied(%{$hashi});
 
     my $consid =   $self->DictGetNextVal(tname => "cons1",
+                                         col   => "cons_id",
                                          tieval => $tv);
 
     unless ($consid > -1)

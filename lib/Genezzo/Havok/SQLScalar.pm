@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/SQLScalar.pm,v 1.14 2006/10/26 07:26:24 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/SQLScalar.pm,v 1.16 2006/11/19 08:57:34 claude Exp claude $
 #
 # copyright (c) 2005, 2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -78,6 +78,7 @@ require Exporter;
              );
 
 use Genezzo::Util;
+use Genezzo::Havok::Utils;
 
 use strict;
 use warnings;
@@ -88,7 +89,7 @@ our $VERSION;
 our $MAKEDEPS;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 1.14 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.16 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     my $pak1  = __PACKAGE__;
     $MAKEDEPS = {
@@ -106,7 +107,7 @@ BEGIN {
     # DML is an array, not a hash
 
     my $now = 
-    do { my @r = (q$Date: 2006/10/26 07:26:24 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
+    do { my @r = (q$Date: 2006/11/19 08:57:34 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
 
 
     my %tabdefs = ();
@@ -185,32 +186,57 @@ BEGIN {
                        unquurl
                        );
 
+
+    # NOTE: should really use "select add_user_function", not
+    # _build_sql_for_user_function, but the parsing and dynamic load
+    # dramatically slows the db init.
+
     my @ins1;
-    my $ccnt = 1;
+    my $ccnt = 3;
     for my $pfunc (@perl_funcs)
     {
-        my $bigstr = "i user_functions $ccnt require $pak1 " 
-            . "sql_func_" . $pfunc . " SYSTEM $now 0 ";
+        my %attr = (module => $pak1, 
+                    function => "sql_func_" . $pfunc,
+                    creationdate => $now,
+                    xid => $ccnt);
+
+        my $bigstr = 
+            Genezzo::Havok::Utils::_build_sql_for_user_function(%attr);
+
         push @ins1, $bigstr;
         $ccnt++;
     }
     for my $pfunc (@sql_funcs)
     {
-        my $bigstr = "i user_functions $ccnt require $pak1 " 
-            . "sql_func_" . $pfunc . " SYSTEM $now 0";
+        my %attr = (module => $pak1, 
+                    function => "sql_func_" . $pfunc,
+                    creationdate => $now,
+                    xid => $ccnt);
 
         if ($pfunc =~ m/^(greatest|least)$/i)
         {
-            $bigstr .= " HASH";
+            $attr{argstyle} = "HASH";
         }
+        else
+        {
+            delete $attr{argstyle} if (exists($attr{argstyle}));
+        }
+
+        my $bigstr = 
+            Genezzo::Havok::Utils::_build_sql_for_user_function(%attr);
 
         push @ins1, $bigstr;
         $ccnt++;
     }
     for my $pfunc (@gnz_funcs)
     {
-        my $bigstr = "i user_functions $ccnt require $pak1 " 
-            . "sql_func_" . $pfunc . " SYSTEM $now 0";
+        my %attr = (module => $pak1, 
+                    function => "sql_func_" . $pfunc,
+                    creationdate => $now,
+                    xid => $ccnt);
+
+        my $bigstr = 
+            Genezzo::Havok::Utils::_build_sql_for_user_function(%attr);
 
         push @ins1, $bigstr;
         $ccnt++;

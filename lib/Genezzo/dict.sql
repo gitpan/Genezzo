@@ -1,6 +1,6 @@
-REM  $Header: /Users/claude/fuzz/lib/Genezzo/RCS/dict.sql,v 1.10 2006/10/29 06:36:54 claude Exp claude $
+REM  $Header: /Users/claude/fuzz/lib/Genezzo/RCS/dict.sql,v 1.11 2006/11/17 09:02:29 claude Exp claude $
 REM
-REM $Revision: 1.10 $
+REM $Revision: 1.11 $
 REM
 REM copyright (c) 2005, 2006 Jeffrey I Cohen, all rights reserved, worldwide
 REM
@@ -22,7 +22,14 @@ alter table _tspace add constraint tspace_tsname_uk unique (tsname);
 create table dual (dummy varchar(1));
 insert into dual values ('X');
 
+REM load initial havok modules
 select HavokUse('Genezzo::Havok') from dual;
+select HavokUse('Genezzo::Havok::UserFunctions') from dual;
+select HavokUse('Genezzo::Havok::Utils') from dual;
+
+REM reload the userfunctions to load the new utils functions
+select HavokUse('Genezzo::Havok::UserFunctions', 'reload') from dual;
+
 select HavokUse('Genezzo::Havok::SQLScalar') from dual;
 select HavokUse('Genezzo::Havok::SQLCompare') from dual;
 

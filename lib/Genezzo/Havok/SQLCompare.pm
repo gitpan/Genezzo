@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/SQLCompare.pm,v 1.1 2006/10/26 21:25:55 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/SQLCompare.pm,v 1.2 2006/11/17 07:52:56 claude Exp claude $
 #
 # copyright (c) 2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -23,7 +23,7 @@ our $VERSION;
 our $MAKEDEPS;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 1.1 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.2 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     my $pak1  = __PACKAGE__;
     $MAKEDEPS = {
@@ -41,7 +41,7 @@ BEGIN {
     # DML is an array, not a hash
 
     my $now = 
-    do { my @r = (q$Date: 2006/10/26 21:25:55 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
+    do { my @r = (q$Date: 2006/11/17 07:52:56 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
 
 
     my %tabdefs = ();
@@ -55,8 +55,18 @@ BEGIN {
     my $ccnt = 1;
     for my $pfunc (@sql_funcs)
     {
-        my $bigstr = "i user_functions $ccnt require $pak1 " 
-            . "sql_func_" . $pfunc . " SYSTEM $now 0";
+        my %attr = (module => $pak1, 
+                    function => "sql_func_" . $pfunc,
+                    creationdate => $now);
+
+        my @attr_list;
+        while ( my ($kk, $vv) = each (%attr))
+        {
+            push @attr_list, '\'' . $kk . '=' . $vv . '\'';
+        }
+
+        my $bigstr = "select add_user_function(" . join(", ", @attr_list) .
+            ") from dual";
         push @ins1, $bigstr;
         $ccnt++;
     }
@@ -143,10 +153,14 @@ sub sql_compare_like
 
         $escape = quotemeta($escape);
 
-        # zero width negative look behind
+        # zero width negative look behind -- match any occurence of
+        # "%" wildcard which does not follow the escape character (and
+        # similarly for "_")
         $pattern =~ s/(?<!$escape)\\%/$wildcard/gm;
         $pattern =~ s/(?<!$escape)_/$singlechar/gm;
 
+        # replace the "escaped" match expressions with their literal
+        # values
         $pattern =~ s/(($escape)\\%)/\\%/gm;
         $pattern =~ s/(($escape)_)/_/gm;
     }

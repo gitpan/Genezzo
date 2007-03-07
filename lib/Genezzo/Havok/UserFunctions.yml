@@ -1,4 +1,4 @@
-# havok version=7.12
+# havok version=7.14
 ABSTRACT:     
 AUTHOR:    Jeffrey I Cohen (jcohen@cpan.org)
 DML:    
@@ -18,9 +18,9 @@ TABLEDEFS:
   user_functions:    
     create_table:    xid=n xtype=c xname=c args=c owner=c creationdate=c version=c argstyle=c sqlname=c typecheck=c
     dml:    
-      -    i havok 2 Genezzo::Havok::UserFunctions SYSTEM 2006-08-05T22:49:39 0 1.03
+      -    i havok 2 Genezzo::Havok::UserFunctions SYSTEM 2006-12-03T09:47:47 0 1.05
 
 
 
-UPDATED:    2006-08-05T15:55:21
-VERSION:    1.03
+UPDATED:    2006-12-03T01:50:46
+VERSION:    1.05

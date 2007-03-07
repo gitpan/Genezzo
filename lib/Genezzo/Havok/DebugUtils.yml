@@ -1,4 +1,4 @@
-# havok version=7.12
+# havok version=7.13
 ABSTRACT:     
 AUTHOR:    Jeffrey I Cohen (jcohen@cpan.org)
 DML:    
@@ -7,9 +7,8 @@ DML:
       -    select * from user_functions where xname = 'Genezzo::Havok::DebugUtils'
 
     install:    
-      -    i user_functions 49 require Genezzo::Havok::DebugUtils sql_func_bcfiledump SYSTEM 2006-08-02T05:46:23 0 HASH bcfiledump
-      -    i user_functions 50 require Genezzo::Havok::DebugUtils sql_func_metadump SYSTEM 2006-08-02T05:46:23 0 HASH metadump
-      -    i user_functions 51 require Genezzo::Havok::DebugUtils sql_func_makebigdb SYSTEM 2006-08-02T05:46:23 0 HASH makebigdb
+      -    i user_functions 49 require Genezzo::Havok::DebugUtils sql_func_bcfiledump SYSTEM 2006-11-17T09:06:53 0 HASH bcfiledump
+      -    i user_functions 50 require Genezzo::Havok::DebugUtils sql_func_metadump SYSTEM 2006-11-17T09:06:53 0 HASH metadump
 
 
 
@@ -17,8 +16,9 @@ LICENSE:    gpl
 NAME:    Genezzo::Havok::DebugUtils
 PREREQ_HAVOK:    
   Genezzo::Havok::UserFunctions:    0.0
+  Genezzo::Havok::Utils:    0.0
 
 TABLEDEFS:    
 
-UPDATED:    2006-08-21T14:01:29
-VERSION:    1.01
+UPDATED:    2006-11-17T01:08:46
+VERSION:    1.03
