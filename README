@@ -401,9 +401,14 @@ NEW FEATURES - automatic tablespace and file growth
   of a fixed size, or use the new "increase_by" parameter to grow to some
   maximum size (currently 2G).
 
-  The script "bigdb.sql" can be used to reset your database for
-  automatic growth.  It can be invoked as "@bigdb.sql" from the
-  gendba command line.
+  Prior to version 0.69, the simplest way to alter tablespace settings
+  was the "bigdb.sql" script.  This script is supplanted in version 0.69
+  by the alter_ts() utility function.  The command:
+    select alter_ts() from dual;
+  will, by default, upgrade the SYSTEM tablespace to use a base file
+  size of 10M which automatically grows in 50% increments.  For more 
+  information, in gendba.pl line-mode please type:
+    help area=utility_functions alter_ts
   
 NEW FEATURES - ALTER TABLE ADD CONSTRAINT
 
@@ -455,16 +460,8 @@ NEW FEATURES - System/User Extensibility
   Genezzo::Havok for more details.  The script "havok.sql" (now
   deprecated) can be used to add extensibility tables to your database.
   In version 0.58 a new function HavokUse supercedes the havok.sql
-  script.  In particular, the table user_extend can be used to load
-  new functions or perl modules into Genezzo.  For example, the
-  havok.sql script loads "Text::Soundex", so queries can use
-  Text::Soundex::soundex in the WHERE clause.
-
-  Version 0.28 of Genezzo slightly modifies the havok and user_extend
-  tables, and it provides the capability to import functions into the
-  default Genezzo namespace.  For example, if the "soundex" function is
-  imported, then the query can just call soundex(), versus using the 
-  fully-qualified name Text::Soundex::soundex.
+  script, and the table user_extend is supplanted in version 0.59 by
+  Havok::UserFunctions.
 
 NEW FEATURES - Improved error reporting, handling
 
@@ -631,6 +628,13 @@ NEW FEATURES - Havok::UserFunctions, standard SQL scalar functions
   and the math functions mod, power, round, sign, trunc, logN.  Please
   see Genezzo::Havok::SQLScalar for more information.
 
+  Version 0.69 adds the utility function add_user_function() which
+  simplifies the creation of new sql functions. In gendba.pl 
+  line-mode please type:
+    help area=utility_functions add_user_function
+  for more information.
+
+
 NEW FEATURES - improved genexp.pl
  
   The version 0.60 database export (genexp.pl) now correctly handles table
@@ -676,15 +680,28 @@ NEW FEATURES - additional comparison functions IN, LIKE
   is treated as a literal.  Note that LIKE comparisons are
   case-sensitive.
 
-NEW FEATURES - additional utility functions add_user_functions, alter_ts
+NEW FEATURES - additional utility functions add_user_function, alter_ts
   
   In version 0.69 utility functions simplify the tasks of adding new
-  user functions, and altering tablespaces for large databases.
+  user functions, and altering tablespaces for large databases. 
+  In gendba.pl line-mode please type:
+    help area=utility_functions long=alter_ts add_user_function
+  for more information.
+
+NEW FEATURES - improved HELP
+  
+  In version 0.70 the help system is re-organized and enhanced.  The
+  new help supports regex lookup, loadable help modules, and online
+  support for the SQL functions.  In gendba.pl line-mode, try:
+    Help Help
+  or
+    Help area=sql
+  for more information.
         
 
 INCOMPATIBLE CHANGES
 
-  Version 0.69 dictionary and block format is incompatible with
+  Version 0.70 dictionary and block format is incompatible with
   previous releases.  No upgrade path is supported.
   Version 0.48 thru 0.50 are compatible.
 

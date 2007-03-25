@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/Utils.pm,v 1.6 2006/12/03 09:45:00 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/Utils.pm,v 1.8 2007/01/11 09:59:33 claude Exp claude $
 #
-# copyright (c) 2006 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2006, 2007 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 package Genezzo::Havok::Utils;
@@ -24,7 +24,7 @@ our $VERSION;
 our $MAKEDEPS;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 1.6 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.8 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     my $pak1  = __PACKAGE__;
     $MAKEDEPS = {
@@ -42,7 +42,7 @@ BEGIN {
     # DML is an array, not a hash
 
     my $now = 
-    do { my @r = (q$Date: 2006/12/03 09:45:00 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
+    do { my @r = (q$Date: 2007/01/11 09:59:33 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
 
 
     my %tabdefs = ();
@@ -124,6 +124,91 @@ sub MakeYML
 
     return Genezzo::Havok::MakeYML($makedp);
 }
+
+sub getpod
+{
+    my $bigHelp;
+    ($bigHelp = <<'EOF_HELP') =~ s/^\#//gm;
+#=head1 Utility_Functions
+#
+#=head2  add_user_function : add_user_function(module=...,function=...)
+#
+#To create a user function based upon the function 'somefunc' in
+#Genezzo::Contrib::MyModule just use the module and function named
+#parameters:
+#
+#  select add_user_function(
+#             'module=Genezzo::Contrib::MyModule',
+#             'function=somefunc') from dual;
+#
+#Simple functions may be defined directly as a single argument which is
+#just a function definition (minus the leading "sub").  For example,
+#the function foobar just adds two to the argument:
+#
+#  select add_user_function(
+#             'foobar { my $foo = shift; $foo += 2; return $foo}'
+#              ) from dual;
+#
+#More sophisticated functions may need to define the user_function
+#table columns as specified in L<Genezzo::Havok::UserFunctions>. 
+#Use the help command:
+#
+#  select add_user_function('help') from dual;
+#
+#to list the valid parameters
+#
+#
+#=head2  alter_ts : alter_ts(tsname=...,increase_by=..., ...)
+#
+#Update a tablespace to support large databases. This function
+#supercedes the bigdb.sql script.  When called with no arguments:
+#
+#    select alter_ts() from dual;
+#
+#the SYSTEM tablespace is set to automatically increase by 50% each
+#time it runs out of space, and the buffer cache size is set to 1000
+#blocks.  When new datafiles are acquired, they will start at 10M and
+#increase by 50% each time they resize.
+#
+#alter_ts can also take the single argument 'help':
+#
+#    select alter_ts('help') from dual;
+#
+#which will cause it to list the named parameters (all of which are optional).
+#The parameters are:
+#
+#  tsname - the tablespace name
+#
+#  increase_by - the amount to increase the current filesize by
+#    when it runs out of free space.  The value may be a percentage,
+#    e.g. 50%, or a fixed size like 100M.  If this paramater is set to
+#    zero, the tablespace will remain a fixed size.
+#
+#  filesize - the initial size of a new file when it is added to
+#    the tablespace.  Note that this parameter only affects files which are
+#    automatically created, not files added with "addfile".
+#
+#  bufcachesize - the buffer cache size (in number of blocks).
+#
+#The default settings are equivalent to:
+#
+#    select alter_ts(
+#    'tsname=SYSTEM',
+#    'increase_by=50%',
+#    'filesize=10M', 
+#    'bufcachesize=1000') from dual;
+#
+#The tsname argument may be specified multiple times -- the increase_by
+#and filesize will be applied to each tablespace.
+#
+EOF_HELP
+
+    my $msg = $bigHelp;
+
+    return $msg;
+
+} # end getpod
+
 
 sub _build_sql_for_user_function
 {
@@ -470,7 +555,6 @@ sub sql_func_alter_ts
     return 1;
 }
 
-
 END { }       # module clean-up code here (global destructor)
 
 ## YOUR CODE GOES HERE
@@ -554,7 +638,8 @@ e.g. 50%, or a fixed size like 100M.  If this paramater is set to
 zero, the tablespace will remain a fixed size.
 
 =item filesize - the initial size of a new file when it is added to
-the tablespace.
+the tablespace.  Note that this parameter only affects files which are
+automatically created, not files added with "addfile".
 
 =item bufcachesize - the buffer cache size (in number of blocks).
 
@@ -591,7 +676,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 
 L<perl(1)>.
 
-Copyright (c) 2006 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2006, 2007 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

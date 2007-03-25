@@ -221,6 +221,16 @@ c
 
 3 rows selected.
 
+t/SQL/SQLScalar1.sql> select  substr(col1, -1) from test1;
+substr(col1, -1)	
+________________	
+
+a	
+b	
+c	
+
+3 rows selected.
+
 t/SQL/SQLScalar1.sql> 
 
 t/SQL/SQLScalar1.sql> select  uc(col3) from test1;

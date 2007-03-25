@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/SQLScalar.pm,v 1.16 2006/11/19 08:57:34 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/SQLScalar.pm,v 1.22 2007/01/09 09:27:40 claude Exp claude $
 #
-# copyright (c) 2005, 2006 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2005, 2006, 2007 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 package Genezzo::Havok::SQLScalar;
@@ -89,7 +89,7 @@ our $VERSION;
 our $MAKEDEPS;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 1.16 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.22 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     my $pak1  = __PACKAGE__;
     $MAKEDEPS = {
@@ -107,7 +107,7 @@ BEGIN {
     # DML is an array, not a hash
 
     my $now = 
-    do { my @r = (q$Date: 2006/11/19 08:57:34 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
+    do { my @r = (q$Date: 2007/01/09 09:27:40 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
 
 
     my %tabdefs = ();
@@ -192,7 +192,7 @@ BEGIN {
     # dramatically slows the db init.
 
     my @ins1;
-    my $ccnt = 3;
+    my $ccnt = 4; # skip util functions and syshelp
     for my $pfunc (@perl_funcs)
     {
         my %attr = (module => $pak1, 
@@ -242,6 +242,9 @@ BEGIN {
         $ccnt++;
     }
 
+    # add help for all functions
+    push @ins1, "select add_help(\'Genezzo::Havok::SQLScalar\') from dual";
+
     # if check returns 0 rows then proceed with install
     $MAKEDEPS->{'DML'} = [
                           { check => [
@@ -262,6 +265,304 @@ sub MakeYML
 
     return Genezzo::Havok::MakeYML($makedp);
 }
+
+sub getpod
+{
+    my $bigHelp;
+    ($bigHelp = <<EOF_HELP) =~ s/^\#//gm;
+#=head1 SQL_Functions
+#
+#=head2  chomp : chomp(char_str)
+#
+#Return the string with the trailing newline removed.
+#
+#=head2  chop : chop(char_str)
+#
+#Return the string with the last character removed.
+#
+#=head2  chr : chr(number)
+#
+#Returns the character represented by the number in the character set.
+#
+#=head2  crypt : crypt(plaintext, salt)
+#
+#Returns the plaintext string encrypted with the C crypt routine.
+#
+#=head2  index : index(char_str, substr[, start_position])
+#
+#Returns the position (0-based) of the first character of the substring
+#in the string, or -1 if not found, starting at start_position.
+#Start_position defaults to zero if not specified.
+#
+#=head2  lc : lc(char_str)
+#
+#Returns the lowercased char_str.
+#
+#=head2  lcfirst : lcfirst(char_str)
+#
+#Returns char_str with only the first character lowercased.
+#
+#=head2  length : length(char_str)
+#
+#Returns the number of characters in char_str.
+#
+#=head2  ord : ord(char_str)
+#
+#Returns the numeric encoding of the first character of char_str.
+#
+#=head2  pack : pack(template_str, list_of_values)
+#
+#Converts a list of values into a string using the perl pack function.
+#
+#=head2  reverse : reverse(char_str)
+#
+#Returns the string in reverse order.
+#
+#=head2  rindex : rindex(char_str, substr[, start_position])
+#
+#Like index, but backwards: finds the last occurrence of the substr in
+#char_str.
+#
+#=head2  sprintf : sprintf(format_str, list_of_values)
+#
+#Returns a string formatted using the C sprintf.
+#
+#Note that the sprintf format string must be single-quoted (SQL-style),
+#not double-quoted.
+#
+#=head2  substr : substr(char_str, offset_position[, length])
+#
+#Returns the substring of char_str, starting at the offset, of the
+#specified length.  If length is omitted the it returns from the offset
+#to the end of the string.  Special rules for negative offset, length.
+#
+#=head2  uc : uc(char_str)
+#
+#Returns the uppercased char_str.
+#
+#=head2  ucfirst : ucfirst(char_str)
+#
+#Returns char_str with only the first character uppercased.
+#
+#=head2  abs : abs(number)
+#
+#Absolute value
+#
+#=head2  atan2 : atan2(numberY, numberX)
+#
+#Arctangent (in radians)
+#
+#=head2  cos : cos(number)
+#
+#Cosine (in radians).
+#
+#=head2  exp : exp(n)
+#
+#Returns e**n
+#
+#=head2  hex : hex(char_str)
+#
+#Treats char_str as a hexadecimal value and converts to number.
+#
+#=head2  int : int(number)
+#
+#Returns the integer portion of number.
+#
+#=head2  oct : oct(char_str)
+#
+#Treats char_str as a octal value and converts to number.
+#
+#=head2  rand : rand(number)
+#
+#Returns returns a random number N, where 0 <= N < number.  Note that N
+#is not an integer, so use an expression like int(rand(Max_N)) to
+#obtain integer values where 0 <= N <= (Max_N - 1).
+#
+#=head2  sin : sin(number)
+#
+#Sine (in radians)
+#
+#=head2  sqrt : sqrt(number)
+#
+#Square root.
+#
+#=head2  srand : srand(number)
+#
+#Set the random seed.
+#
+#=head2  perl_join : perl_join(char_str1, char_str2)
+#
+#The perl string join, renamed to avoid conflict with the SQL
+#relational join.  Concatenates the strings with the join_expr. 
+#Example:  perl_join(':', 'foo', 'bar', 'baz') returns 'foo:bar:baz'.
+#
+#=head2  concat : concat(char_str1, char_str2)
+#
+#Concatenate strings
+#
+#=head2  greatest : greatest(item1, item2...)
+#
+#Find the greatest element in a list
+#
+#=head2  initcap : initcap(char_str)
+#
+#Return the string with the initial letter of each word capitalized,
+#where words are defined as contiguous groups of alphanumeric chars
+#separated by non-word chars.
+#
+#=head2  least : least(item1, item2...)
+#
+#Find the smallest element in a list
+#
+#=head2  lower : lower(char_str)
+#
+#Return the string with all letters lowercase
+#
+#=head2  lpad : lpad(char_str1, n [, char_str2])
+#
+#Returns the string char_str1 padded out on the left to length n with
+#copies of char_str2.  If char_str2 is not specified blanks are used.
+#If char_str1 is larger than length n it is truncated to fit.
+#
+#=head2  ltrim : ltrim(char_str [, set])
+#
+#Returns the string which is trimmed on the left up to the first
+#character which is not in the specified set.  If set is unspecified,
+#blanks are trimmed.
+#
+#=head2  soundex : soundex(char_str)
+#
+#Knuth's soundex from L<Text::Soundex>.
+#
+#=head2  replace : replace(char_str, search_str [, replace_str])
+#
+#Returns char_str with all occurrences of the search_str replaced by
+#replace_str.  If the replace_str is unspecified or null, it removes
+#all occurrences of the search_str.
+#
+#=head2  rpad : rpad(char_str1, n [, char_str2])
+#
+#Returns the string char_str1 padded out on the right to length n with
+#copies of char_str2.  If char_str2 is not specified blanks are used.
+#If char_str1 is larger than length n it is truncated to fit.
+#
+#=head2  rtrim : rtrim(char_str [, set])
+#
+#Returns the string which is trimmed on the right up to the first
+#character which is not in the specified set.  If set is unspecified,
+#blanks are trimmed.
+#
+#=head2  translate : translate(char_str, search_str, replace_str)
+#
+#Similar to perl transliteration tr/ (see L<perlop(1)> ), returns a
+#string where all occurrences of a character in the search string are
+#replaced with the corresponding character in the replace string.
+#
+#=head2  upper : upper(char_str)
+#
+#Returns the string with all characters uppercase.
+#
+#=head2  cosh : cosh(n)
+#
+#Hyperbolic cosine
+#
+#=head2  ceil : ceil(n)
+#
+#Returns the smallest integer greater than or equal to n
+#
+#=head2  floor : floor(n)
+#
+#Returns the largest integers less than or equal to n
+#
+#=head2  ln : ln(n)
+# 
+#Natural log.
+#
+#=head2  log10 : log10(n)
+#
+#Log base 10.
+#
+#=head2  logN : logN(base_N, num)
+#
+#Returns the Log base base_N on num.
+#
+#=head2  mod : mod(m,n)
+#
+#Returns the remainder of m divided by n.
+#
+#=head2  power : power(m,n)
+#
+#Returns m**n
+#
+#=head2  round : round(num [, m])
+#
+#Return num rounded to m places to the right of the decimal point.  M=0
+#if not specified.  If m is negative num is rounded to the left of the
+#decimal point.
+#
+#
+#=head2  sign : sign(n)
+#
+#Similar to "spaceship", returns -1 for N < 0, 0 for N==0, and 1 for N > 0.
+#
+#=head2  sinh : sinh(n)
+#
+#Hyperbolic sine.
+#
+#=head2  tan : tan(n)
+#
+#tangent
+#
+#=head2  tanh : tanh(n)
+#
+#Hyperbolic tangent.
+#
+#=head2  trunc : trunc(num [, m])
+#
+#Return num truncated to m places to the right of the decimal point.
+#M=0 if not specified.  If m is negative num is truncated to the left
+#of the decimal point.
+#
+#=head2  ascii : ascii(char_str)
+#
+#Return the ascii value of the first char of the string.
+#
+#=head2  instr : instr(char_str, substring [, position [, occurrence]])
+#
+#Returns the index (1 based, not zero based) of the substring in the
+#char_str, starting at position.  If occurrence and position are not
+#specified they default to one: instr returns the index of the first
+#occurrence of the substring.  If occurrence is specified instr returns
+#the index of the Nth occurrence.  If position is negative instr begins
+#the search from the tail end of char_str.
+#
+#=head2  nvl : nvl(char_str1, char_str2)
+#
+#Returns char_str2 if char_str1 is NULL, else returns char_str1
+#
+#=head2  quurl : quurl(char_str)
+#
+#"Quote URL" - Replace all non-alphanumeric chars in a string with
+#'%hex' values, similar to the standard URL-style quoting.
+#
+#=head2  quurl2 : quurl2(char_str)
+#
+#"Quote URL" - Replace most non-alphanumeric chars in a string with
+#'%hex' values, leaving spaces and most punctuation (with the exception
+#of '%') untouched.
+#
+#=head2  unquurl : unquurl(char_str)
+#
+#Convert a "quoted url" string back.
+#
+#
+EOF_HELP
+
+    my $msg = $bigHelp;
+
+    return $msg;
+
+} # end getpod
 
 # perl scalar functions
 # CHAR
@@ -356,9 +657,12 @@ sub sql_func_sprintf
 
 sub sql_func_substr
 {
-    my $exp1 = shift;
-    my $off1 = shift;
-    return substr $exp1, $off1, @_;
+    my ($exp1, $off1, $len1) = @_;
+
+    return substr $exp1, $off1, $len1
+        if (defined($len1));
+    return substr $exp1, $off1;
+
 }
 sub sql_func_uc
 {
@@ -996,63 +1300,129 @@ See L<perlfunc(1)> for descriptions.
 
 =over 4
 
-=item  chomp 
+=item  chomp(char_str)
 
-=item  chop
+Return the string with the trailing newline removed.
 
-=item  chr
+=item  chop(char_str)
 
-=item  crypt
+Return the string with the last character removed.
 
-=item  index
+=item  chr(number)
 
-=item  lc
+Returns the character represented by the number in the character set.
 
-=item  lcfirst
+=item  crypt(plaintext, salt)
 
-=item  length
+Returns the plaintext string encrypted with the C crypt routine.
 
-=item  ord
+=item  index(char_str, substr[, start_position])
 
-=item  pack
+Returns the position (0-based) of the first character of the substring
+in the string, or -1 if not found, starting at start_position.
+Start_position defaults to zero if not specified.
 
-=item  reverse
+=item  lc(char_str)
 
-=item  rindex
+Returns the lowercased char_str.
 
-=item  sprintf
+=item  lcfirst(char_str)
 
-=item  substr
+Returns char_str with only the first character lowercased.
 
-=item  uc
+=item  length(char_str)
 
-=item  ucfirst
+Returns the number of characters in char_str.
 
-=item  abs
+=item  ord(char_str)
 
-=item  atan2
+Returns the numeric encoding of the first character of char_str.
 
-=item  cos
+=item  pack(template_str, list_of_values)
 
-=item  exp
+Converts a list of values into a string using the perl pack function.
 
-=item  hex
+=item  reverse(char_str)
 
-=item  int
+Returns the string in reverse order.
 
-=item  oct
+=item  rindex(char_str, substr[, start_position])
 
-=item  rand
+Like index, but backwards: finds the last occurrence of the substr in
+char_str.
 
-=item  sin
+=item  sprintf(format_str, list_of_values)
 
-=item  sqrt
+Returns a string formatted using the C sprintf.
 
-=item  srand
+Note that the sprintf format string must be single-quoted (SQL-style),
+not double-quoted.
 
-=item  perl_join
+=item  substr(char_str, offset_position[, length])
 
-The perl string join, renamed to avoid conflict with the SQL relational join
+Returns the substring of char_str, starting at the offset, of the
+specified length.  If length is omitted the it returns from the offset
+to the end of the string.  Special rules for negative offset, length.
+
+=item  uc(char_str)
+
+Returns the uppercased char_str.
+
+=item  ucfirst(char_str)
+
+Returns char_str with only the first character uppercased.
+
+=item  abs(number)
+
+Absolute value
+
+=item  atan2(numberY, numberX)
+
+Arctangent (in radians)
+
+=item  cos(number)
+
+Cosine (in radians).
+
+=item  exp(n)
+
+Returns e**n
+
+=item  hex(char_str)
+
+Treats char_str as a hexadecimal value and converts to number.
+
+=item  int(number)
+
+Returns the integer portion of number.
+
+=item  oct(char_str)
+
+Treats char_str as a octal value and converts to number.
+
+=item  rand(number)
+
+Returns returns a random number N, where 0 <= N < number.  Note that N
+is not an integer, so use an expression like int(rand(Max_N)) to
+obtain integer values where 0 <= N <= (Max_N - 1).
+
+=item  sin(number)
+
+Sine (in radians)
+
+=item  sqrt(number)
+
+Square root.
+
+=item  srand(number)
+
+Set the random seed.
+
+=item  perl_join(join_expr, char_str1, char_str2[, char_str3...])
+
+The perl string join, renamed to avoid conflict with the SQL
+relational join.  Concatenates the strings with the join_expr. 
+Example:  perl_join(':', 'foo', 'bar', 'baz') returns 'foo:bar:baz'.
 
 =back
 
@@ -1060,7 +1430,7 @@ The perl string join, renamed to avoid conflict with the SQL relational join
 
 =over 4
 
-=item  concat(char1, char2)
+=item  concat(char_str1, char_str2)
 
 Concatenate strings
 
@@ -1068,7 +1438,7 @@ Concatenate strings
 
 Find the greatest element in a list
 
-=item  initcap(char)
+=item  initcap(char_str)
 
 Return the string with the initial letter of each word capitalized,
 where words are defined as contiguous groups of alphanumeric chars
@@ -1078,51 +1448,51 @@ separated by non-word chars.
 
 Find the smallest element in a list
 
-=item  lower(char)
+=item  lower(char_str)
 
 Return the string with all letters lowercase
 
-=item  lpad(char1, n [, char2])
+=item  lpad(char_str1, n [, char_str2])
 
-Returns the string char1 padded out on the left to length n with
-copies of char2.  If char2 is not specified blanks are used.  If char1
-is larger than length n it is truncated to fit.
+Returns the string char_str1 padded out on the left to length n with
+copies of char_str2.  If char_str2 is not specified blanks are used.
+If char_str1 is larger than length n it is truncated to fit.
 
-=item  ltrim(char [, set])
+=item  ltrim(char_str [, set])
 
 Returns the string which is trimmed on the left up to the first
 character which is not in the specified set.  If set is unspecified,
 blanks are trimmed.
 
-=item  soundex
+=item  soundex(char_str)
 
 Knuth's soundex from L<Text::Soundex>.
 
-=item  replace(char, search_str [, replace_str])
+=item  replace(char_str, search_str [, replace_str])
 
-Returns char with all occurrences of the search_str replaced by
+Returns char_str with all occurrences of the search_str replaced by
 replace_str.  If the replace_str is unspecified or null, it removes
 all occurrences of the search_str.
 
-=item  rpad(char1, n [, char2])
+=item  rpad(char_str1, n [, char_str2])
 
-Returns the string char1 padded out on the right to length n with
-copies of char2.  If char2 is not specified blanks are used.  If char1
-is larger than length n it is truncated to fit.
+Returns the string char_str1 padded out on the right to length n with
+copies of char_str2.  If char_str2 is not specified blanks are used.
+If char_str1 is larger than length n it is truncated to fit.
 
-=item  rtrim(char [, set])
+=item  rtrim(char_str [, set])
 
-Returns the string which is trimmed on the rightt up to the first
+Returns the string which is trimmed on the right up to the first
 character which is not in the specified set.  If set is unspecified,
 blanks are trimmed.
 
-=item  translate(char, search_str, replace_str)
+=item  translate(char_str, search_str, replace_str)
 
 Similar to perl transliteration tr/ (see L<perlop(1)> ), returns a
 string where all occurrences of a character in the search string are
 replaced with the corresponding character in the replace string.
 
-=item  upper(char)
+=item  upper(char_str)
 
 Returns the string with all characters uppercase.
 
@@ -1140,15 +1510,15 @@ Hyperbolic cosine
 
 Returns the smallest integer greater than or equal to n
 
-=item  floor
+=item  floor(n)
 
 Returns the largest integers less than or equal to n
 
-=item  ln
+=item  ln(n)
  
 Natural log.
 
-=item  log10
+=item  log10(n)
 
 Log base 10.
 
@@ -1175,49 +1545,50 @@ decimal point.
 
 Similar to "spaceship", returns -1 for N < 0, 0 for N==0, and 1 for N > 0.
 
-=item  sinh
+=item  sinh(n)
 
 Hyperbolic sine.
 
-=item  tan
+=item  tan(n)
 
 tangent
 
-=item  tanh
+=item  tanh(n)
 
 Hyperbolic tangent.
 
 =item  trunc(num [, m])
 
-Return num truncated to m places to the right of the decimal point.  M=0
-if not specified.  If m is negative num is truncated to the left of the
-decimal point.
+Return num truncated to m places to the right of the decimal point.
+M=0 if not specified.  If m is negative num is truncated to the left
+of the decimal point.
 
 
 =back
 
 =head2 SQL conversion functions
 
-These functions return a value of a different type than their operands.
+These functions return a value of a different type than their
+operands.
 
 =over 4
 
-=item  ascii(char)
+=item  ascii(char_str)
 
 Return the ascii value of the first char of the string.
 
-=item  instr(char, substring [, position [, occurrence]])
+=item  instr(char_str, substring [, position [, occurrence]])
 
 Returns the index (1 based, not zero based) of the substring in the
-char, starting at position.  If occurrence and position are not
+char_str, starting at position.  If occurrence and position are not
 specified they default to one: instr returns the index of the first
 occurrence of the substring.  If occurrence is specified instr returns
 the index of the Nth occurrence.  If position is negative instr begins
-the search from the tail end of char.
+the search from the tail end of char_str.
 
-=item  nvl(char1, char2)
+=item  nvl(char_str1, char_str2)
 
-Returns char2 if char1 is NULL, else returns char1
+Returns char_str2 if char_str1 is NULL, else returns char_str1
 
 =back
 
@@ -1225,18 +1596,18 @@ Returns char2 if char1 is NULL, else returns char1
 
 =over 4
 
-=item  quurl
+=item  quurl(char_str)
 
 "Quote URL" - Replace all non-alphanumeric chars in a string with
 '%hex' values, similar to the standard URL-style quoting.
 
-=item  quurl2
+=item  quurl2(char_str)
 
 "Quote URL" - Replace most non-alphanumeric chars in a string with
 '%hex' values, leaving spaces and most punctuation (with the exception
 of '%') untouched.
 
-=item  unquurl
+=item  unquurl(char_str)
 
 Convert a "quoted url" string back.
 
@@ -1269,7 +1640,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 
 L<perl(1)>.
 
-Copyright (c) 2005, 2006 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2005, 2006, 2007 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

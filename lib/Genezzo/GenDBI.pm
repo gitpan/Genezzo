@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 7.35 2006/12/03 09:57:07 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 7.38 2007/01/09 09:24:56 claude Exp claude $
 #
-# copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2003-2007 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 package Genezzo::GenDBI;
@@ -51,11 +51,11 @@ BEGIN {
 }
 
 ##our $VERSION   = $Genezzo::VERSION;
-our $VERSION   = '0.69';
+our $VERSION   = '0.70';
 our $RELSTATUS = 'Alpha'; # release status
 # grab the code check-in date and convert to YYYYMMDD
 our $RELDATE   = 
-    do { my @r = (q$Date: 2006/12/03 09:57:07 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
+    do { my @r = (q$Date: 2007/01/09 09:24:56 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
 
 our $errstr; # DBI errstr
 
@@ -1419,7 +1419,7 @@ sub getversionstring
 
     my $bigstr = "Genezzo Version " . $verzion . " - " . $relstat . " " ;
     $bigstr .=  $reldate . "  (www.genezzo.com)\n";
-    $bigstr .= "Copyright (c) 2003-2006 Jeffrey I Cohen.  All rights reserved.\n";
+    $bigstr .= "Copyright (c) 2003-2007 Jeffrey I Cohen.  All rights reserved.\n";
 
     if (defined($getlicense))
     {
@@ -1455,8 +1455,9 @@ sub PrintVersionString
 {
     my $self = shift;
     my $msg = "\n\nGenezzo Version $VERSION - $RELSTATUS $RELDATE  (www.genezzo.com)\n";
-    $msg .= "Copyright (c) 2003-2006 Jeffrey I Cohen.  All rights reserved.\n";
-    $msg .= "\nType \"SHOW\" to obtain license information.\n\n";
+    $msg .= "Copyright (c) 2003-2007 Jeffrey I Cohen.  All rights reserved.\n";
+    $msg .= "\nType \"SHOW\" to obtain license information, ";
+    $msg .= "type \"HELP\" for help.\n\n";
     my %earg = (self => $self, msg => $msg,
              severity => 'info');
                     
@@ -3987,7 +3988,17 @@ sub Kgnz_History
     foreach my $aval (@{$histlist})
     {
         my ($hcnt, $val) = @{$aval};
-        
+
+        # remove extra trailing newlines for neatness
+        $val =~ s/(\n)*$//;
+
+        my $addspace = length($hcnt) + 1;
+        my $spacer = ' ' x $addspace;
+
+        # make multiline statements a little prettier in the history
+        # list - offset them from the history number.
+        $val =~ s/\n/\n$spacer/gm;
+
         $msg .= $hcnt . " " . $val . "\n";
     }
         %earg = (self => $self, msg => $msg,
@@ -4002,117 +4013,108 @@ sub Kgnz_Help
 {
     my $self = shift;
 #    print Dumper(%parsedispatch) ;
-    my $bigHelp;
-    $bigHelp = <<EOF_HELP;
+    my $dictobj = $self->{dictobj};
 
-@ : execute a command file.  Syntax - @<filename> 
+    my @args = @_;
+    my %nargs;
 
-!<number>, !! : re-execute command history
+    if (scalar(@args))
+    {
+        my $format_option;
 
-addfile, af : add a file to a tablespace.  Type "addfile help" for more 
-    details.
+        for my $pattern (@args)
+        {
+            # cmd pattern
+            if ($pattern =~ m/^(area|tag|list|short|verbose|full|long)\=.*/i)
+            {
+                my @foo = split('=', $pattern, 2);
 
-alter : SQL alter
-        ALTER TABLE tablename 
-              ADD [CONSTRAINT constraint_name] 
-                  PRIMARY KEY (colname [, colname ...]);
-        ALTER TABLE tablename 
-              ADD [CONSTRAINT constraint_name] 
-                  UNIQUE (colname [, colname ...]);
-        ALTER TABLE tablename 
-              ADD [CONSTRAINT constraint_name] 
-                  CHECK (conditional_expression);
+                unless (scalar(@foo) == 2)
+                {
+                    my $msg = 'invalid option for help: $pattern';
 
-ci : create index.  Syntax - ci <index name> <table name> <column name>.
+                    my %earg = (self => $self, msg => $msg,
+                                severity => 'warn');
+        
+                    &$GZERR(%earg)
+                        if (defined($GZERR));
+                    return 0;
+                }
+                my $cmd = shift @foo;
 
-commit : flush changes to disk
+                # special case for area or tags
+                if ($cmd =~ m/(area|tag)/i)
+                {
+                    if ($cmd =~ m/(area)/i)
+                    {
+                        $nargs{topic_group} = shift @foo;
+                    }
+                    next;
+                }
 
-create : SQL Create
-         CREATE TABLE 
-            tablename (column_name column_type [, column_name column_type]...)
-            [TABLESPACE tsname] [AS SELECT...]
+                # special format option for pattern
+                if ($cmd =~ m/(list|short|verbose|full|long)/i)
+                {
+                    $pattern = shift @foo;
 
-         CREATE TABLESPACE tsname
+                    $format_option = 'list' if ($cmd =~ m/list/i);
+                    $format_option = 'short' if ($cmd =~ m/short/i);
+                    $format_option = 'long' if ($cmd =~ m/long|full|verbose/i);
+                }
 
-         CREATE INDEX indexname 
-            ON tablename (column_name [, column_name]...)
-               [TABLESPACE tsname]
+            } # end cmd pattern
 
-ct : create table.  Syntax - 
-    ct <tablename> <column name>=<column type> [<column name>=<column type>...]
-    Supported types are "c" for character data and "n" for numeric.
+            # special case "!" and "@"
+            if ($pattern =~ m/^(\@|\!)$/)
+            {
+                $pattern = quotemeta($pattern);
+            }
 
-d : delete from a table.  Syntax - d <table-name> <rid> [<rid>...]
+            # do a prefix match unless specified
+            my $match1 = '(^\^)|(\$$)';
+            if ($pattern !~ m/$match1/)
+            {
+                $pattern = '^' . $pattern;
+            }
+            if (exists($nargs{topic_pattern}))
+            {
+                # build a list of patterns
+                $nargs{topic_pattern} .= "|" . $pattern;
+            }
+            else
+            {
+                $nargs{topic_pattern} = $pattern;
+            }
+            $nargs{option}='short';
+        } # end for
+        if (defined($format_option))
+        {
+            $nargs{option}=$format_option;
+        }
+    }
 
-delete : SQL Delete
-         DELETE FROM tablename [WHERE ...]
-
-describe, desc :  describe a table
-
-drop :  SQL Drop
-        DROP TABLE tablename
-
-dt : drop table.  Syntax - dt <table-name>
-
-dump :  dump internal state.  Type "dump help" for more details.
-
-help :  This page.
-
-history, h : command history.  Use shell-style "!<command-number>" to repeat.
-
-i : insert into a table. 
-    Syntax - i <tablename> <column-data> [<column-data>...]
-
-insert : SQL Insert
-         INSERT INTO tablename VALUES (expr [, expr ...]);
-         INSERT INTO tablename (colname [, colname ...]) 
-                               VALUES (expr [, expr ...]);
-         INSERT INTO tablename SELECT ... FROM ...
-
-password : password authentication [unused]
-
-quit : quit the line-mode app
-
-reload : Reload all genezzo modules
-
-rem : Remark [comment]
-
-rollback : discard uncommitted changes
-
-s : select from a table.  
-    Syntax - s <table-name> *
-             s <table-name> <column-name> [<column-name>...]
-    Legal "pseudo-columns" are "rid", "rownum".
-
-select : SQL Select
-         SELECT expr [[AS] column_alias] [, expr [[AS] column_alias]]
-         FROM tablename [[AS] table_alias] [, tablename ...]
-         [WHERE ...]
-
-   
-show :  License, warranty, and version information.  Type "show help"
-        for more information.
-
-shutdown : shutdown an instance.  Provides read-only access to "pref1"
-           table.
- 
-spool : write output to a file.  Syntax - spool <filename>
-
-startup : Loads dictionary, provides read/write access to tables.
-
-sync : flush changes to disk (*without* committing transaction like "commit")
-
-u : update a table.  
-    Syntax - u <table-name> <rid> <column-value> [<column-value>...]
-
-update : SQL Update
-         UPDATE tablename SET colname = expr [, colname = expr ...] [WHERE ...]
-
-EOF_HELP
+    my $bigHelp = $dictobj->DictHelpSearch(%nargs);
 
     my $msg = $bigHelp;
+
+    # additional help on helping
+    unless (scalar(keys(%nargs)))
+    {
+        $msg .= "\n\n  Type \"help help\" for more help.\n";
+    }
+
+    my $sev = 'info';
+
+    # warn if no msg
+    unless (defined($msg))
+    {
+        $sev = 'warn';
+        $msg = "No help for \"help " . join(" ", @_) . '"';
+    }
+
+
     my %earg = (self => $self, msg => $msg,
-                severity => 'info');
+                severity => $sev);
         
     &$GZERR(%earg)
         if (defined($GZERR));
@@ -5276,7 +5278,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 L<perl(1)>, C<gendba.pl -man>,
 C<perldoc DBI>, L<http://dbi.perl.org/>
 
-Copyright (c) 2003-2006 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2003-2007 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

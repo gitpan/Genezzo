@@ -43,6 +43,7 @@ select  rindex('abc', 'def') from dual;
 select  sprintf('number: %d',col2) from test1;
 
 select  substr(col1, 1, 1) from test1;
+select  substr(col1, -1) from test1;
 
 select  uc(col3) from test1;
 

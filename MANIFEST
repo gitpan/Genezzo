@@ -37,6 +37,7 @@ lib/Genezzo/havok.sql
 lib/Genezzo/syshook.sql
 lib/Genezzo/gendba.pl
 lib/Genezzo/genexp.pl
+lib/Genezzo/BasicHelp.pm
 lib/Genezzo/Row/RSIdx1.pm
 lib/Genezzo/Row/RSTab.pm
 lib/Genezzo/Row/RSDual.pm
@@ -66,6 +67,8 @@ lib/Genezzo/Havok/SQLCompare.pm
 lib/Genezzo/Havok/SQLCompare.yml
 lib/Genezzo/Havok/SQLScalar.pm
 lib/Genezzo/Havok/SQLScalar.yml
+lib/Genezzo/Havok/SysHelp.pm
+lib/Genezzo/Havok/SysHelp.yml
 lib/Genezzo/Havok/SysHook.pm
 lib/Genezzo/Havok/SysHook.yml
 lib/Genezzo/Havok/UserExtend.pm

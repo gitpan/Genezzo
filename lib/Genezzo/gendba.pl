@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/gendba.pl,v 7.9 2006/10/20 18:51:20 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/gendba.pl,v 7.10 2007/01/11 10:04:07 claude Exp claude $
 #
-# copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2003-2007 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 use Genezzo::GenDBI;
@@ -206,7 +206,7 @@ There are a couple of other useful commands:
 
 =over 4
 
-=item HELP -- give useless help
+=item HELP -- give help
 
 =item DUMP -- dump out internal data structures
 
@@ -233,7 +233,7 @@ GNZ_HOME is undefined, the default location is $HOME/gnz_home.
 
 =head1 AUTHORS
 
-Copyright (c) 2003-2006 Jeffrey I Cohen.  All rights reserved.  
+Copyright (c) 2003-2007 Jeffrey I Cohen.  All rights reserved.  
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

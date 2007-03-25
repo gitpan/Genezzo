@@ -1,5 +1,11 @@
 Revision history for Perl extension Genezzo
 
+0.70 Mon Jan 15 01:02:45 2007
+        - improved help
+        - substr fix
+        - fix TODO generation
+        - history formatting
+
 0.69 Sun Dec  3 01:39:32 2006
         - add_user_function: add support to dynamically load new
           functions into running database instance (without restart).

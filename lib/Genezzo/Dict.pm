@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 7.25 2006/10/20 18:51:56 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 7.28 2007/01/04 10:39:57 claude Exp claude $
 #
 # copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -16,10 +16,11 @@ use Genezzo::Tablespace ;
 use File::Spec;
 use Genezzo::Index::btHash;
 use Genezzo::Havok;
+use Genezzo::BasicHelp;
 
 BEGIN {
     our $VERSION;
-    $VERSION = do { my @r = (q$Revision: 7.25 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.28 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -286,6 +287,8 @@ sub _init
     $self->{fileheaderinfo} = {}; # set when load SYSTEM tablespace
     # get dictionary preference table info
     $self->{prefs} = {};
+
+    $self->{basichelp} = Genezzo::BasicHelp->new();
 
     # for raw filesystems we pretend /dev/raw is the home directory
     # and raw1 is the file.
@@ -5792,6 +5795,72 @@ sub _make_cons_ck_check
 
 } # end make cons check
 
+sub DictHelpSearch
+{
+    my $self = shift;
+    my $bh = $self->{basichelp};
+
+    my $msg;
+
+    # pass arguments to search_topic, else dump pod document
+    if (scalar(@_))
+    {
+        $msg = $bh->search_topic(@_);
+    }
+    else
+    {
+        $msg = $bh->getpod2text();
+        $msg .= "\n" if (defined($msg));
+    }
+    return $msg;
+}
+
+sub DictAddHelp
+{
+    my $self = shift;
+    my $modname  = shift;
+    my $bh = $self->{basichelp};
+
+    unless (defined($modname) && length($modname))
+    {
+        my %earg = (#self => $self,
+                    severity => 'warn',
+                    msg => "no module name");
+
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
+        return 0;
+    }
+
+    if (eval "require $modname")
+    {
+        my $pod;
+        my $estr = '$pod = ' . "$modname" . '::getpod();';
+
+        eval $estr;
+
+#        print $pod;
+        
+        $bh->pod2gnzhelp($pod);
+
+#        print Data::Dumper->Dump([$bh]);
+
+    }
+    else
+    {
+        my %earg = (#self => $self,
+                    severity => 'warn',
+                    msg => "no such package - $modname");
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
+    
+        return 0;
+    }
+
+    return 1;
+}
 
 
 END { }       # module clean-up code here (global destructor)
