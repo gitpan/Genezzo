@@ -1,4 +1,4 @@
-# Copyright (c) 2003, 2004, 2005, 2006 Jeffrey I Cohen.  All rights reserved.
+# Copyright (c) 2003-2007 Jeffrey I Cohen.  All rights reserved.
 #
 # Before `make install' is performed this script should be runnable with
 # `make test'. After `make install' it should work as `perl test.pl'
@@ -120,6 +120,8 @@ my $gnz_restore = File::Spec->catdir("t", "restore");
             
             next
                 unless (length($lin));
+
+            $lin =~ s/;(\s*)$//; # remove trailing semi
             
             not_ok ("could not create table havok")
                 unless ($dbh->do($lin));

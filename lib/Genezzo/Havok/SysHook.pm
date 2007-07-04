@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/SysHook.pm,v 7.7 2006/06/04 06:28:21 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/SysHook.pm,v 7.12 2007/02/22 09:01:41 claude Exp claude $
 #
-# copyright (c) 2005, 2006 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2005-2007 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 package Genezzo::Havok::SysHook;
@@ -25,7 +25,7 @@ our %ReqObjMethod;    # Object-Oriented Meth
 our $MAKEDEPS;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 7.7 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.12 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     $Got_Hooks = 0;
 
@@ -41,16 +41,19 @@ BEGIN {
 
     $MAKEDEPS->{'PREREQ_HAVOK'} = {
         'Genezzo::Havok' => '0.0',
+        'Genezzo::Havok::Utils' => '0.0', # for userfunctions
     };
 
     # DML is an array, not a hash
 
     my $now = 
-    do { my @r = (q$Date: 2006/06/04 06:28:21 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
+    do { my @r = (q$Date: 2007/02/22 09:01:41 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
+
+    # add_havok_pkg(modname=$pak1)
 
     my $dml =
         [
-         "i havok 3 $pak1 SYSTEM $now 0 $VERSION"
+         "i havok 4 $pak1 SYSTEM $now 0 $VERSION"
          ];
 
     my %tabdefs = 
@@ -62,9 +65,42 @@ BEGIN {
          );
     $MAKEDEPS->{'TABLEDEFS'} = \%tabdefs;
 
+    my @sql_funcs = qw(
+                       add_sys_hook
+                       );
+
+    my @ins1;
+    my $ccnt = 1;
+    for my $pfunc (@sql_funcs)
+    {
+        my %attr = (module => $pak1, 
+                    function => "sql_func_" . $pfunc,
+                    creationdate => $now,
+                    argstyle => 'HASH',
+                    sqlname => $pfunc);
+
+        my @attr_list;
+        while ( my ($kk, $vv) = each (%attr))
+        {
+            push @attr_list, '\'' . $kk . '=' . $vv . '\'';
+        }
+
+        my $bigstr = "select add_user_function(" . join(", ", @attr_list) .
+            ") from dual";
+        push @ins1, $bigstr;
+        $ccnt++;
+    }
+
+    # add help for all functions
+    push @ins1, "select add_help(\'$pak1\') from dual";
+
+    # XXX XXX: NOTE: check is for install, which is after create_table/dml
+
     $MAKEDEPS->{'DML'} = [
-                          { check => [],
-                            install => [] }
+                          { check => [
+                                      "select * from user_functions where xname = \'$pak1\'"                                      
+],
+                            install => \@ins1 }
                           ];
 
 #    print Data::Dumper->Dump([$MAKEDEPS]);
@@ -108,10 +144,10 @@ sub MakeSQL
 {
     my $bigSQL; 
     ($bigSQL = <<EOF_SQL) =~ s/^\#//gm;
-#REM Copyright (c) 2005, 2006 Jeffrey I Cohen.  All rights reserved.
+#REM Copyright (c) 2005, 2006, 2007 Jeffrey I Cohen.  All rights reserved.
 #REM
 #REM 
-#select HavokUse('Genezzo::Havok::SysHook') from dual
+#select HavokUse('Genezzo::Havok::SysHook') from dual;
 #
 #REM HAVOK_EXAMPLE
 #i sys_hook 1 Genezzo::Dict dicthook1 Howdy_Hook require Genezzo::Havok::Examples Howdy SYSTEM TODAY 0
@@ -131,6 +167,480 @@ EOF_SQL
 
     return $bigSQL;
 }
+
+sub getpod
+{
+    my $bigHelp;
+    ($bigHelp = <<'EOF_HELP') =~ s/^\#//gm;
+#=head1 System_Hooks
+#
+#=head2  add_sys_hook : add_sys_hook(pkg=...,hook=...,module=...,function=...)
+#
+#To create a system hook for dicthook1 in Genezzo::Dict using the 
+#function "Howdy" in Genezzo::Havok::Examples just use:
+#  select add_sys_hook(
+#             'pkg=Genezzo::Dict',
+#             'hook=dicthook1',
+#             'replace=Howdy_Hook',
+#             'module=Genezzo::Havok::Examples',
+#             'function=Howdy') from dual;
+#
+#More sophisticated functions may need to define the sys_hook
+#table columns as specified in L<Genezzo::Havok::SysHook>. 
+#Use the help command:
+#
+#  select add_sys_hook('help') from dual;
+#
+#to list the valid parameters
+#
+#
+#
+EOF_HELP
+
+    my $msg = $bigHelp;
+
+    return $msg;
+
+} # end getpod
+
+
+sub _build_sql_for_sys_hook
+{
+    my %required = (
+                    xid => "no xid!",
+                    pkg => "no package!",
+                    hook => "no hook!",
+                    replace => "no replace!",
+                    xname => "no xname!",
+                    args => "no args!"
+                    );
+
+    my $now = Genezzo::Dict::time_iso8601();
+
+    my %optional = (
+                    xtype => "require",
+                    creationdate => $now,
+                    owner => "SYSTEM",
+                    version => 0
+                    );
+    my %args = (
+                %optional,
+		@_);
+
+    # synonyms
+    $args{xname} = $args{module} if (exists($args{module}));
+    $args{args}  = $args{function} if (exists($args{function}));
+    $args{pkg}  = $args{package} if (exists($args{package}));
+
+    return undef
+        unless (Validate(\%args, \%required));
+
+    my $pattern = "\'%s\', " x 9;
+    $pattern .= "\'%s\' ";
+
+    my $bigstr = "insert into sys_hook values (" .
+        sprintf($pattern,
+                $args{xid},
+                $args{pkg},
+                $args{hook},
+                $args{replace},
+                $args{xtype},
+                $args{xname},
+                $args{args},
+
+                $args{owner},
+                $args{creationdate},
+                $args{version});
+
+    $bigstr .= ")";
+
+    return $bigstr;
+}
+
+sub sql_func_add_sys_hook
+{
+    my %args= @_;
+
+    my $dict = $args{dict};
+    my $dbh  = $args{dbh};
+    my $fn_args = $args{function_args};
+    
+#    print Data::Dumper->Dump($fn_args);
+
+    my $now = Genezzo::Dict::time_iso8601();
+
+    # list the optional values
+    my %nargs = (
+                 xtype => "require",
+                 creationdate => $now,
+                 owner => "SYSTEM",
+                 version => 0,
+
+                 dict => $dict
+                 );
+
+    my $do_help = 0;
+
+    $do_help = 1 unless (scalar(@{$fn_args}));
+    
+    my $valid = 
+        'xid|pkg|hook|replace|xtype|xname|args|owner|creationdate|version';
+
+    $valid .= '|module|function|package'; # additional synonyms
+
+    for my $argi (@{$fn_args})
+    {
+        # separate key=val pairs into hash args
+
+        my @foo;
+        @foo = ($argi =~ m/^(\s*\w+\s*\=\s*)(.*)(\s*)$/)
+            if ($argi =~ m/\w+\s*\=/);
+
+
+        if ($argi =~ m/^\s*($valid)\s*\=/i)
+        {
+            my $nargtype = $foo[0];
+            # remove the spaces and equals ("=");
+            $nargtype =~ s/\s//g;
+            $nargtype =~ s/\=//g;
+
+            $nargtype = 'xname' if ($nargtype =~ m/^module/i);
+            $nargtype = 'args' if ($nargtype =~ m/^function/i);
+            $nargtype = 'pkg' if ($nargtype =~ m/^package/i);
+
+            $nargs{lc($nargtype)} = $foo[1];
+        }
+        else
+        {
+            if (scalar(@{$fn_args}) == 1)
+            {
+                if ($argi =~ m/^help$/i)
+                {
+                    $do_help = 1;
+                    last;
+                }
+            } # end if 1 arg
+        }
+    } # end for
+
+    if ($do_help)
+    {
+        my $outi = "Valid arguments are:\n    ";
+
+        $outi .= join(" ",split(/\|/, $valid)) . "\n";
+
+        my $bigexample;
+        ($bigexample = <<EOF_EXAMPLE) =~ s/^\#//gm;
+#
+#To create a system hook for dicthook1 in Genezzo::Dict using the 
+#function "Howdy" in Genezzo::Havok::Examples just use:
+#  select add_sys_hook(
+#             'pkg=Genezzo::Dict',
+#             'hook=dicthook1',
+#             'replace=Howdy_Hook',
+#             'module=Genezzo::Havok::Examples',
+#             'function=Howdy') from dual;
+EOF_EXAMPLE
+
+        $outi .= $bigexample;
+        
+        return $outi;
+    }
+
+    unless (exists($nargs{xid}))
+    {
+        my $hashi  = $dict->DictTableGetTable (tname => "sys_hook") ;
+        my $tv = tied(%{$hashi});
+
+        $nargs{xid} = $dict->DictGetNextVal(tname => "sys_hook",
+                                            col   => "xid",
+                                            tieval => $tv);
+
+    }
+
+    my $bigstr = _build_sql_for_sys_hook(%nargs);
+
+    return 0 unless(defined($bigstr));
+
+    my $sth =
+        $dbh->prepare($bigstr);
+    
+    return 0
+        unless ($sth);
+
+
+    # insert the function definition in the user_function table
+    return 0
+        unless ($sth->execute());
+
+    # load the hook
+    return Genezzo::Havok::SysHook::LoadSysHook(%nargs);
+
+}
+
+sub LoadSysHook
+{
+    my %optional;
+
+    my %required = (
+                    xid          => "no xid!",
+                    xtype        => "no xtype!",
+                    xname        => "no xname!",
+                    owner        => "no owner!",
+                    creationdate => "no creationdate!",
+                    args         => "no args!",
+
+                    pkg          => "no pkg!",
+                    hook         => "no hook!",
+                    replace      => "no replace!",
+
+                    dict         => "no dictionary!"
+                    );
+
+    my %args = (%optional,
+                @_);
+
+    return 0
+        unless (Validate(\%args, \%required));
+
+    my $xid    = $args{xid};
+    my $xtype  = $args{xtype};
+    my $xname  = $args{xname};
+    my $owner  = $args{owner};
+    my $dat    = $args{creationdate};
+    my $xargs  = $args{args};
+
+    my $xpkg   = $args{pkg};
+    my $hook   = $args{hook};
+    my $repl   = $args{replace};
+
+    my $dict   = $args{dict};
+
+    my $stat = 1;
+
+    my $save_previous_hook;
+
+    # block 1
+    {
+        my $mainf = $xpkg . "::"  . $hook;
+
+        my @varlist; # list of variables to hold previous value of coderef
+
+        if (defined($repl)
+            && length($repl))
+        {
+                
+            # build name of variable to hold previous value of
+            # hook coderef
+            
+            $repl = $xname . "::" . $repl; # scope for require package
+            push @varlist, $repl;
+        }
+
+        # have we seen this hook before?
+        unless (exists($SysHookOriginal{"$mainf"}))
+        {
+
+            # create a placeholder, even for non-existant
+            # functions.  Then we know to "undef" them if we
+            # re-initialize...
+            
+            $SysHookOriginal{"$mainf"} = undef;
+
+            # save the original value for a hook variable if necessary
+            my $orig_var = 'SysHookOriginal{"'. $mainf . '"}';
+            push @varlist, $orig_var;
+        }
+
+        if (scalar(@varlist))
+        {
+            # we have a hook that needs saving...
+            $save_previous_hook = "";
+
+            # save to modules "replace" var and SysHookOriginal 
+            # if necessary
+            for my $varname (@varlist)
+            {
+                $save_previous_hook .= '$' . $varname . ' = \&' . $mainf .
+                    ' if defined(&' . $mainf . ');';
+            }
+            greet $save_previous_hook;
+
+        }
+        else
+        {
+            # do nothing
+            $save_previous_hook = undef;
+        }
+
+    } # end block 1
+
+    if ($xtype =~ m/^(oo_require|require)$/i)
+    {
+        my $req_str = "require $xname";
+
+        eval "$save_previous_hook"
+            if (defined($save_previous_hook));
+            
+        greet $req_str;
+
+        unless (eval $req_str)
+        {
+            my %earg = (#self => $self,
+                        msg => "no such package - $xname - for table sys_hook, row $xid");
+
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
+#                next;
+            return 0;
+        }
+
+
+        # XXX XXX: check for existance of "args" function...
+
+        no strict 'refs';
+        no warnings 'redefine';
+
+        my @inargs;
+
+        if ($xargs =~ m/\s/)
+        {
+            @inargs = split(/\s/, $xargs);
+        }
+        else
+        {
+            push @inargs, $xargs;
+        }
+
+        if ($xtype =~ m/^(oo_require)$/i)
+        {
+            # Object-Oriented Require
+            unless (exists($ReqObjList{"$xname"}))
+            {
+                whisper "init object for package $xname";
+                
+                my $obj;
+                my $initstr = '$obj = ' . $xname ;
+                $initstr   .= "->" . 'SysHookInit($dict)';
+                whisper "$initstr";
+                eval " $initstr " ;
+                if ($@)
+                {
+                    my %earg = (#self => $self,
+                                msg => "$@\nbad pkg init : $initstr");
+                    
+                    &$GZERR(%earg)
+                        if (defined($GZERR));
+
+                    $stat = 0;
+                }
+
+                # create an entry even if the init fails
+                $ReqObjList{"$xname"} = $obj;                        
+            }
+                
+        }
+
+        my $obj1;
+
+        for my $fname (@inargs)
+        {
+            # Note: add functions to specified namespace...
+
+            my $mainf = $xpkg . "::"  . $hook;
+            my $packf =  $xname . "::" . $fname;
+
+            my $func = "sub " . $mainf ;
+            if (($xtype =~ m/^(oo_require)$/i) &&
+                exists($ReqObjList{"$xname"}) &&
+                defined($ReqObjList{"$xname"}))
+            {
+                $obj1 = $ReqObjList{"$xname"};
+                #$ReqObjMethod{$packf} = sub { $obj1->$packf(@_) };
+                #$func .= '{ return $ReqObjMethod{' . $packf . '}->(@_); }';
+#                    $func .= '{ my $mref = sub { $obj1->$packf(@_) };';
+#                    $func .= ' return $mref->(@_); }';
+
+                # lots of work to avoid 'Variable "$mref" may be
+                # unavailable...'
+
+                $func .= '{ my $mref = ' .
+                    'sub { $Genezzo::Havok::SysHook::ReqObjList{"' 
+                    . $xname .'"}->' . $packf . '(@_) };';
+                $func .= ' return $mref->(@_); }';
+
+#                    $mref = sub { $obj1->$packf(@_) };
+#                    $func .= '{ return $mref->(@_); }';
+            }
+            else
+            {
+                $func .= "{ return " . $packf . '(@_); }';
+            }            
+
+            whisper $func;
+
+#            eval {$func } ;
+            eval " $func " ;
+            if ($@)
+            {
+                my %earg = (#self => $self,
+                            msg => "$@\nbad function : $func");
+
+                &$GZERR(%earg)
+                    if (defined($GZERR));
+
+                $stat = 0;
+            }
+
+        }
+
+            
+    } # end  if $xtype =~ (oo_require|require)
+    elsif ($xtype =~ m/^function$/i)
+    {
+        my $doublecolon = "::";
+
+
+        # XXX XXX: what about hook name? what should it mean?
+
+        unless ($xname =~ m/$doublecolon/)
+        {
+            # Note: add functions to  namespace...
+            
+            $xname = $xpkg . "::" . $xname;
+        }
+
+        my $func = "sub " . $xname . " " . $xargs;
+            
+#            whisper $func;
+
+#            eval {$func } ;
+        eval " $func " ;
+        if ($@)
+        {
+            my %earg = (#self => $self,
+                        msg => "$@\nbad function : $func");
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+            $stat = 0;
+        }
+    } # end if xtpe =~ function
+    else
+    {
+        my %earg = (#self => $self,
+                    msg => "unknown user extension - $xtype");
+
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
+        $stat = 0;
+    }
+
+    return $stat;
+
+} # end loadsyshook
 
 sub HavokInit
 {
@@ -193,217 +703,22 @@ sub HavokInit
         my $repl   = $vv->[$getcol->{replace}];
             
 #        greet $vv;
+        
+        my $lstat =
+            LoadSysHook(
+                        xid          => $xid,
+                        xtype        => $xtype,
+                        xname        => $xname,
+                        owner        => $owner,
+                        creationdate => $dat,
+                        args         => $xargs,
 
-        my $save_previous_hook;
+                        pkg          => $xpkg,
+                        hook         => $hook,
+                        replace      => $repl,
 
-        {
-            my $mainf = $xpkg . "::"  . $hook;
-
-            my @varlist; # list of variables to hold previous value of coderef
-
-            if (defined($repl)
-                && length($repl))
-            {
-                
-                # build name of variable to hold previous value of
-                # hook coderef
-
-                $repl = $xname . "::" . $repl; # scope for require package
-                push @varlist, $repl;
-            }
-
-            # have we seen this hook before?
-            unless (exists($SysHookOriginal{"$mainf"}))
-            {
-
-                # create a placeholder, even for non-existant
-                # functions.  Then we know to "undef" them if we
-                # re-initialize...
-
-                $SysHookOriginal{"$mainf"} = undef;
-
-                # save the original value for a hook variable if necessary
-                my $orig_var = 'SysHookOriginal{"'. $mainf . '"}';
-                push @varlist, $orig_var;
-            }
-
-            if (scalar(@varlist))
-            {
-                # we have a hook that needs saving...
-                $save_previous_hook = "";
-
-                # save to modules "replace" var and SysHookOriginal 
-                # if necessary
-                for my $varname (@varlist)
-                {
-                    $save_previous_hook .= '$' . $varname . ' = \&' . $mainf .
-                        ' if defined(&' . $mainf . ');';
-                }
-                greet $save_previous_hook;
-
-            }
-            else
-            {
-                # do nothing
-                $save_previous_hook = undef;
-            }
-
-        }
-
-        if ($xtype =~ m/^(oo_require|require)$/i)
-        {
-            my $req_str = "require $xname";
-
-            eval "$save_previous_hook"
-                if (defined($save_previous_hook));
-            
-            greet $req_str;
-
-            unless (eval $req_str)
-            {
-                my %earg = (#self => $self,
-                            msg => "no such package - $xname - for table sys_hook, row $xid");
-
-                &$GZERR(%earg)
-                    if (defined($GZERR));
-
-                next;
-            }
-
-
-            # XXX XXX: check for existance of "args" function...
-
-            no strict 'refs';
-            no warnings 'redefine';
-
-            my @inargs;
-
-            if ($xargs =~ m/\s/)
-            {
-                @inargs = split(/\s/, $xargs);
-            }
-            else
-            {
-                push @inargs, $xargs;
-            }
-
-            if ($xtype =~ m/^(oo_require)$/i)
-            {
-                # Object-Oriented Require
-                unless (exists($ReqObjList{"$xname"}))
-                {
-                    whisper "init object for package $xname";
-
-                    my $obj;
-                    my $initstr = '$obj = ' . $xname ;
-                    $initstr   .= "->" . 'SysHookInit($dict)';
-                    whisper "$initstr";
-                    eval " $initstr " ;
-                    if ($@)
-                    {
-                        my %earg = (#self => $self,
-                                    msg => "$@\nbad pkg init : $initstr");
-
-                        &$GZERR(%earg)
-                            if (defined($GZERR));
-                    }
-
-                    # create an entry even if the init fails
-                    $ReqObjList{"$xname"} = $obj;                        
-                }
-                
-            }
-
-            my $obj1;
-
-            for my $fname (@inargs)
-            {
-                # Note: add functions to specified namespace...
-
-                my $mainf = $xpkg . "::"  . $hook;
-                my $packf =  $xname . "::" . $fname;
-
-                my $func = "sub " . $mainf ;
-                if (($xtype =~ m/^(oo_require)$/i) &&
-                    exists($ReqObjList{"$xname"}) &&
-                    defined($ReqObjList{"$xname"}))
-                {
-                    $obj1 = $ReqObjList{"$xname"};
-                    #$ReqObjMethod{$packf} = sub { $obj1->$packf(@_) };
-                    #$func .= '{ return $ReqObjMethod{' . $packf . '}->(@_); }';
-#                    $func .= '{ my $mref = sub { $obj1->$packf(@_) };';
-#                    $func .= ' return $mref->(@_); }';
-
-                    # lots of work to avoid 'Variable "$mref" may be
-                    # unavailable...'
-
-                    $func .= '{ my $mref = ' .
-                        'sub { $Genezzo::Havok::SysHook::ReqObjList{"' 
-                        . $xname .'"}->' . $packf . '(@_) };';
-                    $func .= ' return $mref->(@_); }';
-
-#                    $mref = sub { $obj1->$packf(@_) };
-#                    $func .= '{ return $mref->(@_); }';
-                }
-                else
-                {
-                    $func .= "{ return " . $packf . '(@_); }';
-                }            
-
-            whisper $func;
-
-#            eval {$func } ;
-                eval " $func " ;
-                if ($@)
-                {
-                    my %earg = (#self => $self,
-                                msg => "$@\nbad function : $func");
-
-                    &$GZERR(%earg)
-                        if (defined($GZERR));
-                }
-
-            }
-
-            
-        }
-        elsif ($xtype =~ m/^function$/i)
-        {
-            my $doublecolon = "::";
-
-
-            # XXX XXX: what about hook name? what should it mean?
-
-            unless ($xname =~ m/$doublecolon/)
-            {
-                # Note: add functions to  namespace...
-
-                $xname = $xpkg . "::" . $xname;
-            }
-
-            my $func = "sub " . $xname . " " . $xargs;
-            
-#            whisper $func;
-
-#            eval {$func } ;
-            eval " $func " ;
-            if ($@)
-            {
-                my %earg = (#self => $self,
-                            msg => "$@\nbad function : $func");
-
-                &$GZERR(%earg)
-                    if (defined($GZERR));
-            }
-        }
-        else
-        {
-            my %earg = (#self => $self,
-                        msg => "unknown user extension - $xtype");
-
-            &$GZERR(%earg)
-                if (defined($GZERR));
-        }
+                        dict         => $dict
+                        );
 
     } # end while
 
@@ -548,7 +863,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 
 L<perl(1)>.
 
-Copyright (c) 2005, 2006 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2005-2007 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

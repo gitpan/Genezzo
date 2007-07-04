@@ -1,3 +1,5 @@
+# Copyright (c) 2003-2007 Jeffrey I Cohen.  All rights reserved.
+#
 # Before `make install' is performed this script should be runnable with
 # `make test'. After `make install' it should work as `perl GSysHook1.t
 
@@ -106,6 +108,10 @@ rmtree($gnz_home, 1, 1);
         
         next
             unless (length($lin));
+
+        $lin =~ s/;(\s*)$//; # remove trailing semi
+
+        print "do: $lin\n";
         
         fail ("could not create table havok")
             unless ($dbh->do($lin));
@@ -133,6 +139,10 @@ rmtree($gnz_home, 1, 1);
         
         next
             unless (length($lin));
+
+        $lin =~ s/;(\s*)$//; # remove trailing semi
+
+        print "do: $lin\n";
         
         fail ("could not create table syshook")
             unless ($dbh->do($lin));

@@ -1500,7 +1500,7 @@ sub SQLFetch
         # Note: always return the rid
         return ($currkey, $outarr)
             unless (defined($filter));
-        
+
         # filter is defined
         my $val;
 

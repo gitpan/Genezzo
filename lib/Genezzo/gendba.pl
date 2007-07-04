@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/gendba.pl,v 7.10 2007/01/11 10:04:07 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/gendba.pl,v 7.11 2007/01/23 08:51:46 claude Exp claude $
 #
 # copyright (c) 2003-2007 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -262,6 +262,9 @@ our $GZERR = sub {
     return 
         unless (exists($args{msg}));
 
+    # to process spooling to multiple files
+    my $outfile_h = $args{outfile_list} || undef;
+
     my $warn = 0;
     if (exists($args{severity}))
     {
@@ -273,6 +276,15 @@ our $GZERR = sub {
         if ($args{severity} !~ m/info/i)
         {
             printf ("%s: ", $sev);
+
+            if (defined($outfile_h))
+            {
+                while (my ($kk, $vv) = each (%{$outfile_h}))
+                {
+                    printf $vv ("%s: ", $sev);
+                }
+            }
+
             $warn = 1;
         }
         else
@@ -288,6 +300,18 @@ our $GZERR = sub {
     print $args{msg};
     # add a newline if necessary
     print "\n" unless $args{msg}=~/\n$/;
+
+    if (defined($outfile_h))
+    {
+        while (my ($kk, $vv) = each (%{$outfile_h}))
+        {
+            print $vv $args{msg};
+            # add a newline if necessary
+            print $vv "\n" unless $args{msg}=~/\n$/;
+        }
+    }
+
+
 #    carp $args{msg}
 #      if (warnings::enabled() && $warn);
     

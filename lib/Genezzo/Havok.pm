@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Havok.pm,v 7.14 2006/11/19 08:57:02 claude Exp $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Havok.pm,v 7.17 2007/02/23 10:00:32 claude Exp claude $
 #
-# copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2003-2007 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 package Genezzo::Havok;
@@ -19,7 +19,7 @@ our $VERSION;
 our $MAKEDEPS;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 7.14 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.17 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     my $pak1  = __PACKAGE__;
     $MAKEDEPS = {
@@ -41,7 +41,7 @@ BEGIN {
 
 #    my $now = Genezzo::Dict::time_iso8601()
     my $now = 
-    do { my @r = (q$Date: 2006/11/19 08:57:02 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
+    do { my @r = (q$Date: 2007/02/23 10:00:32 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
 
     my $dml =
         [
@@ -596,15 +596,15 @@ sub MakeSQL
 {
     my $bigSQL; 
     ($bigSQL = <<EOF_SQL) =~ s/^\#//gm;
-#REM Copyright (c) 2004-2006 Jeffrey I Cohen.  All rights reserved.
+#REM Copyright (c) 2004-2007 Jeffrey I Cohen.  All rights reserved.
 #REM
 #REM 
-#select HavokUse('Genezzo::Havok') from dual
+#select HavokUse('Genezzo::Havok') from dual;
 #
 #REM HAVOK_EXAMPLE
-#REM select * from tab1 where Genezzo::Havok::Examples::isRedGreen(col1)
+#REM select * from tab1 where Genezzo::Havok::Examples::isRedGreen(col1);
 #REM note that UserExtend usage is deprecated, please use UserFunctions
-#select HavokUse('Genezzo::Havok::UserExtend') from dual
+#select HavokUse('Genezzo::Havok::UserExtend') from dual;
 #i user_extend 1 require Genezzo::Havok::Examples isRedGreen SYSTEM TODAY 0
 #REM moved soundex to Genezzo::Havok::SQLScalar
 #REM i user_extend 2 require Text::Soundex soundex SYSTEM TODAY 0
@@ -921,7 +921,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 
 L<perl(1)>.
 
-Copyright (c) 2003-2006 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2003-2007 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

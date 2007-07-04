@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSBlock.pm,v 7.1 2005/07/19 07:49:03 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSBlock.pm,v 7.2 2007/02/03 10:02:47 claude Exp claude $
 #
-# copyright (c) 2003, 2004 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2003-2007 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 use strict;
@@ -111,6 +111,11 @@ sub _fetchmeta {
     return ($self->{tie_rdblock}->_fetchmeta(@_));
 }
 
+sub BlockInfoString {
+    my $self = shift;
+    return ($self->{tie_rdblock}->BlockInfoString(@_));
+}
+
 # standard hash methods follow
 #sub STORE # same as pushhash store
 #{
@@ -207,7 +212,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 
 L<perl(1)>.
 
-Copyright (c) 2003, 2004 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2003-2007 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

@@ -1,4 +1,4 @@
-# havok version=7.13
+# havok version=7.17
 ABSTRACT:     
 AUTHOR:    Jeffrey I Cohen (jcohen@cpan.org)
 DML:    
@@ -7,18 +7,22 @@ DML:
       -    select * from user_functions where xname = 'Genezzo::Havok::DebugUtils'
 
     install:    
-      -    i user_functions 49 require Genezzo::Havok::DebugUtils sql_func_bcfiledump SYSTEM 2006-11-17T09:06:53 0 HASH bcfiledump
-      -    i user_functions 50 require Genezzo::Havok::DebugUtils sql_func_metadump SYSTEM 2006-11-17T09:06:53 0 HASH metadump
+      -    select add_user_function('sqlname=bcfiledump', 'argstyle=HASH', 'function=sql_func_bcfiledump', 'creationdate=2007-06-26T08:25:52', 'module=Genezzo::Havok::DebugUtils') from dual
+      -    select add_user_function('sqlname=metadump', 'argstyle=HASH', 'function=sql_func_metadump', 'creationdate=2007-06-26T08:25:52', 'module=Genezzo::Havok::DebugUtils') from dual
+      -    select add_user_function('sqlname=blockdump', 'argstyle=HASH', 'function=sql_func_blockdump', 'creationdate=2007-06-26T08:25:52', 'module=Genezzo::Havok::DebugUtils') from dual
+      -    select add_user_function('sqlname=gnz_history', 'argstyle=HASH', 'function=sql_func_gnz_history', 'creationdate=2007-06-26T08:25:52', 'module=Genezzo::Havok::DebugUtils') from dual
+      -    select add_help('Genezzo::Havok::DebugUtils') from dual
 
 
 
 LICENSE:    gpl
 NAME:    Genezzo::Havok::DebugUtils
 PREREQ_HAVOK:    
+  Genezzo::Havok::SysHelp:    0.0
   Genezzo::Havok::UserFunctions:    0.0
   Genezzo::Havok::Utils:    0.0
 
 TABLEDEFS:    
 
-UPDATED:    2006-11-17T01:08:46
-VERSION:    1.03
+UPDATED:    2007-06-26T01:34:56
+VERSION:    1.06

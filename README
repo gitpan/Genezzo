@@ -179,13 +179,14 @@ EXAMPLES
   Some very basic SQL create/drop/describe table, select, insert, update
   and delete syntax is supported, and like standard SQL, table and
   column names are case-insensitive unless quoted.  More complex SQL
-  parses, but is ignored.  The only supported functions
-  are count(*) and ecount(*), a non-blocking count estimation function.
-  The database also supports commit to force changes to disk, and a crude
-  rollback.  NOTE: Data definition (such as create table or ct) must be
-  manually committed to keep the database in a consistent state.
-  Uncommitted inserts and updates will only be block-consistent -- there
-  is no guarantee that the data will get flushed to disk, and no
+  parses, but is ignored.  While many scalar SQL functions are available, 
+  the only supported aggregation functions are count(*) and ecount(*),
+  a non-blocking count estimation function.  The database also
+  supports commit to force changes to disk, and a crude rollback. 
+  NOTE: Data definition (such as create table or ct) must be manually
+  committed to keep the database in a consistent state.  Uncommitted
+  inserts and updates will only be block-consistent -- there is no
+  guarantee that the data will get flushed to disk, and no
   guarantee whether the changes will or will not take effect.
 
     rem  Some simple SELECTs
@@ -595,9 +596,11 @@ NEW FEATURES - HavokUse function for System/User Extensibility
   do nothing, but return successfully.  See the Havok module for more
   details.  Note that the "select" statement is now invoking
   dictionary actions which may create and update new tables, and which
-  may need to be committed.  Also, HavokUse only performs partial
-  initialization -- it is still necessary to commit, shutdown and
-  restart to activate the new Havok modules.
+  may need to be committed.  Also, prior to version 0.71, HavokUse
+  only performs partial initialization -- it is still necessary to
+  commit, shutdown and restart to activate the new Havok modules.
+  Modules created after version 0.71 can use add_user_function and
+  add_sys_hook to dynamically load new functionality.
 
 NEW FEATURES - Havok::UserFunctions, standard SQL scalar functions
 
@@ -626,14 +629,14 @@ NEW FEATURES - Havok::UserFunctions, standard SQL scalar functions
   Version 0.67 has many fixes plus added support for the string
   functions lpad, ltrim, rpad, rtrim, translate, replace, and soundex
   and the math functions mod, power, round, sign, trunc, logN.  Please
-  see Genezzo::Havok::SQLScalar for more information.
+  see Genezzo::Havok::SQLScalar or "help area=sql_functions" for more
+  information.
 
   Version 0.69 adds the utility function add_user_function() which
   simplifies the creation of new sql functions. In gendba.pl 
   line-mode please type:
     help area=utility_functions add_user_function
   for more information.
-
 
 NEW FEATURES - improved genexp.pl
  
@@ -697,11 +700,20 @@ NEW FEATURES - improved HELP
   or
     Help area=sql
   for more information.
-        
+
+NEW FEATURES - dynamic system hooks
+ 
+  Prior to version 0.71, the Genezzo::Havok::SysHook module required
+  direct modification of the sys_hook table.  In version 0.71, the
+  function add_sys_hook can be used to dynamically add system hooks to a
+  running Genezzo instance.  In gendba.pl line-mode please type:
+    help area=system_hooks add_sys_hook
+  for more information.
+
 
 INCOMPATIBLE CHANGES
 
-  Version 0.70 dictionary and block format is incompatible with
+  Version 0.71 dictionary and block format is incompatible with
   previous releases.  No upgrade path is supported.
   Version 0.48 thru 0.50 are compatible.
 
@@ -714,7 +726,7 @@ AUTHOR
 
   Original author: Jeffrey I Cohen <jcohen@genezzo.com>
 
-  Copyright (c) 2003, 2004, 2005, 2006 Jeffrey I Cohen.  All rights reserved.
+  Copyright (c) 2003-2007 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

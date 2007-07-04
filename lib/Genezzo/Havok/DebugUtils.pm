@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/DebugUtils.pm,v 1.3 2006/11/17 09:06:53 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/DebugUtils.pm,v 1.6 2007/06/26 08:25:52 claude Exp claude $
 #
-# copyright (c) 2006 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2006, 2007 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 package Genezzo::Havok::DebugUtils;
@@ -23,7 +23,7 @@ our $VERSION;
 our $MAKEDEPS;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 1.3 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.6 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     my $pak1  = __PACKAGE__;
     $MAKEDEPS = {
@@ -37,12 +37,13 @@ BEGIN {
     $MAKEDEPS->{'PREREQ_HAVOK'} = {
         'Genezzo::Havok::UserFunctions' => '0.0',
         'Genezzo::Havok::Utils' => '0.0',
+        'Genezzo::Havok::SysHelp' => '0.0',
     };
 
     # DML is an array, not a hash
 
     my $now = 
-    do { my @r = (q$Date: 2006/11/17 09:06:53 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
+    do { my @r = (q$Date: 2007/06/26 08:25:52 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
 
 
     my %tabdefs = ();
@@ -51,19 +52,36 @@ BEGIN {
     my @perl_funcs = qw(
                         bcfiledump
                         metadump
+                        blockdump
+                        gnz_history
                         );
 
 
     my @ins1;
-    # XXX XXX XXX XXX: need "select COUNT(*) from user_functions"
-    my $ccnt = 49;
+    my $ccnt = 1;
     for my $pfunc (@perl_funcs)
     {
-        my $bigstr = "i user_functions $ccnt require $pak1 " 
-            . "sql_func_" . $pfunc . " SYSTEM $now 0 HASH $pfunc";
+        my %attr = (module => $pak1, 
+                    function => "sql_func_" . $pfunc,
+                    creationdate => $now,
+                    argstyle => 'HASH',
+                    sqlname => $pfunc);
+
+        my @attr_list;
+        while ( my ($kk, $vv) = each (%attr))
+        {
+            push @attr_list, '\'' . $kk . '=' . $vv . '\'';
+        }
+
+        my $bigstr = "select add_user_function(" . join(", ", @attr_list) .
+            ") from dual";
         push @ins1, $bigstr;
         $ccnt++;
     }
+
+    # add help for DebugUtils
+    push @ins1, "select add_help(\'Genezzo::Havok::DebugUtils\') from dual";
+
 
     # if check returns 0 rows then proceed with install
     $MAKEDEPS->{'DML'} = [
@@ -125,6 +143,65 @@ sub MakeYML
     return Genezzo::Havok::MakeYML($makedp);
 }
 
+sub getpod
+{
+    my $bigHelp;
+    ($bigHelp = <<'EOF_HELP') =~ s/^\#//gm;
+#=head1 Debug_Utility_Functions
+#
+#=head2  bcfiledump : bcfiledump()
+#
+#Dump state for all active buffer caches and their associated tablespace
+#files
+#
+#=head2  metadump : metadump(filenum, blocknum)
+#
+#Dump the metadata rows for the specified block.
+#
+#=head2 blockdump : blockdump(filenum, blocknum)
+#
+#Dump the block header and row state.  Each row may several status flags
+#which are:
+#
+# X DELETED (vs not)
+# M Metadata (vs data)
+# L Locked (vs not) (currently unused).
+# H Head  
+# T Tail 
+# / middle row piece (neither head nor tail)
+# ISNULL (vs not null)
+#
+#Deleted rows still take up space in the block, but they can be "compacted" 
+#to a minimal length.
+#
+#Metadata rows are used for special configuration information, not
+#regular user data.
+#
+#A row can be split across multiple blocks.  The first part of the row
+#is the head piece, and the last part is the tail piece.  
+#
+#The block layer uses a special flag to track completely null entries.
+#However, most Genezzo blocks are organized as "packed" rows of
+#multiple values, which use a separate mechanism to track individual
+#null columns.
+#
+#=head2  gnz_history : gnz_history()
+#
+#Save the interactive command history to ~/.gnz_history.  The history is 
+#automatically reloaded for each session.  If gnz_history('autosave') is 
+#specified, the history is saved when you quit the interactive session.
+#
+#
+EOF_HELP
+
+    my $msg = $bigHelp;
+
+    return $msg;
+
+} # end getpod
+
+
+
 sub sql_func_bcfiledump
 {
     my %args= @_;
@@ -178,13 +255,15 @@ sub _meta_row_dump
 
 }
 
-sub sql_func_metadump
+sub _block_func
 {
     my %args= @_;
 
     my $dict = $args{dict};
     my $dbh  = $args{dbh};
     my $fn_args = $args{function_args};
+
+    my $block_func = $args{block_func};
 
     my @blocklist;
     
@@ -216,7 +295,8 @@ sub sql_func_metadump
     for my $file_info (@blocklist)
     {
         my $tsname = $file_info->[0];
-        my $fileno = $file_info->[1];
+#        my $fileno = $file_info->[1]; # ? tsid, not fileno...
+        my $fileno = $fn_args->[0]; # XXX XXX
         my $fname  = $file_info->[2];
 
         if (exists($dict->{tablespaces}->{$tsname}))
@@ -257,30 +337,43 @@ sub sql_func_metadump
                              blocksize => $bce->{blocksize}
                              );
 
-                        my $metazero = $rowd->_fetchmeta(undef, 0);
-
-                        print Data::Dumper->Dump([$metazero]), "\n";
-
-                        my @row = UnPackRow($metazero, $Genezzo::Util::UNPACK_TEMPL_ARR);
-                        
-                        print Data::Dumper->Dump(\@row), "\n";
-
-                        for my $col1 (@row)
+                        if ($block_func eq 'metadump')
                         {
-                            my @foo = split(':', $col1);
 
-                            if (scalar(@foo) && ($foo[0] ne '#'))
+                            my $metazero = $rowd->_fetchmeta(undef, 0);
+
+                            print Data::Dumper->Dump([$metazero]), "\n";
+
+                            my @row = UnPackRow($metazero, $Genezzo::Util::UNPACK_TEMPL_ARR);
+                        
+                            print Data::Dumper->Dump(\@row), "\n";
+
+                            for my $col1 (@row)
                             {
-                                my $id  = $foo[0];
-                                my $val = $rowd->_get_meta_row($id);
+                                my @foo = split(':', $col1);
+
+                                if (scalar(@foo) && ($foo[0] ne '#'))
+                                {
+                                    my $id  = $foo[0];
+                                    my $val = $rowd->_get_meta_row($id);
                                 
-                                _meta_row_dump($id, $val);
+                                    _meta_row_dump($id, $val);
+
+                                }
 
                             }
+                        }
+                        else
+                        {
+                            my $msg = $rowd->BlockInfoString();
+
+                            # XXX XXX:
+                            print $msg;
+                            
 
                         }
 
-                    }
+                    } # end if bceref
                 }
 
             }
@@ -289,6 +382,43 @@ sub sql_func_metadump
     }
 
     return 1;
+}
+
+
+# fileno, blockno
+sub sql_func_metadump
+{
+    my %args= @_;
+
+    $args{block_func} = 'metadump';
+
+    return _block_func(%args);
+}
+
+# fileno, blockno
+sub sql_func_blockdump
+{
+    my %args= @_;
+
+    $args{block_func} = 'blockdump';
+
+    return _block_func(%args);
+}
+
+
+# save the interactive history.  use 'autosave' to save on quit.
+# TODO: make autosave "sticky" so history is always saved for current
+# and all subsequent sessions.  Delete ~/.gnz_history to clear.
+# Probably need an option to do this, as well as disable autosave...
+sub sql_func_gnz_history
+{
+    my %args= @_;
+
+    my $dict = $args{dict};
+    my $dbh  = $args{dbh};
+    my $fn_args = $args{function_args};
+
+    return $dbh->SaveHistory($fn_args);
 }
 
 
@@ -311,6 +441,8 @@ select HavokUse('Genezzo::Havok::DebugUtils') from dual;
 
 =head1 DESCRIPTION
 
+Special debugging utility functions.
+
 =head1 ARGUMENTS
 
 =head1 FUNCTIONS
@@ -322,6 +454,11 @@ select HavokUse('Genezzo::Havok::DebugUtils') from dual;
 
 =item  metadump
 
+
+=item  blockdump
+
+
+=item gnz_history
 
 =back
 
@@ -343,7 +480,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 
 L<perl(1)>.
 
-Copyright (c) 2006 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2006, 2007 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

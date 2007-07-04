@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Block/RCS/RDBlock.pm,v 7.8 2006/08/21 20:56:21 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Block/RCS/RDBlock.pm,v 7.9 2007/02/03 09:44:44 claude Exp claude $
 #
-# copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2003-2007 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 use strict;
@@ -160,6 +160,88 @@ sub _init
     return _mkrowdir($self, $numelts, $freespace);
 }
 
+# used by Genezzo::Havok::DebugUtils::blockdump()
+sub BlockInfoString
+{
+    my $self = shift;
+
+    my $outi = "";
+
+    $outi .= "blocktype = " . $self->{blocktype} . " ";
+    $outi .= ($self->{blocktype} == 0 ) ? "(Empty)" : 
+        (($self->{blocktype} == 1 ) ? "(Append)" : 
+         (($self->{blocktype} == 2 ) ? "(Random)" : "(Unknown!)"));
+    $outi .= "\n";
+
+    $outi .= "blocksize = " . $self->{blocksize} . "\n";
+    $outi .= "minus hdr/ftr = " . $self->{adjblocksize} . "\n";
+    $outi .= "freespace = " . $self->{freespace} . "\n";
+    $outi .= "used      = " . ($self->{adjblocksize} - $self->{freespace})
+        . "\n";
+    $outi .= "numelts   = " . $self->{numelts} . "\n";
+    $outi .= "can_insert = " . $self->{can_insert} . "\n";
+    $outi .= "compacted = " . $self->{compacted} . "\n";
+    $outi .= "absfree   = " . $self->{absfree} . "\n";
+    $outi .= "pctfree   = " . $self->{absfree}*100/$self->{adjblocksize} . "\%\n";
+    $outi .= "absused   = " . $self->{absused} . "\n";
+    $outi .= "pctused   = " . $self->{absused}*100/$self->{adjblocksize} . "\%\n";
+
+    my $lastelt = $self->{numelts};
+    $lastelt--;
+
+    my $refrowdir = $self->{rowdir};
+
+    $outi .= "\n";
+
+    for my $rplace (0..$lastelt)
+    {
+        my $place = $lastelt - $rplace;
+
+        my ($rowstat, $rowposn, $rowlen) = @{ $refrowdir->[$place] };
+
+        # X DELETED (vs not)
+        # M Metadata (vs data)
+        # L Locked (vs not)
+        # H Head, T Tail (vs both)
+        # ISNULL (vs not null)
+
+        my $del  = _isdeletedrow($rowstat) ? "X" : " ";
+        my $data = _isdatarow($rowstat) ? " " : "M";
+        my $lck  = _islockedrow($rowstat) ? "L" : " ";
+        my $hd   = _isheadrow($rowstat);
+        my $tl   = _istailrow($rowstat);
+
+        # "/" for a middle piece
+        my $ht   = ($hd && $tl) ? " " : 
+            (!($hd || $tl) ? "/" :
+             ($hd ? "H" : "T"));
+
+        my $isnull = _isnull($rowstat) ? "NULL" : "    ";
+        
+        $outi .= sprintf("% 5d: posn: % 5d, len: % 5d, %s %s %s %s %s\n", 
+                         $place,
+                         $rowposn,
+                         $rowlen,
+                         $del,
+                         $data,
+                         $lck,
+                         $ht,
+                         $isnull
+                         );
+
+        next
+            if (_isnull($rowstat));
+
+        my $rowval = $self->_realfetch ($rowposn, $rowlen );
+        $rowval =~ s/([^a-zA-Z0-9])/uc(sprintf("%%%02lx",  ord $1))/eg;
+        $outi .= "\t" . $rowval . "\n";
+
+    }
+    
+
+    return $outi;
+}
+
 # originally, I thought this could be an array, but deleting from an
 # array (via SHIFT or POP) never leaves a "hole", it just shifts the
 # array entries around so they are always consecutively numbered from
@@ -277,6 +359,12 @@ sub _isdeletedrow
     my $rowstat = shift @_;
 
     return ($rowstat & $RowStats{deleted});
+}
+sub _islockedrow
+{
+    my $rowstat = shift @_;
+
+    return ($rowstat & $RowStats{lock});
 }
 sub _isheadrow
 {
@@ -1681,7 +1769,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 
 L<perl(1)>.
 
-Copyright (c) 2003, 2004, 2005, 2006 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2003-2007 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

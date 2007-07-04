@@ -1,3 +1,5 @@
+# Copyright (c) 2003-2007 Jeffrey I Cohen.  All rights reserved.
+#
 # Before `make install' is performed this script should be runnable with
 # `make test'. After `make install' it should work as `perl GSysHook2.t
 

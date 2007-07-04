@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/SpaceMan/RCS/SMHook.pm,v 1.23 2006/07/06 07:35:35 claude Exp $
+# $Header: /Users/claude/fuzz/lib/Genezzo/SpaceMan/RCS/SMHook.pm,v 1.27 2007/06/26 08:19:40 claude Exp claude $
 #
-# copyright (c) 2006 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2006, 2007 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 package Genezzo::SpaceMan::SMHook;
@@ -19,7 +19,7 @@ our $VERSION;
 our $MAKEDEPS;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 1.23 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.27 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     my $pak1  = __PACKAGE__;
     $MAKEDEPS = {
@@ -40,16 +40,17 @@ BEGIN {
 
 #    my $now = Genezzo::Dict::time_iso8601()
     my $now = 
-    do { my @r = (q$Date: 2006/07/06 07:35:35 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
+    do { my @r = (q$Date: 2007/06/26 08:19:40 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
 
     my $dml =
         [
-         "i sys_hook 10 Genezzo::Block::RDBlock push_post_hook Push_Hook require $pak1 block_push_hook SYSTEM $now $VERSION",
-         "i sys_hook 11 Genezzo::Block::RDBlock delete_post_hook Delete_Hook require $pak1 block_delete_hook SYSTEM $now $VERSION",
-         "i sys_hook 12 Genezzo::Block::RDBlock realstore_post_hook Store_Hook require $pak1 block_store_hook SYSTEM $now $VERSION",
-         "i sys_hook 13 Genezzo::Row::RSFile untie_block_pre_hook PreUntie_Hook require $pak1 block_pre_untie_hook SYSTEM $now $VERSION",
-         "i sys_hook 14 Genezzo::Row::RSFile untie_block_post_hook PostUntie_Hook require $pak1 block_post_untie_hook SYSTEM $now $VERSION",
-         "i sys_hook 15 Genezzo::Row::RSFile tie_block_post_hook PostTie_Hook require $pak1 block_post_tie_hook SYSTEM $now $VERSION"
+         "select add_sys_hook(\'pkg=Genezzo::Block::RDBlock\', \'hook=push_post_hook\', \'replace=Push_Hook\', \'module=$pak1\', \'function=block_push_hook\', \'version=$VERSION\') from dual",
+         "select add_sys_hook(\'pkg=Genezzo::Block::RDBlock\', \'hook=delete_post_hook\', \'replace=Delete_Hook\', \'module=$pak1\', \'function=block_delete_hook\', \'version=$VERSION\') from dual",
+         "select add_sys_hook(\'pkg=Genezzo::Block::RDBlock\', \'hook=realstore_post_hook\', \'replace=Store_Hook\', \'module=$pak1\', \'function=block_store_hook\', \'version=$VERSION\') from dual",
+         "select add_sys_hook(\'pkg=Genezzo::Row::RSFile\', \'hook=untie_block_pre_hook\', \'replace=PreUntie_Hook\', \'module=$pak1\', \'function=block_pre_untie_hook\', \'version=$VERSION\') from dual",
+         "select add_sys_hook(\'pkg=Genezzo::Row::RSFile\', \'hook=untie_block_post_hook\', \'replace=PostUntie_Hook\', \'module=$pak1\', \'function=block_post_untie_hook\', \'version=$VERSION\') from dual",
+         "select add_sys_hook(\'pkg=Genezzo::Row::RSFile\', \'hook=tie_block_post_hook\', \'replace=PostTie_Hook\', \'module=$pak1\', \'function=block_post_tie_hook\', \'version=$VERSION\') from dual",
+         "select add_sys_hook(\'pkg=Genezzo::SpaceMan::SMExtent\', \'hook=smextent_usehooks\', \'replace=SMX_Use_Hook\', \'module=$pak1\', \'function=spaceman_smx_use_hook\', \'version=$VERSION\') from dual",
          ];
 
 
@@ -67,6 +68,12 @@ our $GZERR = sub {
     return 
         unless (exists($args{msg}));
 
+    if (exists($args{severity}))
+    {
+        my $sev = uc($args{severity});
+        return if ($sev eq 'IGNORE');
+    }
+
     if (exists($args{self}))
     {
         my $self = $args{self};
@@ -81,6 +88,9 @@ our $GZERR = sub {
         if warnings::enabled();
     
 };
+
+#our $SMH_SEV = 'info';
+our $SMH_SEV = 'IGNORE';
 
 sub MakeYML
 {
@@ -281,10 +291,16 @@ sub _maybe_update_segment_header
         # the current block is the segment header,
         # so update it now, before the untie
 
-        print "update seghdr - file $fnam, current block $blocknum\n";
+        my $msg =  "update seghdr - file $fnam, current block $blocknum\n";
         
-        print Data::Dumper->Dump([$extent_stats]), "\n";
+        $msg .=  Data::Dumper->Dump([$extent_stats])  . "\n";
         
+        my %earg = (self => $hookee_self, msg => $msg,
+                    severity => $SMH_SEV);
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
         my $xdsc = $smf->_make_extent_descriptor(
                                                  $ext_hdr_block,
                                                  $extent_size,
@@ -303,7 +319,13 @@ sub _maybe_update_segment_header
         # save the info needed to update the
         # segment header and use it post_untie
 
-        print "update seghdr - file $fnam, need seghdr block $seghdr for extent $blocknum\n";
+        my $msg = "update seghdr - file $fnam, need seghdr block $seghdr for extent $blocknum\n";
+        
+        my %earg = (self => $hookee_self, msg => $msg,
+                    severity => $SMH_SEV);
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
             
         $hookee_self->{Contrib}->{$pak1}->{blk_update_seg_hdr} =
         {
@@ -415,7 +437,13 @@ sub block_pre_untie_hook
                     my $smf  = $self->_get_smf();
                     unless (defined($smf))
                     {
-                        print "bad smf\n";
+                        my $msg = "bad smf\n";
+                        my %earg = (self => $self, msg => $msg,
+                                    severity => 'warn');
+        
+                        &$GZERR(%earg)
+                            if (defined($GZERR));
+
                         goto  L_nogood;
                     }
 
@@ -457,12 +485,31 @@ sub block_pre_untie_hook
                     {
 #                        if ($maybe_stat[0] !~ m/no_update/)
                         {
-                            print "update segment header: ", $maybe_stat[0], "\n";
+                            my $msg = 
+                                "update segment header [pre]" . 
+                                " ($fnam, $blocknum): " . 
+                                $maybe_stat[0] . "\n";
+                            my %earg = (self => $self, msg => $msg,
+                                        severity => $SMH_SEV);
+        
+                            &$GZERR(%earg)
+                                if (defined($GZERR));
+
                         }
                     }
                     else
                     {
-                        print "update segment header failed!\n";
+                        my $msg = 
+                        "update segment header [pre]" . 
+                        " ($fnam, $blocknum) failed!\n";
+
+                        # XXX XXX: warn? 
+                        my %earg = (self => $self, msg => $msg,
+                                    severity => $SMH_SEV);
+        
+                        &$GZERR(%earg)
+                            if (defined($GZERR));
+
                     }
                     
                 } # end if posn = 0
@@ -544,36 +591,74 @@ sub block_post_untie_hook
                 my $smf  = $self->_get_smf();
                 unless (defined($smf))
                 {
-                    print "bad smf\n";
+                    my $msg = "bad smf\n";
+                    my %earg = (self => $self, msg => $msg,
+                                severity => 'warn');
+                    
+                    &$GZERR(%earg)
+                        if (defined($GZERR));
+
                     goto  L_nogood;
                 }
 
                 my $rowd = $smf->_get_rowd($blocknum - $posn);
                 unless (defined($rowd))
                 {
-                    print "bad rowd\n";
+                    my $msg = "bad rowd\n";
+                    my %earg = (self => $self, msg => $msg,
+                                severity => 'warn');
+        
+                    &$GZERR(%earg)
+                        if (defined($GZERR));
+
                     goto  L_nogood;
                 }
 
                 my $row = $rowd->_get_meta_row("XHA"); 
                 unless (defined($row) && (scalar(@{$row}) > 1))
                 {
-                    print "bad XHA row\n";
+                    my $cnt = $rowd->HCount();
+
+                    # NOTE: don't bother trying to update the XHA in
+                    # an empty block -- this situation could arise
+                    # when we clear the blocks for "DROP TABLE"
+
+                    # XXX XXX: maybe should dump BlockInfoString? 
+                    goto  L_nogood
+                        unless ($cnt);
+
+                    my $msg = "rowcount: $cnt\n";
+
+                    my $bk = $blocknum - $posn;
+
+                    $msg .= "bad XHA row for block $bk\n";
+
+                    my %earg = (self => $self, msg => $msg,
+                                severity => 'warn');
+        
+                    &$GZERR(%earg)
+                        if (defined($GZERR));
+
                     goto  L_nogood;
                 }
 
                 my $seghdr = $row->[0];
                 $bvec   = $row->[2];
 
-                print "extent size: ", $row->[1];
-                print ", bv: ", unpack("b*",$bvec), "\n";
+                my $msg2 = "extent size: " .  $row->[1];
+                $msg2 .=  ", bv: " .  unpack("b*",$bvec) . "\n";
                 my @pct = $smf->_xhdr_bv_to_pct($bvec, $row->[1]);
                 $extent_stats = shift @pct;
                 my $avgpct   = $extent_stats->{avgpct};
                 my $numempty = $extent_stats->{numempty};
                 my $allocpct = $extent_stats->{allocpct};
 
-                print join(", ", @pct), " avg: $avgpct, empty: $numempty\n";
+                $msg2 .= join(", ", @pct) . " avg: $avgpct, empty: $numempty\n";
+                my %earg = (self => $self, msg => $msg2,
+                            severity => $SMH_SEV);
+        
+                &$GZERR(%earg)
+                    if (defined($GZERR));
 
                 my @stat;
 
@@ -589,18 +674,32 @@ sub block_post_untie_hook
                 $row = $rowd->_get_meta_row("XHA"); 
                 unless (defined($row) && (scalar(@{$row}) > 1))
                 {
-                    print "bad row 2\n";
+                    my $msg = "bad row 2\n";
+                    my %earg = (self => $self, msg => $msg,
+                                severity => 'warn');
+        
+                    &$GZERR(%earg)
+                        if (defined($GZERR));
+
                     goto  L_nogood;
                 }
                 $bvec = $row->[2];
-                print "extent size: ", $row->[1];
-                print ", bv: ", unpack("b*",$bvec), "\n";
+
+                $msg2 = "extent size: " .  $row->[1];
+                $msg2 .=  ", bv: " .  unpack("b*",$bvec) . "\n";
+
                 @pct = $smf->_xhdr_bv_to_pct($bvec, $row->[1]);
                 $extent_stats = shift @pct;
                 my $new_avgpct   = $extent_stats->{avgpct};
                 my $new_numempty = $extent_stats->{numempty};
 
-                print join(", ", @pct), " avg: $new_avgpct, empty: $new_numempty\n";
+                $msg2 .= join(", ", @pct) . " avg: $avgpct, empty: $numempty\n";
+                %earg = (self => $self, msg => $msg2,
+                         severity => $SMH_SEV);
+        
+                &$GZERR(%earg)
+                    if (defined($GZERR));
+
                     
                 # Now check if we need to update the segment
                 # header
@@ -625,7 +724,16 @@ sub block_post_untie_hook
                 {
 #                        if ($maybe_stat[0] !~ m/no_update/)
                     {
-                        print "update segment header: ", $maybe_stat[0], "\n";
+                        my $msg = 
+                            "update segment header [post]" .
+                            " ($fnam, $blocknum): " . 
+                            $maybe_stat[0] . "\n";
+
+                        my %earg = (self => $self, msg => $msg,
+                                    severity => $SMH_SEV);
+        
+                        &$GZERR(%earg)
+                            if (defined($GZERR));
                     }
                     if ($maybe_stat[0] !~ m/updated/)
                     {
@@ -634,7 +742,16 @@ sub block_post_untie_hook
                 }
                 else
                 {
-                    print "update segment header failed!\n";
+                    my $msg = 
+                        "update segment header [post]" .
+                        " ($fnam, $blocknum) failed!\n";
+
+                    # XXX XXX: warn? 
+                    my %earg = (self => $self, msg => $msg,
+                                severity => $SMH_SEV);
+        
+                    &$GZERR(%earg)
+                        if (defined($GZERR));
                 }
 
           L_nogood:
@@ -651,8 +768,8 @@ sub block_post_untie_hook
                     $seg_hdr_block = $up_seg_hsh->{seg_hdr_block};
                     $ext_hdr_block = $up_seg_hsh->{ext_hdr_block};
                     $extent_stats  = $up_seg_hsh->{extent_stats};
-                    $extent_size      = $up_seg_hsh->{extent_size};
-                    $bvec            = $up_seg_hsh->{bvec};
+                    $extent_size   = $up_seg_hsh->{extent_size};
+                    $bvec          = $up_seg_hsh->{bvec};
                 }
                 else
                 {
@@ -662,18 +779,37 @@ sub block_post_untie_hook
                 my $smf  = $self->_get_smf();
                 unless (defined($smf))
                 {
-                    print "bad smf\n";
+                    my $msg = "bad smf\n";
+                    my %earg = (self => $self, msg => $msg,
+                                severity => 'warn');
+        
+                    &$GZERR(%earg)
+                        if (defined($GZERR));
+
                     goto L_no_update_seghdr;
                 }
 
                 my $rowd = $smf->_get_rowd($seg_hdr_block);
                 unless (defined($rowd))
                 {
-                    print "bad rowd\n";
+                    my $msg = "bad rowd\n";
+                    my %earg = (self => $self, msg => $msg,
+                                severity => 'warn');
+        
+                    &$GZERR(%earg)
+                        if (defined($GZERR));
+
+
                     goto L_no_update_seghdr;
                 }
 
-                print "last try to update seg hdr!!\n";
+                my $msg2 = "last try to update seg hdr!!\n";
+
+                my %earg = (self => $self, msg => $msg2,
+                            severity => $SMH_SEV);
+        
+                &$GZERR(%earg)
+                    if (defined($GZERR));
 
                 # XXX XXX: build a fake stat structure like
                 # update_extend_header
@@ -694,7 +830,16 @@ sub block_post_untie_hook
                 {
 #                        if ($maybe_stat[0] !~ m/no_update/)
                     {
-                        print "update segment header: ", $maybe_stat[0], "\n";
+                        my $msg = 
+                            "update segment header [post2]" .
+                            " (?, $seg_hdr_block): " . 
+                            $maybe_stat[0] . "\n";
+
+                        my %earg = (self => $self, msg => $msg,
+                                    severity => $SMH_SEV);
+        
+                        &$GZERR(%earg)
+                            if (defined($GZERR));
                     }
                     if ($maybe_stat[0] !~ m/updated/)
                     {
@@ -703,7 +848,16 @@ sub block_post_untie_hook
                 }
                 else
                 {
-                    print "update segment header failed!\n";
+                    my $msg = 
+                        "update segment header [post2]" .
+                        " (?, $seg_hdr_block) failed!\n";
+
+                    # XXX XXX: warn? 
+                    my %earg = (self => $self, msg => $msg,
+                                severity => $SMH_SEV);
+        
+                    &$GZERR(%earg)
+                        if (defined($GZERR));
                 }
                 
           L_no_update_seghdr:
@@ -799,6 +953,15 @@ sub block_post_tie_hook
 
 } # end block_post_tie_hook
 
+# Genezzo::SpaceMan::SMExtent hook
+our $SMX_Use_Hook;
+sub spaceman_smx_use_hook
+{
+    my %args = @_;
+
+    return 1;
+}
+
 sub _track_usage
 {
     my ($rdblock, $sizediff) = @_;
@@ -853,7 +1016,17 @@ sub _track_usage
     }
     if ($new_pctused != -1)
     {
-        print "update pctused -- was $pctused","0, now $new_pctused", "0\n";
+        my $msg = "update pctused -- was $pctused" .
+            "0, now $new_pctused" . "0\n";
+
+        # XXX XXX: NOTE: no $self !!!
+#        my %earg = (self => $rdblock, msg => $msg,
+        my %earg = ( msg => $msg,
+                    severity => $SMH_SEV);
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
 
         $row->[1] = $new_pctused;
 
@@ -998,7 +1171,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 
 L<Genezzo::Block::RDBlock>, perl(1).
 
-Copyright (c) 2006 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2006, 2007 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 7.28 2007/01/04 10:39:57 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Dict.pm,v 7.29 2007/06/26 08:13:35 claude Exp claude $
 #
 # copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -20,7 +20,7 @@ use Genezzo::BasicHelp;
 
 BEGIN {
     our $VERSION;
-    $VERSION = do { my @r = (q$Revision: 7.28 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.29 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -1407,7 +1407,7 @@ sub _DictDBInit
     # XXX: Add FORCE for recreate...
     if (-e $deffile_full && !getUseRaw())
     {
-        my $msg = "file $deffile already exists\n";
+        my $msg = "file $deffile_full already exists\n";
         my %earg = (self => $self, msg => $msg, 
                     severity => 'warn');
                     

@@ -1,5 +1,14 @@
 Revision history for Perl extension Genezzo
 
+0.71 Wed Jul  4 00:03:46 2007
+        - change output file spooling (drop tee dependency)
+        - fixes for Havok, SysHook MakeSQL (havok.sql/syshook.sql)
+        - SMExtent: self-managed extents (disabled)
+        - help: slight regex fixups
+        - SysHook: add support for dynamic load of new hooks into 
+          running database instance (without restart)
+        - line-mode history fixes
+
 0.70 Mon Jan 15 01:02:45 2007
         - improved help
         - substr fix

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 7.38 2007/01/09 09:24:56 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/GenDBI.pm,v 7.41 2007/06/26 08:14:22 claude Exp claude $
 #
 # copyright (c) 2003-2007 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -51,11 +51,11 @@ BEGIN {
 }
 
 ##our $VERSION   = $Genezzo::VERSION;
-our $VERSION   = '0.70';
+our $VERSION   = '0.71';
 our $RELSTATUS = 'Alpha'; # release status
 # grab the code check-in date and convert to YYYYMMDD
 our $RELDATE   = 
-    do { my @r = (q$Date: 2007/01/09 09:24:56 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
+    do { my @r = (q$Date: 2007/06/26 08:14:22 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)|); sprintf ("%04d%02d%02d", $r[1],$r[2],$r[3]); };
 
 our $errstr; # DBI errstr
 
@@ -100,6 +100,9 @@ our $dbi_gzerr = sub {
     return 
         unless (exists($args{msg}));
 
+    # to process spooling to multiple files
+    my $outfile_h = $args{outfile_list} || undef;
+
     my $warn = 0;
     if (exists($args{severity}))
     {
@@ -112,6 +115,15 @@ our $dbi_gzerr = sub {
         {
 #            printf STDERR ("%s: ", $sev);
             printf ("%s: ", $sev);
+
+            if (defined($outfile_h))
+            {
+                while (my ($kk, $vv) = each (%{$outfile_h}))
+                {
+                    printf $vv ("%s: ", $sev);
+                }
+            }
+
             $warn = 1;
         }
         else
@@ -132,6 +144,15 @@ our $dbi_gzerr = sub {
     print  "\n" unless $args{msg}=~/\n$/;
 #    carp $args{msg}
 #      if (warnings::enabled() && $warn);
+
+    if (defined($outfile_h))
+    {
+        while (my ($kk, $vv) = each (%{$outfile_h}))
+        {
+            print $vv  __PACKAGE__, ": ",  $args{msg};
+            print $vv  "\n" unless $args{msg}=~/\n$/;
+        }
+    }
     
 };
 
@@ -171,6 +192,8 @@ sub _build_gzerr_wrapper
 
     # build a closure to control printing of "INFO" status messages...
     my $gzerr_print_info = 1;
+    my %gzerr_outfile_h;
+
     my $gzerr_closure = sub {
 
         my %nargs = @_;
@@ -186,10 +209,27 @@ sub _build_gzerr_wrapper
             $gzerr_print_info = $nargs{set_status};
         }
 
+        if (exists($nargs{add_file}) && exists($nargs{fh}))
+        {
+            my $fname = $nargs{add_file};
+
+            $gzerr_outfile_h{$fname} = $nargs{fh};
+
+        }
+        if (exists($nargs{drop_file}))
+        {
+            my $fname = $nargs{drop_file};
+
+            delete $gzerr_outfile_h{$fname}
+                if (exists($gzerr_outfile_h{$fname}));
+        }
+
         if ($gzerr_print_info == 0)
         {
             $nargs{no_info} = 1;
         }
+
+        $nargs{outfile_list} = \%gzerr_outfile_h;
 
         return &$gzerr_cb(%nargs);
 
@@ -198,6 +238,30 @@ sub _build_gzerr_wrapper
     return $gzerr_closure;
 }
 
+
+# special printing methods: print to STDOUT and spool to output files
+# simultaneously
+
+# print to STDOUT and spool outfiles
+sub _print_to_all
+{
+    my ($self, $msg) = @_;
+
+    print $msg;
+
+    $self->_print_to_outfiles($msg);
+}
+
+# print to spool outfiles only - special handling for prompts, etc.
+sub _print_to_outfiles
+{
+    my ($self, $msg) = @_;
+
+    while (my ($kk, $vv) = each (%{$self->{outfile_list}}))
+    {
+        print $vv $msg;
+    }
+}
 
 sub _init
 {
@@ -218,6 +282,9 @@ sub _init
     $self->{histlist} = \@histlist;
     $self->{maxhist}  = 100;
     $self->{histcounter} = 1;
+    $self->{histsave} = 0; # autosave
+
+    $self->{outfile_list} = {};
 
     if ((exists($args{gnz_home}))
         && (defined($args{gnz_home}))
@@ -575,6 +642,73 @@ sub Kgnz_Rem
     return 1;
 }
 
+sub SaveHistory
+{
+    my ($self, $fn_args) = @_;
+
+    my $hfile = File::Spec->catdir($ENV{HOME} , '.gnz_history');
+
+    my $h_fh;
+
+    return 0
+        unless (open($h_fh, "> $hfile"));
+
+    my $histlist = $self->{histlist};
+
+    foreach my $aval (@{$histlist})
+    {
+        my ($hcnt, $val) = @{$aval};
+
+        # URL-style substitution to handle spaces, weird chars
+        $val =~ s/([^a-zA-Z0-9])/uc(sprintf("%%%02lx",  ord $1))/eg;
+        
+        print $h_fh $val, "\n";
+
+    }
+
+    if (defined($fn_args) && scalar(@{$fn_args}))
+    {
+        $self->{histsave} = 1
+            if ($fn_args->[0] =~ m/autosave/i);
+    }
+
+    return 1;
+
+}
+
+sub LoadHistory
+{
+    my ($self, $term) = @_;
+
+    my $hfile = File::Spec->catdir($ENV{HOME} , '.gnz_history');
+
+    return 0
+        unless (-e $hfile);
+
+    my $h_fh;
+
+    return 0
+        unless (open($h_fh, "< $hfile"));
+
+    while (<$h_fh>)
+    {
+        my $ini = $_;
+
+        chomp($ini);
+
+        # URL-style substitution to handle spaces, weird chars
+        $ini =~ s/\%([A-Fa-f0-9]{2})/pack('C', hex($1))/seg;
+
+        $term->addhistory($ini);
+        $self->histpush($self->{histcounter}, $ini);
+        ($self->{histcounter}) += 1;
+    }
+
+    return 1;
+
+}
+
+
 sub Kgnz_Quit
 {
     my $self = shift;
@@ -582,6 +716,11 @@ sub Kgnz_Quit
 
     &$GZERR(%earg)
         if (defined($GZERR));
+
+    if ($self->{histsave})
+    {
+        $self->SaveHistory();
+    }
 
     exit ;
 
@@ -633,23 +772,35 @@ sub Kgnz_Explain
         return 0
             unless (defined($parse_tree));
 
-        print Data::Dumper->Dump([$parse_tree],['parse_tree']);
+        my $msg = Data::Dumper->Dump([$parse_tree],['parse_tree']);
+        $msg .= "\n\n";
 
-        print "\n\n";
+        my %earg = (self => $self,  msg => $msg, severity => 'info');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
 
         my $algebra = $self->{plan}->Algebra(parse_tree => $parse_tree);
 
-        print Data::Dumper->Dump([$algebra],['algebra']);
+        $msg = Data::Dumper->Dump([$algebra],['algebra']);
+        $msg .= "\n\n";
 
-        print "\n\n";
+        %earg = (self => $self,  msg => $msg, severity => 'info');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
 
         my ($tc, $err_status) 
             = $self->{plan}->TypeCheck(algebra   => $algebra,
                                        statement => $sqltxt);
 
-        print Data::Dumper->Dump([$tc],['type_analysis']);
+        $msg = Data::Dumper->Dump([$tc],['type_analysis']);
+        $msg .= "\n\n";
 
-        print "\n\n";
+        %earg = (self => $self,  msg => $msg, severity => 'info');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
 
         unless ($err_status)
         {
@@ -657,9 +808,13 @@ sub Kgnz_Explain
                  = $self->{plan}->QueryRewrite(algebra   => $tc,
                                                statement => $sqltxt);
 
-             print Data::Dumper->Dump([$tc],['query_rewrite']);
+            $msg = Data::Dumper->Dump([$tc],['query_rewrite']);
+            $msg .= "\n\n";
             
-            print "\n\n";
+            %earg = (self => $self,  msg => $msg, severity => 'info');
+        
+            &$GZERR(%earg)
+                if (defined($GZERR));
         }
     }
 
@@ -1349,18 +1504,51 @@ sub Kgnz_Spool
 
         if (uc($outfile) eq "OFF")
         {
-            close  (NEWOUT);
-            select (STDOUT) ; 
+            while (my ($kk, $vv) = each (%{$self->{outfile_list}}))
+            {
+                drop_gzerr_outfile(GZERR=>$GZERR,
+                                   filename => $kk,
+                                   self => $self);
+                close ($vv);
+            }
+            $self->{outfile_list} = {};
+
             last;
         }
 
-        close (NEWOUT);
-        open (NEWOUT, "| tee $outfile ") 
-            or die "Could not tee open $outfile for writing : $! \n";
+        if (exists($self->{outfile_list}->{$outfile}))
+        {
+            my $msg = "Output file $outfile is already open";
 
-        $| = 1; # force flush
-	select (NEWOUT);
-	$| = 1;
+            my %earg = (self => $self, msg => $msg, 
+                        severity => 'warn');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
+            return 0;
+        }
+        
+        my $fh;
+
+        unless(open ($fh, "> $outfile "))
+        {
+            my $msg = "Could not open $outfile for writing : $! \n";
+
+            my %earg = (self => $self, msg => $msg, 
+                        severity => 'warn');
+                    
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
+            return 0;
+        }
+
+        $self->{outfile_list}->{$outfile} = $fh;        
+        add_gzerr_outfile(GZERR=>$GZERR,
+                          filename => $outfile,
+                          fh => $fh,
+                          self => $self);
     }
 
     return 1;
@@ -2986,20 +3174,27 @@ sub HCountPrint
     {
 	last if (@_ < 1);
 
-        print "COUNT(*)\n";
-        print "--------\n";
+        my $msg = "COUNT(*)\n";
+        $msg .= "--------\n";
 
         my $tv = tied(%{$hashi});
 
-        print $tv->HCount(), "\n\n";
+        $msg .= $tv->HCount() . "\n\n";
+
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'info');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
 
         $rownum++;
 
-        my $msg = ($rownum ? $rownum : "no") ;
+        $msg = ($rownum ? $rownum : "no") ;
         $msg .= ((1 == $rownum) ? " row " : " rows ") .
             "selected.\n";
-        my %earg = (self => $self, msg => $msg,
-                    severity => 'info');
+        %earg = (self => $self, msg => $msg,
+                 severity => 'info');
         
         &$GZERR(%earg)
             if (defined($GZERR));
@@ -3132,8 +3327,14 @@ sub ECountPrint
     {
 	last if (@_ < 1);
         
-        print "ESTIMATE\tCURRENT\tSTDDEV\tPCT_COMPLETE\n";
-        print "--------\t-------\t------\t------------\n";
+        my $msg = "ESTIMATE\tCURRENT\tSTDDEV\tPCT_COMPLETE\n";
+        $msg .=  "--------\t-------\t------\t------------\n";
+
+        my %earg = (self => $self, msg => $msg,
+                    severity => 'info');
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
 
         my $tv = tied(%{$hashi});
 
@@ -3169,8 +3370,14 @@ sub ECountPrint
 
             my $conf = $alpha*$stddev/sqrt($ccnt);
 
-            printf "%.2f\t%d\t%.2f\t%.2f\n",
+            $msg = sprintf "%.2f\t%d\t%.2f\t%.2f\n",
             $est,$sum,$stddev,$pct;
+
+            %earg = (self => $self, msg => $msg,
+                     severity => 'info');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
 
             $rownum++;
 
@@ -3178,12 +3385,12 @@ sub ECountPrint
                 unless (defined($kk));
 
         } # end while
-        print "\n";
+        $msg = "\n";
 
-        my $msg = ($rownum ? $rownum : "no") ;
+        $msg .= ($rownum ? $rownum : "no") ;
         $msg .= ((1 == $rownum) ? " row " : " rows ") .
             "selected.\n";
-        my %earg = (self => $self, msg => $msg,
+        %earg = (self => $self, msg => $msg,
                     severity => 'info');
         
         &$GZERR(%earg)
@@ -3763,20 +3970,27 @@ sub SelectPrint
             return $rownum;
         }
 
+        my $msg;
 
+        $msg = "";
 
         # print column name headers
         foreach my $coldef (@{$collist})
         {
-            print $coldef->{alias}, "\t";
+            $msg .=  $coldef->{alias} . "\t";
         }
-        print "\n";
+        $msg .= "\n";
         foreach  my $coldef2 (@{$collist})
         {
-            print '_' x length($coldef2->{alias}), "\t";
+            $msg .=  '_' x length($coldef2->{alias});
+            $msg .= "\t";
         }
-        print "\n";
-        print "\n";
+        $msg .=  "\n\n";
+        my %earg = (self => $self, msg => $msg, 
+                    severity => 'info');
+            
+        &$GZERR(%earg)
+            if (defined($GZERR));
 
         # print the columns
 
@@ -3806,29 +4020,40 @@ sub SelectPrint
                 # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
                 # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
                 # XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
+
+                $msg = "";
                 
                 for my $colval (@rarr)
                 {
                     $colval = '<undef>' # NOTE: deal with undefs
                         unless (defined($colval));
                     
-                    print $colval ;
-                    print "\t";
+                    $msg .= $colval ;
+                    $msg .= "\t";
                 }
-                print "\n";
+                $msg .= "\n";
+
+                %earg = (self => $self, msg => $msg, 
+                         severity => 'info');
+            
+                &$GZERR(%earg)
+                    if (defined($GZERR));
+
                 next;
             }
 
+            $msg = "";
 	    foreach my $coldef (@{$collist})
 	    {
                 my $colnum = $coldef->{colnum};
+
                 if ($colnum =~ m/$rxrid/i )
                 {
-                    print $kk ; 
+                    $msg .=  $kk ; 
                 }
                 elsif ($colnum =~ m/$rxrownum/i )
                 {
-                    print $rownum ;
+                    $msg .= $rownum ;
                 }
                 else
                 {
@@ -3836,18 +4061,22 @@ sub SelectPrint
                     $rval = '<undef>' # NOTE: deal with undefs
                         unless (defined($rval));
                     
-                    print $rval ;
+                    $msg .= $rval ;
                 }
-                print "\t";
+                $msg .= "\t";
 	    }
-
-            print "\n";
+            $msg .= "\n";
+            %earg = (self => $self, msg => $msg, 
+                     severity => 'info');
+            
+            &$GZERR(%earg)
+                if (defined($GZERR));
 	}
-        print "\n";
-        my $msg = ($rownum ? $rownum : "no") ;
+        $msg = "\n";
+        $msg .= ($rownum ? $rownum : "no") ;
         $msg .= ((1 == $rownum) ? " row " : " rows ") .
             "selected.\n";
-        my %earg = (self => $self, msg => $msg,
+        %earg = (self => $self, msg => $msg,
                     severity => 'info');
         
         &$GZERR(%earg)
@@ -4074,6 +4303,9 @@ sub Kgnz_Help
             my $match1 = '(^\^)|(\$$)';
             if ($pattern !~ m/$match1/)
             {
+                $pattern =~ s/^\*/\.\*/
+                    if ($pattern =~ m/^\*/);
+
                 $pattern = '^' . $pattern;
             }
             if (exists($nargs{topic_pattern}))
@@ -4209,7 +4441,12 @@ sub Kgnz_Prepare
                 
                 my ($hcnt, $val) = @{$aval};
                 $self->histpush ($self->{histcounter}, $val);
-                print "$val\n";
+
+                $self->_print_to_all("$val\n");
+
+                $val =~ s/;(\s*)$//  # Note: remove the semicolon
+                    ;
+
                 return $self->Kgnz_Prepare($val);
             }
         }
@@ -4255,7 +4492,10 @@ sub Kgnz_Prepare
 
               L_w1:
 		while (<$fh>) {
-		    print $prompt, $_; # input is already newline terminated
+                    my $m1 = $prompt . $_;
+                    # input is already newline terminated
+                    $self->_print_to_all($m1);
+
                     my $in_line = $_;
                     if (defined($prev_line))
                     {
@@ -4564,6 +4804,9 @@ sub Interactive
 
     my $term = new Term::ReadLine 'gendba';
 
+    # Load History
+    $self->LoadHistory($term);
+
 #    greet $term->Features ;
 
     my $prompt = "\ngendba $self->{histcounter}> ";
@@ -4595,21 +4838,29 @@ sub Interactive
             $prompt = $prompt_2;
             next;
         }
-        else
-        {
-            $prev_line =~ s/;(\s*)$//  # Note: remove the semicolon
-                ;
-#                if ($multiline);
-        }
 
         $term->addhistory($prev_line);
         $self->histpush($self->{histcounter}, $prev_line);
+
+        # make spool output better...
+        $self->_print_to_outfiles("\ngendba $self->{histcounter}>  ");
+        $self->_print_to_outfiles($prev_line);
+        $self->_print_to_outfiles("\n");
+
+        $prev_line =~ s/;(\s*)$//  # Note: remove the semicolon
+            ;
+
         $self->Parseall ($prev_line);
         ($self->{histcounter}) += 1;
         $prompt = "\ngendba $self->{histcounter}> ";
         $prev_line = undef;
         $multiline = 0;
     } # end big while
+
+    if ($self->{histsave})
+    {
+        $self->SaveHistory();
+    }
 
     return 1; 
 }
@@ -5248,6 +5499,8 @@ Genezzo::GenDBI.pm - an extensible database with SQL and DBI
 =head1 TODO
 
 =over 4
+
+=item SPOOL: options to remove "prompt> " from output files
 
 =item Feeble/SQL: fix DESCribe to handle quoted identifiers.
 

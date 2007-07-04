@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/SpaceMan/RCS/SMFreeBlock.pm,v 1.2 2006/10/19 09:12:28 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/SpaceMan/RCS/SMFreeBlock.pm,v 1.3 2007/02/05 05:48:33 claude Exp claude $
 #
-# copyright (c) 2006 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2006, 2007 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 package Genezzo::SpaceMan::SMFreeBlock;
@@ -20,7 +20,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 1.2 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.3 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
     @EXPORT      = ( ); # qw(&NumVal);
@@ -86,7 +86,8 @@ sub _init
                     );
 
     my %optional = (
-                    firstextent => 0
+                    firstextent => 0,
+                    newextent => 0
                     );
     
     my %args = (%optional,
@@ -100,6 +101,7 @@ sub _init
     $self->{extent_size}     = $args{extent_size};
     $self->{extent_position} = $args{extent_position};
     $self->{firstextent}     = $args{firstextent};
+    $self->{newextent}       = $args{newextent};
 
     return 1;
 
@@ -156,6 +158,14 @@ sub GetExtentPosition
 
     return $self->{extent_position};
 }
+
+sub IsNewExtent
+{
+    my $self = shift;
+
+    return $self->{newextent};
+}
+
 sub IsFirstExtent
 {
     my $self = shift;
@@ -174,16 +184,26 @@ Genezzo::SpaceMan::SMFreeBlock.pm - FreeBlock Space Management
 
 =head1 SYNOPSIS
 
+ use Genezzo::SpaceMan::SMFreeBlock;
 
 =head1 DESCRIPTION
 
-
+SMFreeBlock is a data structure which describes the basic space
+objects associated with each block.
 
 =head1 FUNCTIONS
 
 =over 4
 
-=item Under Construction
+=item GetBlocknum
+
+=item GetCurrentExtent
+
+=item GetExtentSize
+
+=item IsNewExtent
+
+=item IsFirstExtent
 
 =back
 
@@ -206,9 +226,9 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 
 =head1 SEE ALSO
 
-perl(1).
+perl(1), L<Genezzo::SpaceMan::SMFile>, L<Genezzo::SpaceMan::SMExtent>.
 
-Copyright (c) 2006 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2006, 2007 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

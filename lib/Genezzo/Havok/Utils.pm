@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/Utils.pm,v 1.8 2007/01/11 09:59:33 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/Utils.pm,v 1.9 2007/06/26 08:25:35 claude Exp claude $
 #
 # copyright (c) 2006, 2007 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -24,7 +24,7 @@ our $VERSION;
 our $MAKEDEPS;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 1.8 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.9 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     my $pak1  = __PACKAGE__;
     $MAKEDEPS = {
@@ -42,7 +42,7 @@ BEGIN {
     # DML is an array, not a hash
 
     my $now = 
-    do { my @r = (q$Date: 2007/01/11 09:59:33 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
+    do { my @r = (q$Date: 2007/06/26 08:25:35 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
 
 
     my %tabdefs = ();
@@ -181,7 +181,7 @@ sub getpod
 #
 #  increase_by - the amount to increase the current filesize by
 #    when it runs out of free space.  The value may be a percentage,
-#    e.g. 50%, or a fixed size like 100M.  If this paramater is set to
+#    e.g. 50%, or a fixed size like 100M.  If this parameter is set to
 #    zero, the tablespace will remain a fixed size.
 #
 #  filesize - the initial size of a new file when it is added to
@@ -634,7 +634,7 @@ The parameters are:
 
 =item increase_by - the amount to increase the current filesize by
 when it runs out of free space.  The value may be a percentage,
-e.g. 50%, or a fixed size like 100M.  If this paramater is set to
+e.g. 50%, or a fixed size like 100M.  If this parameter is set to
 zero, the tablespace will remain a fixed size.
 
 =item filesize - the initial size of a new file when it is added to

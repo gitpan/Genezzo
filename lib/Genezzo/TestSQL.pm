@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/TestSQL.pm,v 1.2 2006/11/19 08:56:32 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/TestSQL.pm,v 1.3 2007/06/26 08:17:04 claude Exp claude $
 #
 # copyright (c) 2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -91,9 +91,26 @@ sub TestDiff
     return "no such file: $new_log"
         unless (-e $new_log);
 
+    my ($old_line, $new_line) = ("no old line", "no new line");
+    my $linecount = 0;
+
+    # use a closure for the comparison function so can find out where
+    # the diff happened and get the offending lines
+    my $cmp_fn = sub
+    {
+        ($old_line, $new_line) = @_;
+        $linecount++;
+
+#        print "cmp_fn: $old_line\n$new_line\n";
+        
+        return ($old_line ne $new_line);
+    };
+
+
     use File::Compare;
 
-    my $stat = compare($old_log, $new_log);
+    my $stat = File::Compare::compare_text($old_log, $new_log, $cmp_fn);
+#    my $stat = compare($old_log, $new_log);
 
     if ($stat == 0)
     {
@@ -101,7 +118,11 @@ sub TestDiff
     }
     elsif ($stat == 1)
     {
-        return "differences found: $old_log, $new_log";
+#        print $old_line, "\n";
+#        print $new_line, "\n";
+#        print $linecount, "\n";
+
+        return "differences found: $old_log, $new_log\nline $linecount:\nold:$old_line\nnew:$new_line";
     }
 
     return undef;

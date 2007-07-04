@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Util.pm,v 7.18 2006/10/19 08:35:09 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Util.pm,v 7.19 2007/01/23 08:52:30 claude Exp claude $
 #
-# copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2003-2007 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 package Genezzo::Util;  # assumes Some/Module.pm
@@ -22,7 +22,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 7.18 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.19 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
     @EXPORT      = qw(&whisper &whoami &greet 
@@ -31,6 +31,7 @@ BEGIN {
                       &PackRowCheck &PackRow &UnPackRow &PackRow2
                       &getUseRaw &setUseRaw &gzn_read &gnz_write
                       &get_gzerr_status &set_gzerr_status
+                      &add_gzerr_outfile &drop_gzerr_outfile
                       );
     %EXPORT_TAGS = ( );     # eg: TAG => [ qw!name1 name2! ],
 
@@ -1894,6 +1895,66 @@ sub set_gzerr_status
     return &$gzerr_cb(%earg);
 }
 
+# add another output file (besides STDOUT) for gzerr
+sub add_gzerr_outfile
+{
+    my %required = (
+                    GZERR => "no gzerr!",
+                    filename => "no filename!",
+                    fh => "no fh!",
+                    self  => "no self!"
+                    );
+#    my %optional = (
+#                    );
+
+    my %args = (
+#                %optional,
+		@_);
+
+    return undef
+        unless (Validate(\%args, \%required));
+
+    my $gzerr_cb = $args{GZERR};
+
+    my $msg = "add outfile: $args{filename}\n";
+    my %earg = (self => $args{self}, msg => $msg, severity => 'info', 
+                no_info => 1,
+                add_file => $args{filename},
+                fh => $args{fh}
+                );
+
+    return &$gzerr_cb(%earg);
+}
+
+sub drop_gzerr_outfile
+{
+    my %required = (
+                    GZERR => "no gzerr!",
+                    filename => "no filename!",
+                    self  => "no self!"
+                    );
+#    my %optional = (
+#                    );
+
+    my %args = (
+#                %optional,
+		@_);
+
+    return undef
+        unless (Validate(\%args, \%required));
+
+    my $gzerr_cb = $args{GZERR};
+
+    my $msg = "drop outfile: $args{filename}\n";
+    my %earg = (self => $args{self}, msg => $msg, severity => 'info', 
+                no_info => 1,
+                drop_file => $args{filename},
+                );
+
+    return &$gzerr_cb(%earg);
+}
+
+
 END { }       # module clean-up code here (global destructor)
 
 ## YOUR CODE GOES HERE
@@ -1939,7 +2000,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 
 L<perl(1)>.
 
-Copyright (c) 2003, 2004, 2005, 2006 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2003-2007 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

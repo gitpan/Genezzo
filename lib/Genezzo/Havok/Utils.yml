@@ -1,4 +1,4 @@
-# havok version=7.14
+# havok version=7.17
 ABSTRACT:     
 AUTHOR:    Jeffrey I Cohen (jcohen@cpan.org)
 DML:    
@@ -7,8 +7,8 @@ DML:
       -    select * from user_functions where xname = 'Genezzo::Havok::Utils'
 
     install:    
-      -    i user_functions 1 require Genezzo::Havok::Utils sql_func_alter_ts SYSTEM 2007-01-11T09:59:33 0 HASH alter_ts
-      -    i user_functions 2 require Genezzo::Havok::Utils sql_func_add_user_function SYSTEM 2007-01-11T09:59:33 0 HASH add_user_function
+      -    i user_functions 1 require Genezzo::Havok::Utils sql_func_alter_ts SYSTEM 2007-06-26T08:25:35 0 HASH alter_ts
+      -    i user_functions 2 require Genezzo::Havok::Utils sql_func_add_user_function SYSTEM 2007-06-26T08:25:35 0 HASH add_user_function
 
 
 
@@ -19,5 +19,5 @@ PREREQ_HAVOK:
 
 TABLEDEFS:    
 
-UPDATED:    2007-01-11T02:01:32
-VERSION:    1.08
+UPDATED:    2007-06-26T01:34:57
+VERSION:    1.09

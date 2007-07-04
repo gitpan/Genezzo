@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSFile.pm,v 7.19 2006/10/19 08:53:30 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSFile.pm,v 7.20 2007/02/16 09:49:01 claude Exp claude $
 #
-# copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2003-2007 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 use strict;
@@ -335,13 +335,14 @@ sub _make_new_chunk # override the hph method
 
         if (defined($blockinfo))
         {
-            if (exists($blockinfo->{currextent}))
+            $gotnewextent = $blockinfo->IsNewExtent();
+
+            if ($gotnewextent)
             {
                 greet "new extent", $blockinfo ;
-                $gotnewextent = 1; # true if get new extent
             }
 
-            $bc->{bufblockno} = $blockinfo->{basic_array}->[0];
+            $bc->{bufblockno} = $blockinfo->GetBlocknum();
 
             $blockno   = $bc->{bufblockno};
         }
@@ -385,7 +386,7 @@ sub _make_new_chunk # override the hph method
     if ($gotnewextent)
     {
         # size of extent is last entry in blockinfo
-        my $extent_size = $blockinfo->{currextent}->[-1];
+        my $extent_size = $blockinfo->GetExtentSize();
 
 #        print "e:", $extent_size, "\n";
 
@@ -549,6 +550,8 @@ sub _get_a_chunk # override the hph method
     }
 
     $self->_untie_block();
+
+#    print "RSFILE READ BLOCK: ", $blocknum, "\n";
 
     $bc->{bceref} = 
         $self->{realbc}->ReadBlock(filenum  => $bc->{realbcfileno},
@@ -949,7 +952,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 
 L<perl(1)>.
 
-Copyright (c) 2003, 2004, 2005, 2006 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2003-2007 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

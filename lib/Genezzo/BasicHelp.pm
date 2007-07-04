@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/BasicHelp.pm,v 1.9 2007/01/09 09:25:35 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/BasicHelp.pm,v 1.12 2007/06/26 08:12:39 claude Exp claude $
 #
-# copyright (c) 2006 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2006, 2007 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 package Genezzo::BasicHelp;
@@ -18,7 +18,7 @@ use Carp;
 our $VERSION;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 1.9 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.12 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
 }
 
@@ -115,6 +115,8 @@ sub getpod
 #        match as well, but the regex must match a unique area.
 #
 #=head2 history, h : command history.  Use shell-style "!<command-number>" to repeat.
+#
+#    use "history -clear" to clear the history buffer.
 #
 #=head2 i : insert into a table. 
 #
@@ -433,8 +435,51 @@ sub search_topic
     my $format_option = $args{option};
     my $topic_pattern;
 
-    $topic_pattern = $args{topic_pattern}
-        if (exists($args{topic_pattern}) && defined($args{topic_pattern}));
+    if (exists($args{topic_pattern}) && defined($args{topic_pattern}))
+    {
+        $topic_pattern = $args{topic_pattern};
+
+        if ($topic_pattern =~ m/^\*/)
+        {
+            $topic_pattern =~ s/^\*/\.\*/;
+        }
+
+        my @baz;
+        my $foo = "foo";
+        my $test_pattern = "\@baz = (\$foo =~ m/$topic_pattern/);";
+
+        # avoid blowing up
+        eval $test_pattern;
+
+        if ($@)
+        {
+            my $outi = "invalid pattern \"$topic_pattern\": $@\n";
+            return $outi;
+        }
+
+    }
+
+    {
+        if ($topic_group =~ m/^\*/)
+        {
+            $topic_group =~ s/^\*/\.\*/;
+        }
+
+        my @baz;
+        my $foo = "foo";
+        my $test_pattern = "\@baz = (\$foo =~ m/$topic_group/);";
+
+        # avoid blowing up
+        eval $test_pattern;
+
+        if ($@)
+        {
+            my $outi = "invalid group specification \"$topic_group\" : $@\n";
+            return $outi;
+        }
+
+    }
+
     
     my $bigh = $self->{bigh};
 
@@ -562,7 +607,9 @@ sub search_topic
 
 #    return wrap('','', @topics);
 
-    my $msg = join("\n", @outi);
+    my $msg = "help area=$topic_group\n\n";
+
+    $msg .= join("\n", @outi);
 
     if (scalar(@fullnames) == 1)
     {
@@ -584,6 +631,10 @@ sub search_topic
                 && exists($entry->{long_desc}))
             {
                 $msg .= $entry->{long_desc} ;
+
+                # make sure have trailing newline
+                $msg .= "\n"
+                    unless ($msg =~ m/\n$/);
             }
             $msg .= "\n";
 
@@ -771,7 +822,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 
 L<perl(1)>.
 
-Copyright (c) 2006 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2006, 2007 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

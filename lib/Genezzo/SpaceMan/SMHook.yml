@@ -1,4 +1,4 @@
-# havok version=7.12
+# havok version=7.17
 ABSTRACT:     
 AUTHOR:    Jeffrey I Cohen (jcohen@cpan.org)
 DML:    
@@ -7,12 +7,13 @@ DML:
       -    select * from sys_hook where xname='Genezzo::SpaceMan::SMHook'
 
     install:    
-      -    i sys_hook 10 Genezzo::Block::RDBlock push_post_hook Push_Hook require Genezzo::SpaceMan::SMHook block_push_hook SYSTEM 2006-07-06T07:35:35 1.23
-      -    i sys_hook 11 Genezzo::Block::RDBlock delete_post_hook Delete_Hook require Genezzo::SpaceMan::SMHook block_delete_hook SYSTEM 2006-07-06T07:35:35 1.23
-      -    i sys_hook 12 Genezzo::Block::RDBlock realstore_post_hook Store_Hook require Genezzo::SpaceMan::SMHook block_store_hook SYSTEM 2006-07-06T07:35:35 1.23
-      -    i sys_hook 13 Genezzo::Row::RSFile untie_block_pre_hook PreUntie_Hook require Genezzo::SpaceMan::SMHook block_pre_untie_hook SYSTEM 2006-07-06T07:35:35 1.23
-      -    i sys_hook 14 Genezzo::Row::RSFile untie_block_post_hook PostUntie_Hook require Genezzo::SpaceMan::SMHook block_post_untie_hook SYSTEM 2006-07-06T07:35:35 1.23
-      -    i sys_hook 15 Genezzo::Row::RSFile tie_block_post_hook PostTie_Hook require Genezzo::SpaceMan::SMHook block_post_tie_hook SYSTEM 2006-07-06T07:35:35 1.23
+      -    select add_sys_hook('pkg=Genezzo::Block::RDBlock', 'hook=push_post_hook', 'replace=Push_Hook', 'module=Genezzo::SpaceMan::SMHook', 'function=block_push_hook', 'version=1.27') from dual
+      -    select add_sys_hook('pkg=Genezzo::Block::RDBlock', 'hook=delete_post_hook', 'replace=Delete_Hook', 'module=Genezzo::SpaceMan::SMHook', 'function=block_delete_hook', 'version=1.27') from dual
+      -    select add_sys_hook('pkg=Genezzo::Block::RDBlock', 'hook=realstore_post_hook', 'replace=Store_Hook', 'module=Genezzo::SpaceMan::SMHook', 'function=block_store_hook', 'version=1.27') from dual
+      -    select add_sys_hook('pkg=Genezzo::Row::RSFile', 'hook=untie_block_pre_hook', 'replace=PreUntie_Hook', 'module=Genezzo::SpaceMan::SMHook', 'function=block_pre_untie_hook', 'version=1.27') from dual
+      -    select add_sys_hook('pkg=Genezzo::Row::RSFile', 'hook=untie_block_post_hook', 'replace=PostUntie_Hook', 'module=Genezzo::SpaceMan::SMHook', 'function=block_post_untie_hook', 'version=1.27') from dual
+      -    select add_sys_hook('pkg=Genezzo::Row::RSFile', 'hook=tie_block_post_hook', 'replace=PostTie_Hook', 'module=Genezzo::SpaceMan::SMHook', 'function=block_post_tie_hook', 'version=1.27') from dual
+      -    select add_sys_hook('pkg=Genezzo::SpaceMan::SMExtent', 'hook=smextent_usehooks', 'replace=SMX_Use_Hook', 'module=Genezzo::SpaceMan::SMHook', 'function=spaceman_smx_use_hook', 'version=1.27') from dual
 
 
 
@@ -22,5 +23,5 @@ PREREQ_HAVOK:
   Genezzo::Havok:    0.0
   Genezzo::Havok::SysHook:    0.0
 
-UPDATED:    2006-08-01T22:58:35
-VERSION:    1.23
+UPDATED:    2007-06-26T01:34:58
+VERSION:    1.27

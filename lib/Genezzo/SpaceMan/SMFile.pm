@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/SpaceMan/RCS/SMFile.pm,v 7.11 2006/10/19 09:13:07 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/SpaceMan/RCS/SMFile.pm,v 7.15 2007/06/26 08:21:53 claude Exp claude $
 #
-# copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
+# copyright (c) 2003-2007 Jeffrey I Cohen, all rights reserved, worldwide
 #
 #
 package Genezzo::SpaceMan::SMFile;  # assumes Some/Module.pm
@@ -22,7 +22,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 7.11 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.15 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
     @EXPORT      = ( ); # qw(&NumVal);
@@ -521,7 +521,12 @@ sub nextfreeblock
                     extentsize  => 2, # 2 blocks
                     pctincrease => 0, # make next extent 0% larger, i.e
                                       # the same size as previous
-                    all_info    => 0  # only return basic info
+                    all_info    => 0, # only return basic info
+
+                    neednewextent => 0, # force new extent creation
+
+                    mark_as_full => 0   # set current location to the end 
+                                        # of the new extent (see SMExtent)
                     );
 
     my %required = (
@@ -558,7 +563,7 @@ sub nextfreeblock
     my $tablename = $args{tablename};
     my $object_id = $args{object_id};
 
-    my ($currBlocknum, @currExtent );
+    my ($currBlocknum, @currExtent, $endNewExtent );
 
     my $spacelist = $self->UnPackSpaceList($tablename);
 #    greet "spacelist:", $spacelist;
@@ -610,12 +615,17 @@ sub nextfreeblock
     $extsize = $Genezzo::Util::MAXEXTENTSIZE
         if ($extsize > $Genezzo::Util::MAXEXTENTSIZE);
 
-    # XXX XXX XXX XXX: can just clear @currExtent to force new extent
+    # XXX XXX XXX: can just clear @currExtent to force new extent
     # allocation.  Maybe extend this to create multiple extents
     # simultaneously? Or never update the table entry in block zero,
     # which would treat each call to nextfreeblock as the first extent
     # creation (though this would break pctincrease, since no last
     # extent...)
+
+    if ($args{neednewextent} > 0)
+    {
+        @currExtent = ();
+    }
 
   L_bigloop:
     while (1)
@@ -731,6 +741,7 @@ sub nextfreeblock
             # new extent
             $currBlocknum  = $currExtent[0] = $free_ext->[0];
             $currExtent[1] = $free_ext->[1];
+            $endNewExtent  = $currBlocknum + $free_ext->[1] - 1;
 
             $gotnewextent = 1;
 
@@ -769,6 +780,15 @@ sub nextfreeblock
     $spacelist->[1] = $currBlocknum;
     $spacelist->[2] = join (':', @currExtent);
 
+    if ($gotnewextent && ($args{mark_as_full}))
+    {
+        # SMExtent: allocate a new extent, but mark it as full.
+        # SMExtent does its own space-management, so it doesn't care,
+        # and SMFile must not attempt to allocate blocks in
+        # SMExtent-managed extents.
+        $spacelist->[1] = $endNewExtent;
+    }
+
     # extend the used extent list if got a new one
     push @{$spacelist}, $spacelist->[2]
         if ($gotnewextent);
@@ -790,68 +810,22 @@ sub nextfreeblock
         # NOTE: for RSFile
         # return as hash vs simple array
 
-        my %nargs = (basic_array => \@outi,
-                     currblocknum => $currBlocknum,
-                     firstextent  => $firstextent);
-        $nargs{currextent} = \@currExtent
-            if ($gotnewextent);
-        # XXX XXX: replace with SMFreeBlock
-        my $foo = _make_all_info_for_free_block(%nargs);
-
-        %nargs = (
-                  blocknum        => $currBlocknum,
-                  firstextent     => $firstextent,
-                  current_extent  => $currExtent[0],
-                  extent_size     => $currExtent[1],
-                  extent_position => ($currBlocknum - $currExtent[0])
-                  );
+        my %nargs = (
+                     newextent       => $gotnewextent,
+                     blocknum        => $currBlocknum,
+                     firstextent     => $firstextent,
+                     current_extent  => $currExtent[0],
+                     extent_size     => $currExtent[1],
+                     extent_position => ($currBlocknum - $currExtent[0])
+                     );
 
         my $baz = 
             Genezzo::SpaceMan::SMFreeBlock->new(%nargs);
 
-        return $foo;
+        return $baz;
     }
 
     return @outi;
-}
-
-# XXX XXX: replace with SMFreeBlock
-# XXX: note - not a class or instance method
-sub _make_all_info_for_free_block
-{
-    my %required = (
-                    currblocknum => "no block number!"
-                    );
-
-    my %optional = (
-#                    basic_array => [],
-#                    currextent  => [],
-                    firstextent => 0
-                    );
-
-    my %args = (%optional,
-                @_);
-
-    return undef
-        unless (Validate(\%args, \%required));
-
-    my $h1 = {};
-    $h1->{currblocknum} = $args{currblocknum};
-    if (defined($args{basic_array}))
-    {
-        $h1->{basic_array} = $args{basic_array};
-    }
-    else
-    {
-        # basic array of only the blocknum in simplest case...
-        $h1->{basic_array} = [$args{currblocknum}];
-    }
-
-    $h1->{currextent} = ($args{currextent})
-        if (defined($args{currextent}));
-
-    $h1->{firstextent} = $args{firstextent};
-    return $h1;
 }
 
 sub get_current_block
@@ -960,8 +934,8 @@ sub nextblock
 
     # XXX XXX XXX XXX XXX XXX XXX 
     # stop if we reached the current block (insertion point)
-    return undef
-        if ($prevblock == $currBlocknum);
+#    return undef
+#        if ($prevblock == $currBlocknum);
 
     # shift off the current block info
     splice (@{$spacelist}, 0, 3);
@@ -1344,7 +1318,7 @@ Jeffrey I. Cohen, jcohen@genezzo.com
 
 perl(1).
 
-Copyright (c) 2003, 2004, 2005, 2006 Jeffrey I Cohen.  All rights reserved.
+Copyright (c) 2003-2007 Jeffrey I Cohen.  All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

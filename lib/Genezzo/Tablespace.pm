@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Tablespace.pm,v 7.12 2006/10/19 08:45:01 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Tablespace.pm,v 7.14 2007/06/26 08:19:09 claude Exp claude $
 #
 # copyright (c) 2003-2006 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -29,7 +29,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 7.12 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.14 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
 #    @EXPORT      = qw(&func1 &func2 &func4 &func5);
@@ -1377,6 +1377,9 @@ sub TS_get_fileno ()
     return 0
         unless (Validate(\%args, \%required));
 
+    
+#  "TS_get_fileno: ", Data::Dumper->Dump([%args]), "\n";
+
     greet "filearr", $self->{files}->{filearr};
     greet "used", $self->{files}->{used};
     greet "unused", $self->{files}->{unused};
@@ -1438,6 +1441,8 @@ sub TSFileInfo ()
                 fileno => 0,
                 @_);
 
+#    "TSFileInfo: ", Data::Dumper->Dump([%args]), "\n";
+
     return undef
         unless (Validate(\%args, \%required));
 
@@ -1457,6 +1462,12 @@ sub TSFileInfo ()
         
         &$GZERR(%earg)
             if (defined($GZERR));
+
+#        {
+#            local $Genezzo::Util::QUIETWHISPER = 0;
+#            local $Genezzo::Util::WHISPERDEPTH = 10;
+#            whoami("nfi");
+#        }
 
         return undef;
     }

@@ -42,6 +42,9 @@ our $GZERR = sub {
     return 
         unless (exists($args{msg}));
 
+    # to process spooling to multiple files
+    my $outfile_h = $args{outfile_list} || undef;
+
     my $warn = 0;
     if (exists($args{severity}))
     {
@@ -53,6 +56,15 @@ our $GZERR = sub {
         if ($args{severity} !~ m/info/i)
         {
             printf ("%s: ", $sev);
+
+            if (defined($outfile_h))
+            {
+                while (my ($kk, $vv) = each (%{$outfile_h}))
+                {
+                    printf $vv ("%s: ", $sev);
+                }
+            }
+
             $warn = 1;
         }
         else
@@ -70,6 +82,16 @@ our $GZERR = sub {
     print "\n" unless $args{msg}=~/\n$/;
 #    carp $args{msg}
 #      if (warnings::enabled() && $warn);
+
+    if (defined($outfile_h))
+    {
+        while (my ($kk, $vv) = each (%{$outfile_h}))
+        {
+            print $vv $args{msg};
+            # add a newline if necessary
+            print $vv "\n" unless $args{msg}=~/\n$/;
+        }
+    }
     
 };
 
