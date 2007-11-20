@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/SQLScalar.pm,v 1.22 2007/01/09 09:27:40 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/SQLScalar.pm,v 1.24 2007/11/18 08:16:56 claude Exp claude $
 #
 # copyright (c) 2005, 2006, 2007 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -89,7 +89,7 @@ our $VERSION;
 our $MAKEDEPS;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 1.22 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.24 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     my $pak1  = __PACKAGE__;
     $MAKEDEPS = {
@@ -107,7 +107,7 @@ BEGIN {
     # DML is an array, not a hash
 
     my $now = 
-    do { my @r = (q$Date: 2007/01/09 09:27:40 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
+    do { my @r = (q$Date: 2007/11/18 08:16:56 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
 
 
     my %tabdefs = ();
@@ -192,7 +192,7 @@ BEGIN {
     # dramatically slows the db init.
 
     my @ins1;
-    my $ccnt = 4; # skip util functions and syshelp
+    my $ccnt = 6; # skip util functions and syshelp
     for my $pfunc (@perl_funcs)
     {
         my %attr = (module => $pak1, 
@@ -243,7 +243,15 @@ BEGIN {
     }
 
     # add help for all functions
-    push @ins1, "select add_help(\'Genezzo::Havok::SQLScalar\') from dual";
+    push @ins1, "select add_help(\'$pak1\') from dual";
+
+    # register havok module
+
+    push @ins1, "select register_havok_package(" .
+        "\'modname=" . $pak1 .  "\', ".
+        "\'creationdate=" . $now .  "\', ".
+        "\'version=" . $VERSION .  "\'".
+        ") from dual";
 
     # if check returns 0 rows then proceed with install
     $MAKEDEPS->{'DML'} = [
@@ -253,6 +261,7 @@ BEGIN {
                             install => \@ins1
                             }
                           ];
+
 
 #    print Data::Dumper->Dump([$MAKEDEPS]);
 }
@@ -390,13 +399,13 @@ sub getpod
 #
 #Set the random seed.
 #
-#=head2  perl_join : perl_join(char_str1, char_str2)
+#=head2  perl_join : perl_join(join_exp, char_str1, char_str2...)
 #
 #The perl string join, renamed to avoid conflict with the SQL
 #relational join.  Concatenates the strings with the join_expr. 
 #Example:  perl_join(':', 'foo', 'bar', 'baz') returns 'foo:bar:baz'.
 #
-#=head2  concat : concat(char_str1, char_str2)
+#=head2  concat : concat(char_str1, char_str2...)
 #
 #Concatenate strings
 #
@@ -555,6 +564,13 @@ sub getpod
 #
 #Convert a "quoted url" string back.
 #
+#=head2 now : now()
+#
+#Return the current date in ISO 8601 format.
+#
+#=head2 sysdate : sysdate()
+#
+#Return the current date in ISO 8601 format.
 #
 EOF_HELP
 
@@ -1270,6 +1286,35 @@ sub sql_func_unquurl
     return $str;
 }
 
+sub HavokInit
+{
+#    whoami;
+    my %optional = (phase => "init");
+    my %required = (dict  => "no dictionary!",
+                    flag  => "no flag"
+                    );
+
+    my %args = (%optional,
+		@_);
+#		
+    my @stat;
+
+#    push @stat, 0, $args{flag};
+    push @stat, 1, $args{flag};
+#    whoami (%args);
+
+    return @stat
+        unless (Validate(\%args, \%required));
+
+    return @stat;
+}
+
+sub HavokCleanup
+{
+#    whoami;
+    return HavokInit(@_, phase => "cleanup");
+}
+
 
 END { }       # module clean-up code here (global destructor)
 
@@ -1430,7 +1475,7 @@ Example:  perl_join(':', 'foo', 'bar', 'baz') returns 'foo:bar:baz'.
 
 =over 4
 
-=item  concat(char_str1, char_str2)
+=item  concat(char_str1, char_str2...)
 
 Concatenate strings
 

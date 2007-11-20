@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/SpaceMan/RCS/SMExtent.pm,v 1.41 2007/06/26 08:25:05 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/SpaceMan/RCS/SMExtent.pm,v 1.42 2007/07/28 07:48:40 claude Exp claude $
 #
 # copyright (c) 2006, 2007 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -22,7 +22,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 1.41 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.42 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
     @EXPORT      = ( ); # qw(&NumVal);
@@ -82,6 +82,7 @@ our $GZERR = sub {
 
 
 our $SMX_SEV = 'IGNORE';
+#our $SMX_SEV = 'WARN';
 
 sub _init
 {
@@ -1074,6 +1075,10 @@ sub nextfreeblock
         
         &$GZERR(%earg)
             if (defined($GZERR));
+
+        # if we are using smextent and need a new extent from smfile,
+        # then mark it as full.
+        $freeblockargs{mark_as_full} = 1;
     }
     else
     {
@@ -1115,6 +1120,12 @@ sub nextfreeblock
         else
         {
             # need a new extent
+            #
+            # NOTE: Always mark the extent as full to prevent problems
+            # if revert back to SMFile space management.  If not
+            # marked full, SMFile will assume it is empty, which will
+            # cause problems when it bounces off full blocks in the
+            # extent.
             $freeblockargs{neednewextent} = 1;
             $freeblockargs{mark_as_full} = 1;
 
@@ -1562,8 +1573,6 @@ sub flush
     my $self = shift;
     return $self->{smf}->flush(@_);
 }
-
-
 
 END {
 

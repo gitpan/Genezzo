@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/SpaceMan/RCS/SMHook.pm,v 1.27 2007/06/26 08:19:40 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/SpaceMan/RCS/SMHook.pm,v 1.30 2007/11/20 07:43:07 claude Exp claude $
 #
 # copyright (c) 2006, 2007 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -19,7 +19,7 @@ our $VERSION;
 our $MAKEDEPS;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 1.27 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.30 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     my $pak1  = __PACKAGE__;
     $MAKEDEPS = {
@@ -40,7 +40,8 @@ BEGIN {
 
 #    my $now = Genezzo::Dict::time_iso8601()
     my $now = 
-    do { my @r = (q$Date: 2007/06/26 08:19:40 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
+    do { my @r = (q$Date: 2007/11/20 07:43:07 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
+
 
     my $dml =
         [
@@ -52,6 +53,35 @@ BEGIN {
          "select add_sys_hook(\'pkg=Genezzo::Row::RSFile\', \'hook=tie_block_post_hook\', \'replace=PostTie_Hook\', \'module=$pak1\', \'function=block_post_tie_hook\', \'version=$VERSION\') from dual",
          "select add_sys_hook(\'pkg=Genezzo::SpaceMan::SMExtent\', \'hook=smextent_usehooks\', \'replace=SMX_Use_Hook\', \'module=$pak1\', \'function=spaceman_smx_use_hook\', \'version=$VERSION\') from dual",
          ];
+
+    for my $pfunc ('spacefixup', 'extent_fixup')
+    {
+        my %attr = (module => $pak1, 
+                    function => "sql_func_" . $pfunc,
+                    creationdate => $now,
+                    argstyle => 'HASH',
+                    sqlname => $pfunc);
+
+        my @attr_list;
+        while ( my ($kk, $vv) = each (%attr))
+        {
+            push @attr_list, '\'' . $kk . '=' . $vv . '\'';
+        }
+
+        my $bigstr = "select add_user_function(" . join(", ", @attr_list) .
+            ") from dual";
+        push @{$dml}, $bigstr;
+
+    }
+
+    # NOTE: run extent fixup once, then remove it from the function table
+
+    my $bigstr = "select extent_fixup() from dual";
+    push @{$dml}, $bigstr;
+    $bigstr = "select drop_user_function(\'extent_fixup'\) from dual";
+    push @{$dml}, $bigstr;
+    $bigstr = "select spacefixup() from dual";
+    push @{$dml}, $bigstr;
 
 
     $MAKEDEPS->{'DML'} = [
@@ -1065,6 +1095,179 @@ sub _get_rsfile_smf_from_mailbox
 
 }
 
+# In block zero of the file, SMFile tracks the current block in the
+# current extent, but SMExtent always marks its extents as full, which
+# serves several purposes: 
+#  1.  Since SMExtent manages the contents of its own extents, SMFile
+#      shouldn't ever try to manage them.  If the extent is "full"
+#      SMFile will just get a new one.
+#  2.  If we fallback to SMFile space management from SMExtent,
+#      everything will work correctly.  We may waste some space
+#      because the extent could have free blocks, but SMFile cannot
+#      correctly manage non-sequential free blocks anyway.
+sub sql_func_extent_fixup
+{
+    my %args= @_;
+
+    my $dict = $args{dict};
+    my $dbh  = $args{dbh};
+    my $fn_args = $args{function_args};
+
+    if (1)
+    {
+        my $tsf   =  $dict->_get_table(tname => "_tsfiles");
+
+        return 0
+            unless  (defined($tsf));
+
+        return 0
+            unless (exists($dict->{tablespaces}->{SYSTEM}));
+
+        my $ts1 = $dict->{tablespaces}->{SYSTEM};
+
+        return 0
+            unless (exists($ts1->{tsref})
+                    && exists($ts1->{tsref}->{the_ts})
+                    && exists($ts1->{tsref}->{the_ts}->{bc}));
+
+        my $bc1 = $ts1->{tsref}->{the_ts}->{bc};
+
+        while (my ($kk, $vv) = each (%{$tsf}))
+        {
+            my $getcol  = $dict->_get_col_hash("_tsfiles");
+            my $fsize   = $vv->[$getcol->{filesize}];
+            my $blksize = $vv->[$getcol->{blocksize}];
+            my $filenum = $vv->[$getcol->{fileidx}];
+            my $numblks = $vv->[$getcol->{numblocks}];
+
+            my $fhts;     # gnz_home table space
+
+	    if(getUseRaw()){
+		$fhts = $dict->{gnz_home};
+	    }else{
+                $fhts = File::Spec->catdir($dict->{gnz_home}, "ts");
+	    }
+
+            my $fnam1   = $vv->[$getcol->{filename}];
+
+            my $fname   = 
+                File::Spec->file_name_is_absolute($fnam1) ?
+                $fnam1 : 
+                File::Spec->rel2abs(
+                                    File::Spec->catfile(
+                                                        $fhts,
+                                                        $fnam1
+                                                        ));
+
+#            print "\n$fname\n";
+
+            my $smf = Genezzo::SpaceMan::SMFile->new($fname,
+                                                     $fsize,
+                                                     $numblks,
+                                                     $bc1,
+                                                     $filenum);
+
+            if (defined($smf))
+            {
+#                $smf->dump();
+
+                # call SMFile method to iterate over all objects for
+                # the datafile and mark current extent as full.
+                $smf->_extent_fixup_mark_full();
+#                $smf->dump();
+            }
+
+        } # end while
+
+        return 1;
+    }
+    return 0;
+} # end extent_fixup
+
+sub _spacefixup_table
+{
+    my ($dict, $tname) = @_;
+
+    my $hashi  = $dict->DictTableGetTable (tname => $tname);
+
+    return 0
+        unless (defined($hashi));
+
+    my $tv = tied(%{$hashi});
+        
+    my $blockno = $tv->First_Blockno();
+
+    while ($blockno)
+    {
+        my %earg = ( msg => "$blockno",
+                    severity => $SMH_SEV);
+        
+        &$GZERR(%earg)
+            if (defined($GZERR));
+
+        # XXX XXX: cannot use joinrid because is redefined for RSTab
+#            my $blk_place = $tv->_joinrid($blockno, 0);
+        my $blk_place = join ($Genezzo::PushHash::hph::RIDSEP, 
+                              $blockno, 0);
+            
+        {
+            my ($blktie, $block_num, $bceref, $href_tie) = 
+                $tv->_get_block_and_bce($blk_place);
+
+            $blktie->_set_meta_row('FIX',['UP']);
+            $blktie->_delete_meta_row('FIX');
+        }
+
+        $blockno = $tv->Next_Blockno($blockno);
+    }
+    
+    return 1;
+}
+
+sub sql_func_spacefixup
+{
+    my %args= @_;
+
+    my $dict = $args{dict};
+    my $dbh  = $args{dbh};
+    my $fn_args = $args{function_args};
+
+    if (scalar(@{$fn_args}) > 0)
+    {
+        my $tname = $fn_args->[0];
+
+        return _spacefixup_table($dict, $tname);
+    }
+    else
+    {
+        # spacefixup all tables
+
+        my $sth;
+        $sth = $dbh->prepare(
+                    "select tname from _tab1 where object_type = \'TABLE\'");
+
+        return 0
+            unless ($sth->execute());
+
+        my @ggg = $sth->fetchrow_array();
+    
+        while (scalar(@ggg))
+        {
+             my $tname = ($ggg[0]);
+             my %earg = ( msg => "$tname",
+                          severity => $SMH_SEV);
+             
+             &$GZERR(%earg)
+                 if (defined($GZERR));
+
+             _spacefixup_table($dict, $tname);
+             @ggg = $sth->fetchrow_array();
+        }
+    }
+
+    return 1;
+
+} # end spacefixup
 
 
 1;  # don't forget to return a true value from the file

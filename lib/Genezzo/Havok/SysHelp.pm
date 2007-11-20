@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/SysHelp.pm,v 1.7 2007/01/11 10:00:29 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/SysHelp.pm,v 1.8 2007/07/16 07:36:52 claude Exp claude $
 #
 # copyright (c) 2007 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -18,7 +18,7 @@ our $VERSION;
 our $MAKEDEPS;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 1.7 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.8 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     my $pak1  = __PACKAGE__;
     $MAKEDEPS = {
@@ -40,11 +40,11 @@ BEGIN {
 
 #    my $now = Genezzo::Dict::time_iso8601()
     my $now = 
-    do { my @r = (q$Date: 2007/01/11 10:00:29 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
+    do { my @r = (q$Date: 2007/07/16 07:36:52 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
 
     my $dml =
         [
-         "i havok 3 $pak1 SYSTEM $now 0 $VERSION"
+#         "i havok 3 $pak1 SYSTEM $now 0 $VERSION"
          ];
 
     my %tabdefs = 
@@ -89,6 +89,14 @@ BEGIN {
 
     # add help for Utils
     push @ins1, "select add_help(\'Genezzo::Havok::Utils\') from dual";
+
+    # register havok module
+
+    push @ins1, "select register_havok_package(" .
+        "\'modname=" . $pak1 .  "\', ".
+        "\'creationdate=" . $now .  "\', ".
+        "\'version=" . $VERSION .  "\'".
+        ") from dual";
 
     # if check returns 0 rows then proceed with install
     $MAKEDEPS->{'DML'} = [

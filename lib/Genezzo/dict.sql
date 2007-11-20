@@ -1,8 +1,8 @@
-REM  $Header: /Users/claude/fuzz/lib/Genezzo/RCS/dict.sql,v 1.14 2007/07/04 07:40:40 claude Exp claude $
+REM  $Header: /Users/claude/fuzz/lib/Genezzo/RCS/dict.sql,v 1.15 2007/11/20 08:30:45 claude Exp claude $
 REM
-REM $Revision: 1.14 $
+REM $Revision: 1.15 $
 REM
-REM copyright (c) 2005, 2006 Jeffrey I Cohen, all rights reserved, worldwide
+REM copyright (c) 2005-2007 Jeffrey I Cohen, all rights reserved, worldwide
 REM
 REM dict.sql - additional dictionary objects
 REM 
@@ -38,7 +38,7 @@ select HavokUse('Genezzo::Havok::SQLScalar') from dual;
 select HavokUse('Genezzo::Havok::SQLCompare') from dual;
 
 REM load the space management hooks
-REM select HavokUse('Genezzo::SpaceMan::SMHook') from dual;
+select HavokUse('Genezzo::SpaceMan::SMHook') from dual;
 
 REM always commit changes!!
 commit ;

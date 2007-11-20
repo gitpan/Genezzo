@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSFile.pm,v 7.20 2007/02/16 09:49:01 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSFile.pm,v 7.21 2007/11/18 08:13:27 claude Exp claude $
 #
 # copyright (c) 2003-2007 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -480,6 +480,20 @@ sub _get_block_and_bce # override HPHRowBlk
             ($bc->{bceref}), 
             ($self->{reftiebufa}));
 }
+
+sub First_Blockno # override HPHRowBlk
+{
+    my $self = shift;
+
+    return $self->_First_Chunkno();
+} # end First_Blockno
+
+sub Next_Blockno # override HPHRowBlk
+{
+    my $self = shift;
+
+    return $self->_Next_Chunkno(@_);
+} # end Next_Blockno
 
 sub _get_a_chunk # override the hph method
 {

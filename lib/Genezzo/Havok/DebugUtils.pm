@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/DebugUtils.pm,v 1.6 2007/06/26 08:25:52 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/DebugUtils.pm,v 1.10 2007/11/20 08:21:19 claude Exp claude $
 #
 # copyright (c) 2006, 2007 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -23,7 +23,7 @@ our $VERSION;
 our $MAKEDEPS;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 1.6 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.10 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     my $pak1  = __PACKAGE__;
     $MAKEDEPS = {
@@ -43,7 +43,7 @@ BEGIN {
     # DML is an array, not a hash
 
     my $now = 
-    do { my @r = (q$Date: 2007/06/26 08:25:52 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
+    do { my @r = (q$Date: 2007/11/20 08:21:19 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
 
 
     my %tabdefs = ();
@@ -54,6 +54,8 @@ BEGIN {
                         metadump
                         blockdump
                         gnz_history
+                        spacewalk
+                        blockwalk
                         );
 
 
@@ -191,6 +193,15 @@ sub getpod
 #automatically reloaded for each session.  If gnz_history('autosave') is 
 #specified, the history is saved when you quit the interactive session.
 #
+#=head2  spacewalk : spacewalk(filenum,blocknum)
+#
+#Dump BlockInfo for all blocks in current extent, comparing actual 
+#usage with extent header stats.
+#
+#=head2  blockwalk : blockwalk(tablename)
+#
+#Dump block number for every block in the table.
+#
 #
 EOF_HELP
 
@@ -264,6 +275,8 @@ sub _block_func
     my $fn_args = $args{function_args};
 
     my $block_func = $args{block_func};
+    
+    my $spacewalk_args = exists($args{spacewalk}) ? $args{spacewalk} : undef;
 
     my @blocklist;
     
@@ -314,11 +327,16 @@ sub _block_func
                 print Data::Dumper->Dump([$bc1->_get_fn_hash()]), "\n";
 
                 my $blockno = $fn_args->[1];
-                
-                if (defined($blockno))
+
+                my $spacewalk_state;
+
+              L_defblockno:
+                while (defined($blockno))
                 {
-                    my $bceref = $bc1->ReadBlock(filenum  => $fileno,
-                                                 blocknum => $blockno);
+                    my $bceref;
+
+                    $bceref = $bc1->ReadBlock(filenum  => $fileno,
+                                              blocknum => $blockno);
 
                     if ($bceref)
                     {
@@ -339,7 +357,6 @@ sub _block_func
 
                         if ($block_func eq 'metadump')
                         {
-
                             my $metazero = $rowd->_fetchmeta(undef, 0);
 
                             print Data::Dumper->Dump([$metazero]), "\n";
@@ -363,18 +380,198 @@ sub _block_func
 
                             }
                         }
-                        else
+                        elsif ($block_func eq 'blockdump')
                         {
+
                             my $msg = $rowd->BlockInfoString();
 
                             # XXX XXX:
                             print $msg;
-                            
 
                         }
+                        elsif ($block_func eq 'spacewalk')
+                        {
+
+
+                            unless (defined($spacewalk_state))
+                            {
+                                $spacewalk_state = {};
+
+                                $spacewalk_state->{start} = 1;
+                                $spacewalk_state->{cnt}   = 0;
+                            }
+
+                            unless ($spacewalk_state->{start})
+                            {
+                                if ($spacewalk_state->{cnt} > 0)
+                                {
+                                    $spacewalk_state->{cnt} -= 1;
+
+                                    print
+                                        "\nblockno: $blockno\n",
+                                        $rowd->BlockInfoString(1);
+
+                                        my $blockinfo =
+                                            $rowd->BlockInfo();
+                                        
+                                        my $realused_pct = 
+                                            100 - $blockinfo->{realfreepct};
+
+                                        my $bvused_pct = 
+                                            $spacewalk_state->{bvpct}->[
+                                                $spacewalk_state->{bvpct_idx}
+                                                                        ];
+
+                                        print "diff: ", 
+                                        $realused_pct - $bvused_pct, "\n";
+                                    my $round_real = 0;
+                                    if ($realused_pct >= 90)
+                                    {
+                                        $round_real = 90;
+                                    }
+                                    elsif ($realused_pct >= 60)
+                                    {
+                                        $round_real = 60;
+                                    }
+                                    elsif ($realused_pct >= 30)
+                                    {
+                                        $round_real = 30;
+                                    }
+                                    print "rounded pct: ", $round_real, "\n";
+                                    print "rounded diff: ", $round_real - $bvused_pct, "\n";
+
+                                    $spacewalk_state->{bvpct_idx} += 1;
+
+                                    if ($spacewalk_state->{cnt} > 0)
+                                    {
+                                        $blockno++;
+                                        next L_defblockno;
+                                    }
+                                    else
+                                    {
+                                        $blockno = undef;
+                                        last L_defblockno;
+                                    }
+                                }
+                                else
+                                {
+                                    $blockno = undef;
+                                    last L_defblockno;
+                                }
+
+                            }
+
+                            my $metazero = $rowd->_fetchmeta(undef, 0);
+                            
+                            unless (defined($metazero))
+                            {
+                                $blockno = undef;
+                                last;
+                            }
+
+                            my @row = UnPackRow($metazero, $Genezzo::Util::UNPACK_TEMPL_ARR);
+                        
+                            unless (scalar(@row))
+                            {
+                                $blockno = undef;
+                                last;
+                            }
+
+                          L_allmeta:
+                            for my $col1 (@row)
+                            {
+                                my @foo = split(':', $col1);
+
+                                if (scalar(@foo) && ($foo[0] ne '#'))
+                                {
+                                    my $id  = $foo[0];
+                                    my $v1 = $rowd->_get_meta_row($id);
+                                
+                                    if ($id eq "XHA")
+                                    {
+                                        my @val = @{$v1};
+                                            
+                                        my $seghdr = shift @val;
+                                        my $extsiz = shift @val;
+                                        my $bvec   = shift @val;
+
+                                        $spacewalk_state->{cnt} = 
+                                            $extsiz - 1;
+
+                                        _meta_row_dump($id, $v1);
+
+                                        print
+                                            "\nblockno: $blockno\n",
+                                            $rowd->BlockInfoString(1);
+
+                                        my @pct =
+                                          Genezzo::SpaceMan::SMExtent->_xhdr_bv_to_pct(
+                                                                    $bvec, 
+                                                                    $extsiz);
+
+                                        $spacewalk_state->{bvpct} = [];
+                                        $spacewalk_state->{extent_stats} =
+                                            shift @pct;
+
+                                        push 
+                                            @{$spacewalk_state->{bvpct}}, 
+                                            @pct
+                                            ;
+
+                                        my $blockinfo =
+                                            $rowd->BlockInfo();
+                                        
+                                        my $realused_pct = 
+                                            100 - $blockinfo->{realfreepct};
+
+                                        my $bvused_pct = 
+                                            $spacewalk_state->{bvpct}->[0];
+
+                                        $spacewalk_state->{bvpct_idx} = 1;
+
+                                        print "diff: ", 
+                                        $realused_pct - $bvused_pct, "\n";
+                                    my $round_real = 0;
+                                    if ($realused_pct >= 90)
+                                    {
+                                        $round_real = 90;
+                                    }
+                                    elsif ($realused_pct >= 60)
+                                    {
+                                        $round_real = 60;
+                                    }
+                                    elsif ($realused_pct >= 30)
+                                    {
+                                        $round_real = 30;
+                                    }
+                                    print "rounded pct: ", $round_real, "\n";
+                                    print "rounded diff: ", $round_real - $bvused_pct, "\n";
+
+
+
+                                        $spacewalk_state->{start} = 0;
+                                        
+                                        $blockno++;
+
+                                        last L_allmeta;
+                                    }
+
+                                }
+
+                            } # end for my col
+
+                            # prevent endless loop
+                            $spacewalk_state->{start} = 0;
+                            next L_defblockno;
+
+
+                        } # end if spacewalk
 
                     } # end if bceref
-                }
+
+                    $blockno = undef;
+
+                } # end while blockno
 
             }
         }
@@ -403,6 +600,47 @@ sub sql_func_blockdump
     $args{block_func} = 'blockdump';
 
     return _block_func(%args);
+}
+# fileno, blockno
+sub sql_func_spacewalk
+{
+    my %args= @_;
+
+    $args{block_func} = 'spacewalk';
+
+    return _block_func(%args);
+}
+
+sub sql_func_blockwalk
+{
+    my %args= @_;
+
+    my $dict = $args{dict};
+    my $dbh  = $args{dbh};
+    my $fn_args = $args{function_args};
+
+    if (scalar(@{$fn_args}) > 0)
+    {
+        my $tname = $fn_args->[0];
+
+        my $hashi  = $dict->DictTableGetTable (tname => $tname);
+
+        return 0
+            unless (defined($hashi));
+
+        my $tv = tied(%{$hashi});
+        
+        my $blockno = $tv->First_Blockno();
+
+        while ($blockno)
+        {
+            print $blockno, "\n";
+            $blockno = $tv->Next_Blockno($blockno);
+        }
+
+    }
+
+    return 1;
 }
 
 
@@ -459,6 +697,10 @@ Special debugging utility functions.
 
 
 =item gnz_history
+
+=item spacewalk
+
+=item blockwalk
 
 =back
 

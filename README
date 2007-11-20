@@ -710,10 +710,14 @@ NEW FEATURES - dynamic system hooks
     help area=system_hooks add_sys_hook
   for more information.
 
+NEW FEATURES - self-managed extents
+
+  In version 0.72 the extent code keeps better track of block usage,
+  allowing the more efficient re-use of space from deleted rows.
 
 INCOMPATIBLE CHANGES
 
-  Version 0.71 dictionary and block format is incompatible with
+  Version 0.72 dictionary and block format is incompatible with
   previous releases.  No upgrade path is supported.
   Version 0.48 thru 0.50 are compatible.
 

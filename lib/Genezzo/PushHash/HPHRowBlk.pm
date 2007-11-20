@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/PushHash/RCS/HPHRowBlk.pm,v 7.1 2005/07/19 07:49:03 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/PushHash/RCS/HPHRowBlk.pm,v 7.2 2007/11/18 08:15:51 claude Exp claude $
 #
 # copyright (c) 2003,2004,2005 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -152,6 +152,74 @@ sub _get_block_and_bce
     return $chunk->_get_block_and_bce($sliceno);
 }
 
+sub First_Blockno
+{
+    my $chunkno = $_[0]->_First_Chunkno();
+
+    return undef unless (defined($chunkno));
+
+    my $chunk = $_[0]->_get_a_chunk($chunkno);
+
+    return undef
+        unless (defined($chunk));
+
+    my $blockno = $chunk->First_Blockno();
+
+    return undef unless (defined($blockno));
+
+    return $_[0]->_joinrid($chunkno, $blockno);
+} # end First_Blockno
+
+sub Next_Blockno
+{
+    my ($self, $prevkey) = @_;
+
+    return (undef)
+        unless (defined ($prevkey));
+
+    # need the chunkno for the rid, so use splitrid vs get_chunk_and_slice
+    my ($chunkno, $prevsliceno) = $self->_splitrid($prevkey);
+    return (undef)
+        unless (defined($chunkno));
+
+    while (defined($chunkno))
+    {
+        my $sliceno;
+        my $chunk  = $self->_get_a_chunk($chunkno);
+
+        unless (defined($chunk))
+        {
+            my %earg = (self => $self, msg => "No such key: $prevkey ");
+
+            &$GZERR(%earg)
+                if (defined($GZERR));
+
+            return undef;
+        }
+
+        my $blockno;
+
+        if (defined ($prevsliceno))
+        {
+            $blockno = $chunk->Next_Blockno($prevsliceno);
+        }
+        else
+        {
+            $blockno = $chunk->First_Blockno();
+
+            return undef unless (defined($blockno));
+        }
+
+        return $self->_joinrid($chunkno, $blockno)
+            if (defined($blockno));
+
+        $prevsliceno = ();        
+        $chunkno = $self->_Next_Chunkno($chunkno);
+    }
+
+    return undef;
+} # end Next_Blockno
+
 # an augmented fetch.  FETCH returns a scalar, 
 # but fetch2 can return an array
 sub _fetch2
@@ -266,6 +334,10 @@ current chunk.
 
 return an array of the tied block, the buffer cache element
 (see L<Genezzo::BufCa::BufCaElt>), and other useful information.
+
+=item First_Blockno/Next_Blockno
+
+iterate over all the blocks in the HPHRowBlk push hash.
 
 =back
 

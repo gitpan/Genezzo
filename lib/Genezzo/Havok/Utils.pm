@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/Utils.pm,v 1.9 2007/06/26 08:25:35 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/Utils.pm,v 1.10 2007/07/16 07:35:22 claude Exp claude $
 #
 # copyright (c) 2006, 2007 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -24,7 +24,7 @@ our $VERSION;
 our $MAKEDEPS;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 1.9 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 1.10 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     my $pak1  = __PACKAGE__;
     $MAKEDEPS = {
@@ -42,7 +42,7 @@ BEGIN {
     # DML is an array, not a hash
 
     my $now = 
-    do { my @r = (q$Date: 2007/06/26 08:25:35 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
+    do { my @r = (q$Date: 2007/07/16 07:35:22 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
 
 
     my %tabdefs = ();
@@ -51,6 +51,8 @@ BEGIN {
     my @perl_funcs = qw(
                         alter_ts
                         add_user_function
+                        drop_user_function
+                        register_havok_package
                         );
 
 
@@ -157,6 +159,10 @@ sub getpod
 #
 #to list the valid parameters
 #
+#=head2  drop_user_function : drop_user_function(function_name)
+#
+#Undefine an existing function.
+#
 #
 #=head2  alter_ts : alter_ts(tsname=...,increase_by=..., ...)
 #
@@ -200,6 +206,28 @@ sub getpod
 #
 #The tsname argument may be specified multiple times -- the increase_by
 #and filesize will be applied to each tablespace.
+#
+#=head2  register_havok_package : register_havok_package(modname=...,version=...)
+#
+#Havok modules are loaded via the HavokUse function.  The
+#register_havok_package function is designed to simplify the update of
+#the havok table in order to track the particular version of a
+#package.  Currently, there is no requirement that all Havok modules
+#register in the havok table, but future versions of Genezzo may
+#require this registration, or enforce it automatically as part of the
+#HavokUse function.  Note that all registered havok packages must have
+#a valid HavokInit function.
+#
+#  select register_havok_package(
+#             'modname=Genezzo::Contrib::MyModule',
+#             'version=1.1') from dual;
+#
+#Use the help command:
+#
+#  select register_havok_package('help') from dual;
+#
+#to list the valid parameters
+#
 #
 EOF_HELP
 
@@ -386,6 +414,49 @@ EOF_EXAMPLE
 
 } 
 
+sub sql_func_drop_user_function
+{
+    my %args= @_;
+
+    my $dict = $args{dict};
+    my $dbh  = $args{dbh};
+    my $fn_args = $args{function_args};
+    
+#    print Data::Dumper->Dump($fn_args);
+
+    for my $argi (@{$fn_args})
+    {
+        # handle case of a function in a REQUIREd module, or an inline
+        # function definition
+        my $bigstr = 
+            "delete from user_functions" . 
+            " where (xtype = \'require\' and ".
+            "args = lc(\'sql_func_" . $argi . "\'))" .
+            " or (xtype = \'function\' and ".
+            "xname = lc(\'" . $argi . "\'))";
+
+        my $sth =
+            $dbh->prepare($bigstr);
+    
+        return 0
+            unless ($sth);
+
+        # delete the function definition from the user_function table
+        return 0
+            unless ($sth->execute());
+
+        no strict 'refs';
+        no warnings 'redefine';
+        # remove the function from the namespace
+        my $uds = "undef &Genezzo::GenDBI::$argi";
+        eval " $uds ";
+        $uds = "undef &Genezzo::GenDBI::sql_func_" . $argi;
+        eval " $uds ";
+    }
+    return 1;
+} # end drop user function
+
+
 sub sql_func_alter_ts
 {
     my %args= @_;
@@ -555,6 +626,146 @@ sub sql_func_alter_ts
     return 1;
 }
 
+sub sql_func_register_havok_package
+{
+    my %args= @_;
+
+    my $dict = $args{dict};
+    my $dbh  = $args{dbh};
+    my $fn_args = $args{function_args};
+    
+#    print Data::Dumper->Dump($fn_args);
+
+    my $now = Genezzo::Dict::time_iso8601();
+
+    # list the optional values
+    my %nargs = (
+                 creationdate => $now,
+                 owner => "SYSTEM",
+                 flag => 0,
+                 version => 0
+                 );
+
+    my $do_help = 0;
+
+    $do_help = 1 unless (scalar(@{$fn_args}));
+    
+    my $valid = 'hid|modname|owner|creationdate|flag|version';
+
+    $valid .= '|module'; # additional synonyms
+
+    for my $argi (@{$fn_args})
+    {
+        # separate key=val pairs into hash args
+
+        my @foo;
+        @foo = ($argi =~ m/^(\s*\w+\s*\=\s*)(.*)(\s*)$/)
+            if ($argi =~ m/\w+\s*\=/);
+
+
+        if ($argi =~ m/^\s*($valid)\s*\=/i)
+        {
+            my $nargtype = $foo[0];
+            # remove the spaces and equals ("=");
+            $nargtype =~ s/\s//g;
+            $nargtype =~ s/\=//g;
+
+            $nargtype = 'modname' if ($nargtype =~ m/^module/i);
+
+            $nargs{lc($nargtype)} = $foo[1];
+        }
+        else
+        {
+            if (scalar(@{$fn_args}) == 1)
+            {
+                if ($argi =~ m/^help$/i)
+                {
+                    $do_help = 1;
+                    last;
+                }
+            } # end if 1 arg
+        }
+    } # end for
+
+    my $outi = "";
+
+    unless (exists($nargs{modname}) && length($nargs{modname}))
+    {
+        if (!$do_help)
+        {
+            $do_help = 1;
+#            my %earg = (#self => $self,
+#                        severity => 'warn',
+#                        msg => "missing argument: modname\n");
+#
+#            &$GZERR(%earg)
+#                if (defined($GZERR));
+
+            $outi .= "missing argument: modname\n";
+        }
+    }
+
+    if ($do_help)
+    {
+        $outi .= "Valid arguments are:\n    ";
+
+        $outi .= join(" ",split(/\|/, $valid)) . "\n";
+
+        my $bigexample;
+        ($bigexample = <<EOF_EXAMPLE) =~ s/^\#//gm;
+#
+#To register a havok package based upon 
+#Genezzo::Contrib::MyModule just use:
+#  select register_havok_package(
+#             'module=Genezzo::Contrib::MyModule') from dual;
+EOF_EXAMPLE
+
+        $outi .= $bigexample;
+        
+        return $outi;
+    }
+
+    unless (exists($nargs{hid}))
+    {
+        my $hashi  = $dict->DictTableGetTable (tname => "havok") ;
+        my $tv = tied(%{$hashi});
+
+        $nargs{hid} = $dict->DictGetNextVal(tname => "havok",
+                                            col   => "hid",
+                                            tieval => $tv);
+
+    }
+
+    # list the basic column names
+    my @cnames = qw(hid modname owner creationdate flag version);
+
+    my $bigstr = "insert into havok(";
+
+    $bigstr .= join(', ', @cnames);
+    # add the registration date column, which is _now_
+    $bigstr .= ", regdate) values (";
+    for my $col (@cnames)
+    {
+        $bigstr .= "\'" . $nargs{$col} . "\', ";
+    }
+    $bigstr .= "\'" . $now . "\')";
+
+    return 0 unless(defined($bigstr));
+
+    my $sth =
+        $dbh->prepare($bigstr);
+    
+    return 0
+        unless ($sth);
+
+    # insert the function definition in the user_function table
+    return 0
+        unless ($sth->execute());
+
+    return 1;
+} 
+
+
 END { }       # module clean-up code here (global destructor)
 
 ## YOUR CODE GOES HERE
@@ -608,6 +819,9 @@ Use the help command:
 
 to list the valid parameters
 
+=item  drop_user_function 
+
+Undefine an existing function.
 
 =item  alter_ts
 
@@ -655,6 +869,28 @@ The default settings are equivalent to:
 
 The tsname argument may be specified multiple times -- the increase_by
 and filesize will be applied to each tablespace.
+
+=item  register_havok_package 
+
+Havok modules are loaded via the HavokUse function.  The
+register_havok_package function is designed to simplify the update of
+the havok table in order to track the particular version of a
+package.  Currently, there is no requirement that all Havok modules
+register in the havok table, but future versions of Genezzo may
+require this registration, or enforce it automatically as part of the
+HavokUse function.  Note that all registered havok packages must have
+a valid HavokInit function.
+
+  select register_havok_package(
+             'modname=Genezzo::Contrib::MyModule',
+             'version=1.1') from dual;
+
+Use the help command:
+
+  select register_havok_package('help') from dual;
+
+to list the valid parameters
+
 
 =back
 

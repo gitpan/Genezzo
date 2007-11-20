@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Block/RCS/RDBlock.pm,v 7.9 2007/02/03 09:44:44 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Block/RCS/RDBlock.pm,v 7.10 2007/11/18 08:11:09 claude Exp claude $
 #
 # copyright (c) 2003-2007 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -161,11 +161,48 @@ sub _init
 }
 
 # used by Genezzo::Havok::DebugUtils::blockdump()
+sub BlockInfo
+{
+    my $self = shift;
+    my $args = shift;
+
+    my $outi = {};
+
+    $outi->{blocktype} = $self->{blocktype};
+    $outi->{blocktypestr} =
+        ($self->{blocktype} == 0 ) ? "(Empty)" : 
+        (($self->{blocktype} == 1 ) ? "(Append)" : 
+         (($self->{blocktype} == 2 ) ? "(Random)" : "(Unknown!)"));
+
+    $outi->{blocksize} = $self->{blocksize};
+    # minus hdr/ftr
+    $outi->{adjblocksize} = $self->{adjblocksize};
+    $outi->{freespace} = $self->{freespace};
+
+    $outi->{realfreepct} = ($self->{freespace}*100)/$self->{adjblocksize};
+
+    # real used is adjblocksize - freespace
+    # real pct used is 100 - real free pct
+
+    $outi->{numelts}    = $self->{numelts};
+    $outi->{can_insert} = $self->{can_insert};
+    $outi->{compacted}  = $self->{compacted};
+    $outi->{absfree}    = $self->{absfree};
+    $outi->{pctfree}    = $self->{absfree}*100/$self->{adjblocksize};
+    $outi->{absused}    = $self->{absused};
+    $outi->{pctused}    = $self->{absused}*100/$self->{adjblocksize};
+
+    return $outi
+}
+
+# used by Genezzo::Havok::DebugUtils::blockdump()
 sub BlockInfoString
 {
     my $self = shift;
+    my $args = shift;
 
     my $outi = "";
+    my $realfreepct;
 
     $outi .= "blocktype = " . $self->{blocktype} . " ";
     $outi .= ($self->{blocktype} == 0 ) ? "(Empty)" : 
@@ -175,9 +212,15 @@ sub BlockInfoString
 
     $outi .= "blocksize = " . $self->{blocksize} . "\n";
     $outi .= "minus hdr/ftr = " . $self->{adjblocksize} . "\n";
-    $outi .= "freespace = " . $self->{freespace} . "\n";
-    $outi .= "used      = " . ($self->{adjblocksize} - $self->{freespace})
-        . "\n";
+    $outi .= "freespace = " . $self->{freespace};
+
+    $realfreepct = sprintf("%.2f", ($self->{freespace}*100)/$self->{adjblocksize});
+
+    $outi .= " (" . $realfreepct . "%)\n";
+    
+    $outi .= "used      = " . ($self->{adjblocksize} - $self->{freespace});
+    $outi .= " (" . sprintf("%.2f", (100.0 - $realfreepct)) . "%)\n";
+
     $outi .= "numelts   = " . $self->{numelts} . "\n";
     $outi .= "can_insert = " . $self->{can_insert} . "\n";
     $outi .= "compacted = " . $self->{compacted} . "\n";
@@ -185,6 +228,9 @@ sub BlockInfoString
     $outi .= "pctfree   = " . $self->{absfree}*100/$self->{adjblocksize} . "\%\n";
     $outi .= "absused   = " . $self->{absused} . "\n";
     $outi .= "pctused   = " . $self->{absused}*100/$self->{adjblocksize} . "\%\n";
+
+    return $outi
+        if ($args);
 
     my $lastelt = $self->{numelts};
     $lastelt--;
@@ -508,7 +554,33 @@ sub _set_meta_row
         unless (defined($stat));
 
     return $value;
-}
+} # end _set_meta_row
+
+# delete a meta data row by id (as defined in meta zero)
+sub _delete_meta_row
+{
+    my ($self, $id) = @_;
+    my $value;
+    
+    my $place = $self->_fetchmeta($id);
+
+    return undef
+        unless (defined($place));
+
+    # get the value
+    $value = $self->_get_meta_row($id);
+
+    # delete the meta row
+    my $stat = $self->DELETE($place);
+
+    # delete from meta zero
+    my $mplace = $self->_delete_meta($id);
+
+    return undef
+        unless (defined($stat));
+
+    return $value;
+} # end delete_meta_row
 
 # treat row zero as metadata row, an array of scalars identified by a
 # unique id.  If the id does not exist, it is added.
@@ -650,6 +722,70 @@ sub _fetchmeta
     }
     return undef;
 } # end _fetchmeta
+
+# remove the metadata row reference in row zero by id. 
+# Note: called by delete_meta_row, which removes the actual row and
+# calls this function to remove the reference
+sub _delete_meta
+{
+    my ($self, $id) = @_;
+
+    my $place = 0;
+
+    my $refrowdir = $self->{rowdir};
+
+    my $numelts =  $self->{numelts};
+
+#  Carp::croak ("No such row")
+    return (undef)
+        unless ($place < $numelts);
+
+    my ($rowstat, $rowposn, $rowlen) = @{ $refrowdir->[$place] };
+
+    return undef
+        if (_isnull($rowstat));
+
+    my $fetched = $self->_realfetch ($rowposn, $rowlen );
+
+#    greet $fetched;
+
+    return undef
+        unless (defined($fetched));
+
+    # id was defined, so current row is row zero -- unpack it and find
+    # the row associated with the id.
+
+    my @row = UnPackRow($fetched, $Genezzo::Util::UNPACK_TEMPL_ARR);
+
+#    greet @row;
+
+    my $regex = '^' . $id . ':(.*)';
+    my $oldvalue;
+
+    # XXX XXX: better to do a binary search of sorted array.
+    for my $i (0..(scalar(@row)-1))
+    {
+        my $col = $row[$i];
+        my @outi;
+        if (@outi = ($col =~ m/$regex/))
+        {
+            $oldvalue = $outi[0];
+
+            # remove it
+            splice(@row, $i, 1);
+
+            last;
+        }
+    }
+
+    my $stat = $self->_realstore($place, PackRow(\@row));
+
+#    greet $stat;
+    return undef
+        unless (defined($stat));
+
+    return $oldvalue;
+} # end _delete_meta
 
 # return rowstat
 sub _fetch2

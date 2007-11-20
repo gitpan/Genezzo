@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Havok.pm,v 7.17 2007/02/23 10:00:32 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/Havok.pm,v 7.19 2007/11/20 07:47:07 claude Exp claude $
 #
 # copyright (c) 2003-2007 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -19,7 +19,7 @@ our $VERSION;
 our $MAKEDEPS;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 7.17 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.19 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     my $pak1  = __PACKAGE__;
     $MAKEDEPS = {
@@ -41,7 +41,7 @@ BEGIN {
 
 #    my $now = Genezzo::Dict::time_iso8601()
     my $now = 
-    do { my @r = (q$Date: 2007/02/23 10:00:32 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
+    do { my @r = (q$Date: 2007/11/20 07:47:07 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
 
     my $dml =
         [
@@ -54,7 +54,7 @@ BEGIN {
     # module, it should list that module in PREREQ_HAVOK
     my %tabdefs = 
         ('havok' =>  {
-            create_table => 'hid=n modname=c owner=c creationdate=c flag=c version=c',
+            create_table => 'hid=n modname=c owner=c creationdate=c flag=c version=c regdate=c',
             dml => $dml
             }
          );
@@ -78,6 +78,12 @@ our $GZERR = sub {
 
     return 
         unless (exists($args{msg}));
+
+    if (exists($args{severity}))
+    {
+        my $sev = uc($args{severity});
+        return if ($sev eq 'IGNORE');
+    }
 
     if (exists($args{self}))
     {
@@ -207,6 +213,7 @@ sub HavokUse
     {
         while (my ($kk, $vv) = each (%{$tdefs}))
         {
+            # do nothing if table already exists...
             next if ($dict->DictTableExists(tname => $kk,
                                             silent_notexists => 1));
 
@@ -566,10 +573,10 @@ sub MakeYML
 #    Genezzo::GenDBI:    0.0
 #
 #tabledefs:
-#    havok:    hid=n modname=c owner=c creationdate=c flag=c version=c
+#    havok:    hid=n modname=c owner=c creationdate=c flag=c version=c regdate=c
 #
 #dml:
-#    -         i havok 1 Genezzo::Havok SYSTEM TODAY 0 HAVOK_VERSION
+#    -         i havok 1 Genezzo::Havok SYSTEM TODAY 0 HAVOK_VERSION 
 #
 #license: gpl
 #abstract: 
@@ -800,7 +807,8 @@ create table havok (
     owner        char,
     creationdate char, 
     flag         char,
-    version      char
+    version      char,
+    regdate      char
 );
 
 
@@ -812,11 +820,13 @@ create table havok (
 
 =item  owner - module owner
 
-=item  creationdate - date of row creation
+=item  creationdate - date of module creation
 
 =item  flag - (user-defined)
 
 =item  version - module version information
+
+=item  regdate - registration date (date of row creation)
 
 =back
 

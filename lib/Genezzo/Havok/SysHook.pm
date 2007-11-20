@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/SysHook.pm,v 7.12 2007/02/22 09:01:41 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Havok/RCS/SysHook.pm,v 7.14 2007/11/20 07:41:42 claude Exp claude $
 #
 # copyright (c) 2005-2007 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -25,7 +25,7 @@ our %ReqObjMethod;    # Object-Oriented Meth
 our $MAKEDEPS;
 
 BEGIN {
-    $VERSION = do { my @r = (q$Revision: 7.12 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.14 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     $Got_Hooks = 0;
 
@@ -47,13 +47,11 @@ BEGIN {
     # DML is an array, not a hash
 
     my $now = 
-    do { my @r = (q$Date: 2007/02/22 09:01:41 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
-
-    # add_havok_pkg(modname=$pak1)
+    do { my @r = (q$Date: 2007/11/20 07:41:42 $ =~ m|Date:(\s+)(\d+)/(\d+)/(\d+)(\s+)(\d+):(\d+):(\d+)|); sprintf ("%04d-%02d-%02dT%02d:%02d:%02d", $r[1],$r[2],$r[3],$r[5],$r[6],$r[7]); };
 
     my $dml =
         [
-         "i havok 4 $pak1 SYSTEM $now 0 $VERSION"
+#         "i havok 4 $pak1 SYSTEM $now 0 $VERSION"
          ];
 
     my %tabdefs = 
@@ -93,6 +91,14 @@ BEGIN {
 
     # add help for all functions
     push @ins1, "select add_help(\'$pak1\') from dual";
+
+    # register havok module
+
+    push @ins1, "select register_havok_package(" .
+        "\'modname=" . $pak1 .  "\', ".
+        "\'creationdate=" . $now .  "\', ".
+        "\'version=" . $VERSION .  "\'".
+        ") from dual";
 
     # XXX XXX: NOTE: check is for install, which is after create_table/dml
 
@@ -496,6 +502,16 @@ sub LoadSysHook
             return 0;
         }
 
+        # check if package has GZERR function, and redefine it to use
+        # our version (since our version might get redefined to point
+        # to parent routine).
+        
+        my $gz_err_var = $xname . "::GZERR";
+        my $use_gzerr;
+        
+        my $s1 = "\$use_gzerr = defined(\$$gz_err_var);";
+        eval "$s1";
+        greet $s1, $use_gzerr;
 
         # XXX XXX: check for existance of "args" function...
 

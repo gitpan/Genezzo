@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSBlock.pm,v 7.2 2007/02/03 10:02:47 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/Row/RCS/RSBlock.pm,v 7.3 2007/11/18 08:14:20 claude Exp claude $
 #
 # copyright (c) 2003-2007 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -101,6 +101,11 @@ sub _set_meta_row {
     return ($self->{tie_rdblock}->_set_meta_row(@_));
 }
 
+sub _delete_meta_row {
+    my $self = shift;
+    return ($self->{tie_rdblock}->_delete_meta_row(@_));
+}
+
 sub _update_meta_zero {
     my $self = shift;
     return ($self->{tie_rdblock}->_update_meta_zero(@_));
@@ -114,6 +119,11 @@ sub _fetchmeta {
 sub BlockInfoString {
     my $self = shift;
     return ($self->{tie_rdblock}->BlockInfoString(@_));
+}
+
+sub BlockInfo {
+    my $self = shift;
+    return ($self->{tie_rdblock}->BlockInfo(@_));
 }
 
 # standard hash methods follow

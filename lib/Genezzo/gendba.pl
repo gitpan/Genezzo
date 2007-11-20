@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/gendba.pl,v 7.11 2007/01/23 08:51:46 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/RCS/gendba.pl,v 7.12 2007/11/20 07:46:09 claude Exp claude $
 #
 # copyright (c) 2003-2007 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -271,6 +271,9 @@ our $GZERR = sub {
         my $sev = uc($args{severity});
         $sev = 'WARNING'
             if ($sev =~ m/warn/i);
+
+        return 
+            if ($sev =~ m/ignore/i);
 
         # don't print 'INFO' prefix
         if ($args{severity} !~ m/info/i)

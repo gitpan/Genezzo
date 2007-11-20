@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header: /Users/claude/fuzz/lib/Genezzo/SpaceMan/RCS/SMFile.pm,v 7.15 2007/06/26 08:21:53 claude Exp claude $
+# $Header: /Users/claude/fuzz/lib/Genezzo/SpaceMan/RCS/SMFile.pm,v 7.16 2007/07/28 07:45:29 claude Exp claude $
 #
 # copyright (c) 2003-2007 Jeffrey I Cohen, all rights reserved, worldwide
 #
@@ -22,7 +22,7 @@ BEGIN {
     # set the version for version checking
 #    $VERSION     = 1.00;
     # if using RCS/CVS, this may be preferred
-    $VERSION = do { my @r = (q$Revision: 7.15 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    $VERSION = do { my @r = (q$Revision: 7.16 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
 
     @ISA         = qw(Exporter);
     @EXPORT      = ( ); # qw(&NumVal);
@@ -615,7 +615,7 @@ sub nextfreeblock
     $extsize = $Genezzo::Util::MAXEXTENTSIZE
         if ($extsize > $Genezzo::Util::MAXEXTENTSIZE);
 
-    # XXX XXX XXX: can just clear @currExtent to force new extent
+    # XXX XXX XXX XXX: can just clear @currExtent to force new extent
     # allocation.  Maybe extend this to create multiple extents
     # simultaneously? Or never update the table entry in block zero,
     # which would treat each call to nextfreeblock as the first extent
@@ -1208,6 +1208,70 @@ sub dump
         print join(" ",@outarr), "\n";
     }
 }
+
+# if switching from SMFile to SMExtent, mark all current extents for
+# all tables as full.  This fixup prevents problems with SMFile if we
+# switch back.
+sub _extent_fixup_mark_full
+{
+    my $self = shift;
+
+#    whoami;
+
+    my $bc = $self->{bc};
+    unless ($self->_tiefh($bc, 0))
+    {
+        whisper "bad fh tie";
+        return (0);
+    }
+    my $fileheader = $bc->{fileheader};
+#    greet $bc;
+
+    my $reftb = $fileheader->{RefTie};
+
+    my @keylist = keys (%{$reftb});
+
+    for my $kk (@keylist)
+    {
+        my $vv = $reftb->{$kk};
+
+        my @outarr = UnPackRow($vv);
+#        greet $kk, @outarr;
+        my $rtyp = $outarr[0];
+
+        unless ($rtyp =~ m/TABLE/)
+        {
+            @outarr = ();
+            next;
+        }
+        
+        # 0 - object type
+        # 1 - object name
+        # 2 - current blockno
+        # 3 - start of current extent, extent size
+
+        my $currblockno = $outarr[2];
+
+        my @foo = split(':', $outarr[3]);
+
+        my $endextent = $foo[0] + $foo[1] - 1;
+
+        if ($endextent != $currblockno)
+        {
+            $outarr[2] = $endextent;
+
+            $reftb->{$kk} = PackRow(\@outarr);
+        }
+
+        @outarr = ();
+    }
+
+    return 0
+        unless ($self->flush());
+
+    return 1;
+}
+
 
 
 END {
